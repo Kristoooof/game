@@ -1,0 +1,5 @@
+dist
+graphify-out
+.claude
+package-lock.json
+*.md

@@ -12,7 +12,9 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - **Platform:** asztali + mobil/érintés
 - **Közzététel:** GitHub Pages (GitHub Actions build)
 
-Nyitott kérdések (később döntünk): játékidő gyorsítás/szünet, pályagenerálás seed-del vagy kézi térkép, hangok/zene.
+- **Játékidő:** szünet és gyorsítás (1×/2×/4×)
+- **Térkép:** procedurális generálás seed-del, mellette kézzel készített térkép(ek) is
+- **Hang:** hangeffektek és zene
 
 ## Architektúra
 
@@ -27,13 +29,14 @@ Nyitott kérdések (később döntünk): játékidő gyorsítás/szünet, pálya
 ### 0. Alapok
 - [x] Skillek telepítése (caveman, ponytail, graphify, rtk)
 - [x] Terv elkészítése
-- [ ] Vite + TS + PixiJS projekt, Vitest, ESLint/Prettier
-- [ ] GitHub Actions: build + teszt + GitHub Pages deploy
-- [ ] Üres izometrikus vászon megjelenik az élő oldalon
+- [x] Vite + TS + PixiJS projekt, Vitest, ESLint/Prettier
+- [x] GitHub Actions: build + teszt + GitHub Pages deploy
+- [x] Üres izometrikus vászon (élő oldal: main-re merge + Pages bekapcsolása után)
 
 ### 1. Térkép és kamera
 - [ ] Izometrikus csempe-rács (víz, part, föld, hegy, erdő)
 - [ ] Procedurális szigetgenerálás seed-del (több sziget egy tengeren)
+- [ ] Kézzel készített térkép betöltése
 - [ ] Kamera: húzás, zoom (egér + érintés, pinch)
 - [ ] Csempe kijelölés egérrel / érintéssel
 
@@ -46,7 +49,7 @@ Nyitott kérdések (később döntünk): játékidő gyorsítás/szünet, pálya
 - [ ] Kikötő/raktár hatósugár – csak ezen belül lehet építeni
 
 ### 3. Gazdaság és termelési láncok
-- [ ] Szimulációs tick, játékidő
+- [ ] Szimulációs tick, játékidő, szünet és gyorsítás
 - [ ] Áruk és raktárkészlet szigetenként
 - [ ] Termelő épületek (favágó, halász, birkafarm → szövöde, stb.)
 - [ ] Szállítók: piaci/raktári kocsik útkereséssel (A*) az utakon

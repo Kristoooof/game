@@ -1,0 +1,158 @@
+{
+  ".claude/settings.json": {
+    "mtime": 1792090503.7892916,
+    "seen": 1792090953.4236755,
+    "ast_hash": "3b541b9935fcf0831355da956f897645",
+    "semantic_hash": ""
+  },
+  "eslint.config.js": {
+    "mtime": 1792090917.5759475,
+    "seen": 1792090953.4236841,
+    "ast_hash": "f577ed7ce6e70d7d845cf33645666157",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1792090894.1381297,
+    "seen": 1792090953.4236877,
+    "ast_hash": "58619360911ea101d82f911d5398a720",
+    "semantic_hash": ""
+  },
+  "src/main.ts": {
+    "mtime": 1792090917.5683942,
+    "seen": 1792090953.4236898,
+    "ast_hash": "8084990af60c0411413266c83bce9c70",
+    "semantic_hash": ""
+  },
+  "src/render/iso.test.ts": {
+    "mtime": 1792090917.5660622,
+    "seen": 1792090953.4236917,
+    "ast_hash": "0139b691604df9f60f078edbd05f3a4d",
+    "semantic_hash": ""
+  },
+  "src/render/iso.ts": {
+    "mtime": 1792090917.563717,
+    "seen": 1792090953.4236934,
+    "ast_hash": "91e265b1ac33604eb619746a4510d9ab",
+    "semantic_hash": ""
+  },
+  "tsconfig.json": {
+    "mtime": 1792090917.5729818,
+    "seen": 1792090953.4236953,
+    "ast_hash": "6eb517e4be7918229ac73d535bc8579a",
+    "semantic_hash": ""
+  },
+  "vite.config.ts": {
+    "mtime": 1792090917.5705187,
+    "seen": 1792090953.4236972,
+    "ast_hash": "9d66dc6604a0ba0e5aa29d6b13b06d8c",
+    "semantic_hash": ""
+  },
+  ".claude/CLAUDE.md": {
+    "mtime": 1792090503.7884362,
+    "seen": 1792090953.423699,
+    "ast_hash": "9b31786b637be3c13978bec4c2330752",
+    "semantic_hash": ""
+  },
+  ".claude/skills/caveman-commit/README.md": {
+    "mtime": 1792090554.3877728,
+    "seen": 1792090953.4237006,
+    "ast_hash": "15f57347c5b5449b79fdf24fdab21f31",
+    "semantic_hash": ""
+  },
+  ".claude/skills/caveman-commit/SKILL.md": {
+    "mtime": 1792090554.3878357,
+    "seen": 1792090953.4237022,
+    "ast_hash": "7461e17437fcf7629b431e94a7036afb",
+    "semantic_hash": ""
+  },
+  ".claude/skills/caveman-help/README.md": {
+    "mtime": 1792090554.3930535,
+    "seen": 1792090953.4237044,
+    "ast_hash": "9ff7bc2144f39ae708ea54001582a21d",
+    "semantic_hash": ""
+  },
+  ".claude/skills/caveman-help/SKILL.md": {
+    "mtime": 1792090554.3930972,
+    "seen": 1792090953.4237063,
+    "ast_hash": "c5b278a8e35bbcf1e503c8670b9360f9",
+    "semantic_hash": ""
+  },
+  ".claude/skills/caveman-review/README.md": {
+    "mtime": 1792090554.390613,
+    "seen": 1792090953.4237084,
+    "ast_hash": "ae3bdc81125037690fc50504e2917c83",
+    "semantic_hash": ""
+  },
+  ".claude/skills/caveman-review/SKILL.md": {
+    "mtime": 1792090554.3906667,
+    "seen": 1792090953.42371,
+    "ast_hash": "627809fbc078161cc1f060dd3524f051",
+    "semantic_hash": ""
+  },
+  ".claude/skills/caveman/README.md": {
+    "mtime": 1792090554.3853233,
+    "seen": 1792090953.4237123,
+    "ast_hash": "c6565f2f610ce9f2bab13b09009d8c2b",
+    "semantic_hash": ""
+  },
+  ".claude/skills/caveman/SKILL.md": {
+    "mtime": 1792090554.3854785,
+    "seen": 1792090953.4237137,
+    "ast_hash": "56b2f9db32197569a4a53b69bd8e859d",
+    "semantic_hash": ""
+  },
+  ".claude/skills/ponytail-audit/SKILL.md": {
+    "mtime": 1792090554.3995428,
+    "seen": 1792090953.423715,
+    "ast_hash": "4a8ec0358488fe552500e549503771b4",
+    "semantic_hash": ""
+  },
+  ".claude/skills/ponytail-debt/SKILL.md": {
+    "mtime": 1792090554.4019015,
+    "seen": 1792090953.4237168,
+    "ast_hash": "f5ddc8835fd59d3df8eedef0e1228348",
+    "semantic_hash": ""
+  },
+  ".claude/skills/ponytail-help/SKILL.md": {
+    "mtime": 1792090554.4042218,
+    "seen": 1792090953.4237185,
+    "ast_hash": "6b0e701f0b86245eb1f8b395676cfb0f",
+    "semantic_hash": ""
+  },
+  ".claude/skills/ponytail-review/SKILL.md": {
+    "mtime": 1792090554.397335,
+    "seen": 1792090953.42372,
+    "ast_hash": "9a06da6e1f26722dd3c34b50489a1c1e",
+    "semantic_hash": ""
+  },
+  ".claude/skills/ponytail/SKILL.md": {
+    "mtime": 1792090554.3952649,
+    "seen": 1792090953.4237216,
+    "ast_hash": "14fa897c537beacf82472ee98fafbd72",
+    "semantic_hash": ""
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1792090917.5835226,
+    "seen": 1792090953.4237235,
+    "ast_hash": "f55a540bd92e8ed9617eac8855b8d727",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1792090562.8301392,
+    "seen": 1792090953.4237254,
+    "ast_hash": "6db3d9f45953a8014f454875d7e3c3b4",
+    "semantic_hash": ""
+  },
+  "PLAN.md": {
+    "mtime": 1792090724.3821344,
+    "seen": 1792090953.423727,
+    "ast_hash": "f9709889fa93c910bd07fa101916b8a1",
+    "semantic_hash": ""
+  },
+  "index.html": {
+    "mtime": 1792090917.5594292,
+    "seen": 1792090953.4237285,
+    "ast_hash": "91cedf32fe8d2b495bfbfc0bb0e56344",
+    "semantic_hash": ""
+  }
+}
