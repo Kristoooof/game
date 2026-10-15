@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "src/main.ts": {
-    "mtime": 1792095441.403157,
-    "seen": 1792095584.113178,
-    "ast_hash": "dafaad01a28e19d76764770b1ed6c8d9",
+    "mtime": 1792096245.5065217,
+    "seen": 1792096929.741448,
+    "ast_hash": "47491eca86b3f3d9089991771b417a2d",
     "semantic_hash": ""
   },
   "src/render/iso.test.ts": {
@@ -144,9 +144,9 @@
     "semantic_hash": ""
   },
   "PLAN.md": {
-    "mtime": 1792095579.8857913,
-    "seen": 1792095584.1132774,
-    "ast_hash": "242415c673aca3adc27a2f28772b3d7c",
+    "mtime": 1792096928.312825,
+    "seen": 1792096929.7415369,
+    "ast_hash": "30c80f2f0970db4deb23201ce848ab6e",
     "semantic_hash": ""
   },
   "index.html": {
@@ -168,9 +168,9 @@
     "semantic_hash": ""
   },
   "src/render/terrain.ts": {
-    "mtime": 1792095476.2481177,
-    "seen": 1792095584.1132019,
-    "ast_hash": "8841d6d7a9a408cb7660e54a4e4e161e",
+    "mtime": 1792096601.5554128,
+    "seen": 1792096929.7414777,
+    "ast_hash": "00d9c661da99d1837d7a1b5ad73962b7",
     "semantic_hash": ""
   },
   "src/sim/map.test.ts": {
@@ -180,9 +180,9 @@
     "semantic_hash": ""
   },
   "src/sim/map.ts": {
-    "mtime": 1792093480.3340988,
-    "seen": 1792093908.8209834,
-    "ast_hash": "deed6c20ebabbbb5080456a1512898a0",
+    "mtime": 1792096047.3767042,
+    "seen": 1792096929.7414858,
+    "ast_hash": "2845522d0aa3cd8ed87c353769de0e2f",
     "semantic_hash": ""
   },
   "src/sim/rng.ts": {
@@ -204,9 +204,9 @@
     "semantic_hash": ""
   },
   "src/render/buildings.ts": {
-    "mtime": 1792095284.8730192,
-    "seen": 1792095584.113182,
-    "ast_hash": "98de34170ad9db212124cf8af897e4a1",
+    "mtime": 1792096269.8220983,
+    "seen": 1792096929.741452,
+    "ast_hash": "d5486c28c8f926784d8f5d207276ce65",
     "semantic_hash": ""
   },
   "src/sim/world.test.ts": {
@@ -228,9 +228,15 @@
     "semantic_hash": ""
   },
   "src/render/textures.ts": {
-    "mtime": 1792095284.874264,
-    "seen": 1792095584.1132069,
-    "ast_hash": "9f38add01d39ee4c8fca99a728b6014b",
+    "mtime": 1792096250.4357822,
+    "seen": 1792096929.7414806,
+    "ast_hash": "6757e7605728befc7d378acc6cb6c4bc",
+    "semantic_hash": ""
+  },
+  "src/render/ground.ts": {
+    "mtime": 1792096788.9046218,
+    "seen": 1792096929.741462,
+    "ast_hash": "1a57c449340fda7e4e5973307cea3097",
     "semantic_hash": ""
   }
 }

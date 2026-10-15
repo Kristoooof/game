@@ -31,228 +31,185 @@ export function sprite(art: Art, x: number, y: number, scale = 1) {
   return s;
 }
 
-const poly = (c: Ctx, color: string, ...pts: number[][]) => {
-  c.fillStyle = color;
+const poly = (c: Ctx, fill: string | CanvasGradient, pts: number[][]) => {
+  c.fillStyle = fill;
   c.beginPath();
   pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
   c.closePath();
   c.fill();
 };
 
-const ellipse = (c: Ctx, color: string, x: number, y: number, rx: number, ry: number) => {
-  c.fillStyle = color;
+const shadow = (c: Ctx, x: number, y: number, rx: number, ry: number) => {
+  const g = c.createRadialGradient(x, y, 0, x, y, rx);
+  g.addColorStop(0, 'rgba(10,25,10,0.35)');
+  g.addColorStop(1, 'rgba(10,25,10,0)');
+  c.save();
+  c.translate(x, y);
+  c.scale(1, ry / rx);
+  c.translate(-x, -y);
+  c.fillStyle = g;
   c.beginPath();
-  c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+  c.arc(x, y, rx, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+};
+
+/** A ball of foliage lit from the upper left. */
+const leafBall = (c: Ctx, x: number, y: number, r: number, [dark, mid, light]: string[]) => {
+  const g = c.createRadialGradient(x - r * 0.4, y - r * 0.45, r * 0.1, x, y, r);
+  g.addColorStop(0, light);
+  g.addColorStop(0.55, mid);
+  g.addColorStop(1, dark);
+  c.fillStyle = g;
+  c.beginPath();
+  c.arc(x, y, r, 0, Math.PI * 2);
   c.fill();
 };
 
-/** Ground tile: a 64×32 diamond (1px overdraw against seams) with speckles, tufts or flowers. */
-function ground(seed: number, base: string, specks: [string, number, number][], tufts = '', flowers = 0) {
+const conifer = (seed: number, palette: string[], tiers: number) => {
   const r = mulberry32(seed);
-  const at = () => {
-    const u = r();
-    const v = r();
-    return [33 + (u - v) * 32, 1 + (u + v) * 16];
-  };
-  return paint(66, 34, 33, 1, (c) => {
-    poly(c, base, [33, 0], [66, 17], [33, 34], [0, 17]);
-    c.clip();
-    for (const [color, n, size] of specks) {
-      c.fillStyle = color;
-      for (let i = 0; i < n; i++) {
-        const [x, y] = at();
-        c.fillRect(x, y, size, size * 0.6);
-      }
-    }
-    if (tufts) {
-      c.strokeStyle = tufts;
-      c.lineWidth = 0.7;
-      for (let i = 0; i < 10; i++) {
-        const [x, y] = at();
-        c.beginPath();
-        c.moveTo(x - 1.4, y - 2);
-        c.lineTo(x, y);
-        c.lineTo(x + 1.2, y - 2.4);
-        c.stroke();
-      }
-    }
-    for (let i = 0; i < flowers; i++) {
-      const [x, y] = at();
-      ellipse(c, ['#fff6d5', '#f7d34a', '#e88fb4', '#b9a8f0'][i % 4], x, y, 0.9, 0.7);
-    }
-  });
-}
-
-const GRASS_SPECKS: [string, number, number][] = [
-  ['rgba(70,110,40,0.35)', 40, 1.6],
-  ['rgba(170,210,110,0.35)', 30, 1.4],
-];
-
-const conifer = (dark: string, light: string, tiers: number) =>
-  paint(30, 52, 15, 47, (c) => {
-    ellipse(c, 'rgba(0,0,0,0.22)', 19, 47, 10, 3.5);
-    c.fillStyle = '#5d4027';
-    c.fillRect(13.8, 38, 2.6, 10);
+  return paint(34, 60, 17, 55, (c) => {
+    shadow(c, 22, 54, 14, 4.5);
+    c.fillStyle = '#4e3520';
+    c.fillRect(15.6, 44, 2.8, 12);
     for (let i = 0; i < tiers; i++) {
-      const by = 42 - i * 8.5;
-      const hw = 12.5 - i * 2.8;
-      const ty = by - 15;
-      poly(c, light, [15, ty], [15 - hw, by], [15, by - 1.5]);
-      poly(c, dark, [15, ty], [15, by - 1.5], [15 + hw, by]);
-    }
-  });
-
-const broadleaf = (dark: string, light: string, seed: number) => {
-  const r = mulberry32(seed);
-  return paint(38, 48, 19, 43, (c) => {
-    ellipse(c, 'rgba(0,0,0,0.22)', 23, 43, 12, 4);
-    c.fillStyle = '#6b4a2b';
-    c.fillRect(17.6, 26, 2.8, 17);
-    const blobs = [
-      [19, 15, 10],
-      [11, 22, 8],
-      [27, 22, 8],
-      [19, 26, 8.5],
-    ].map(([x, y, rad]) => [x + (r() - 0.5) * 3, y + (r() - 0.5) * 3, rad]);
-    for (const [x, y, rad] of blobs) ellipse(c, dark, x, y, rad, rad * 0.95);
-    c.globalAlpha = 0.85;
-    for (const [x, y, rad] of blobs) ellipse(c, light, x - rad * 0.3, y - rad * 0.3, rad * 0.6, rad * 0.55);
-    c.globalAlpha = 1;
-  });
-};
-
-const bush = paint(22, 16, 11, 12, (c) => {
-  ellipse(c, 'rgba(0,0,0,0.2)', 13, 12, 9, 3);
-  for (const [x, y, rad] of [
-    [7, 9, 5],
-    [14, 8, 5.5],
-    [11, 5, 5],
-  ])
-    ellipse(c, '#3f7a34', x, y, rad, rad * 0.85);
-  for (const [x, y] of [
-    [6, 7],
-    [12, 4],
-  ])
-    ellipse(c, '#6aa84f', x, y, 2.6, 2.2);
-});
-
-const mountain = (seed: number) => {
-  const r = mulberry32(seed);
-  const h = 38 + r() * 18;
-  const px = 44 + r() * 10;
-  return paint(100, 90, 50, 74, (c) => {
-    ellipse(c, 'rgba(0,0,0,0.2)', 56, 74, 42, 12);
-    const P = [px, 74 - h - 10];
-    const P2 = [22 + r() * 8, 74 - h * 0.5 - 6];
-    poly(c, '#b6ad9b', [4, 78], P2, [36, 80]);
-    poly(c, '#857c6e', P2, [44, 78], [36, 80]);
-    poly(c, '#aaa190', [10, 78], P, [px + 4, 82]);
-    poly(c, '#736b5f', P, [94, 76], [px + 4, 82]);
-    const sh = h * 0.33;
-    poly(
-      c,
-      '#f4f6f8',
-      P,
-      [P[0] - sh * 0.6, P[1] + sh],
-      [P[0] - sh * 0.25, P[1] + sh * 0.75],
-      [P[0] + 1, P[1] + sh * 1.05],
-    );
-    poly(
-      c,
-      '#c9d1da',
-      P,
-      [P[0] + 1, P[1] + sh * 1.05],
-      [P[0] + sh * 0.25, P[1] + sh * 0.8],
-      [P[0] + sh * 0.5, P[1] + sh * 0.95],
-    );
-    c.strokeStyle = 'rgba(50,42,35,0.18)';
-    c.lineWidth = 0.8;
-    for (let i = 0; i < 4; i++) {
-      const x = 20 + r() * 60;
+      const by = 49 - i * (32 / tiers);
+      const hw = 14 - i * (10 / tiers);
+      const ty = by - 17;
+      // Jagged lower edge, lit left half, shaded right half.
+      const edge: number[][] = [];
+      for (let k = 0; k <= 6; k++) edge.push([17 - hw + (k * hw * 2) / 6, by - (k % 2) * (2 + r() * 1.5)]);
+      const g = c.createLinearGradient(17 - hw, 0, 17 + hw, 0);
+      g.addColorStop(0, palette[2]);
+      g.addColorStop(0.45, palette[1]);
+      g.addColorStop(1, palette[0]);
+      poly(c, g, [[17, ty], ...edge.reverse()]);
+      c.strokeStyle = 'rgba(0,20,0,0.25)';
+      c.lineWidth = 0.6;
       c.beginPath();
-      c.moveTo(x, 50 + r() * 15);
-      c.lineTo(x + (r() - 0.5) * 8, 70 + r() * 6);
+      c.moveTo(17, ty + 1);
+      c.lineTo(17 + hw * 0.15, by - 1);
       c.stroke();
     }
   });
 };
 
-/** All terrain art, built once (needs a DOM canvas). */
+const broadleaf = (seed: number, palette: string[], size = 1) => {
+  const r = mulberry32(seed);
+  return paint(44, 56, 22, 51, (c) => {
+    shadow(c, 26, 50, 15, 5);
+    const trunk = c.createLinearGradient(19, 0, 25, 0);
+    trunk.addColorStop(0, '#8a6440');
+    trunk.addColorStop(1, '#4e3520');
+    c.fillStyle = trunk;
+    c.beginPath();
+    c.moveTo(19.5, 51);
+    c.lineTo(20.8, 30);
+    c.lineTo(23.2, 30);
+    c.lineTo(24.5, 51);
+    c.fill();
+    const balls: number[][] = [];
+    for (let i = 0; i < 16; i++) {
+      const a = r() * Math.PI * 2;
+      const d = Math.sqrt(r()) * 11 * size;
+      balls.push([22 + Math.cos(a) * d, 22 + Math.sin(a) * d * 0.8, (4.5 + r() * 3.5) * size]);
+    }
+    balls.sort((a, b) => a[1] - b[1]);
+    for (const [x, y, rad] of balls) leafBall(c, x, y, rad, palette);
+  });
+};
+
+const bush = (seed: number, palette: string[]) => {
+  const r = mulberry32(seed);
+  return paint(26, 20, 13, 16, (c) => {
+    shadow(c, 15, 16, 10, 3.5);
+    for (let i = 0; i < 6; i++) leafBall(c, 7 + r() * 12, 8 + r() * 5, 3.2 + r() * 2.2, palette);
+  });
+};
+
+const boulder = paint(20, 14, 10, 11, (c) => {
+  shadow(c, 11, 11, 9, 3);
+  const g = c.createLinearGradient(3, 2, 16, 12);
+  g.addColorStop(0, '#c9c3b6');
+  g.addColorStop(1, '#6f685d');
+  poly(c, g, [
+    [3, 11],
+    [5, 5],
+    [10, 2.5],
+    [15, 5],
+    [17, 11],
+  ]);
+});
+
+const mountain = (seed: number) => {
+  const r = mulberry32(seed);
+  const h = 46 + r() * 22;
+  const px = 46 + r() * 10;
+  return paint(110, 100, 55, 84, (c) => {
+    shadow(c, 60, 84, 48, 13);
+    const base = 86;
+    const peak = [px, base - h];
+    // Jagged silhouette from left foot over the peak to the right foot.
+    const ridge = (x0: number, x1: number, y0: number, y1: number, n: number) =>
+      Array.from({ length: n + 1 }, (_, k) => {
+        const t = k / n;
+        return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t + (k && k < n ? (r() - 0.5) * 6 : 0)];
+      });
+    const leftRidge = ridge(6, peak[0], base, peak[1], 5);
+    const rightRidge = ridge(peak[0], 104, peak[1], base - 2, 5);
+    const spine = [peak, [peak[0] + 6, base - h * 0.45], [peak[0] + 2, base + 2]];
+    const lit = c.createLinearGradient(0, peak[1], 0, base);
+    lit.addColorStop(0, '#c4bcab');
+    lit.addColorStop(1, '#8f8676');
+    const dark = c.createLinearGradient(0, peak[1], 0, base);
+    dark.addColorStop(0, '#7d7568');
+    dark.addColorStop(1, '#575047');
+    poly(c, lit, [...leftRidge, ...spine.slice(1).reverse(), [6, base]]);
+    poly(c, dark, [...rightRidge, [104, base], [peak[0] + 2, base + 2], spine[1], peak]);
+    // Snow: a band hugging the peak with a ragged lower edge.
+    const sh = h * 0.32;
+    const snow = [peak];
+    for (let k = 0; k <= 6; k++) {
+      const t = k / 6;
+      snow.push([peak[0] - sh * 0.9 + t * sh * 1.9, peak[1] + sh * (0.75 + (k % 2) * 0.35 + r() * 0.15)]);
+    }
+    poly(c, '#f5f7fa', snow.slice(0, 5).concat([[peak[0] + 3, peak[1] + sh * 0.6]]));
+    poly(c, '#c3ccd8', [peak, [peak[0] + 3, peak[1] + sh * 0.6], ...snow.slice(4)]);
+    c.strokeStyle = 'rgba(40,34,28,0.28)';
+    c.lineWidth = 0.8;
+    for (let i = 0; i < 6; i++) {
+      const x = 18 + r() * 74;
+      const y = base - 6 - r() * h * 0.5;
+      c.beginPath();
+      c.moveTo(x, y);
+      c.lineTo(x + (r() - 0.3) * 10, y + 8 + r() * 8);
+      c.stroke();
+    }
+  });
+};
+
+const DARK_GREEN = ['#1f4a24', '#2f6a33', '#5f9a4a'];
+const LEAF_GREEN = ['#2f5e1f', '#4f8a2e', '#9cc65a'];
+const OLIVE = ['#4a5a1c', '#7a8a2a', '#c4c45a'];
+const AUTUMN = ['#6a4a1a', '#a8742a', '#e0b048'];
+
+/** All object art, built once (needs a DOM canvas). */
 export function makeArt() {
   return {
-    grass: [1, 2, 3, 4].map((s) => ground(s, '#7cb04c', GRASS_SPECKS, 'rgba(60,100,35,0.6)', s === 4 ? 3 : 0)),
-    forest: [5, 6].map((s) =>
-      ground(s, '#5f8f3e', [
-        ['rgba(40,70,25,0.45)', 50, 1.8],
-        ['rgba(120,90,50,0.35)', 15, 1.5],
-      ]),
-    ),
-    beach: [7, 8, 9].map((s) =>
-      ground(s, '#e9d59d', [
-        ['rgba(190,160,100,0.45)', 45, 1.3],
-        ['rgba(255,245,215,0.6)', 30, 1.2],
-      ]),
-    ),
-    rock: [10, 11].map((s) =>
-      ground(s, '#9d937f', [
-        ['rgba(70,62,52,0.45)', 40, 2],
-        ['rgba(200,195,180,0.4)', 25, 1.6],
-      ]),
-    ),
-    trees: [
-      conifer('#255a30', '#357a3f', 4),
-      conifer('#2a5e45', '#3d7f5c', 3),
-      broadleaf('#3f7a2d', '#78b04a', 3),
-      broadleaf('#5e7a26', '#a8b84a', 4),
+    conifers: [
+      conifer(1, ['#163c22', '#245a32', '#3f7d48'], 4),
+      conifer(2, ['#1b4232', '#2a634a', '#4a8a66'], 5),
+      conifer(3, ['#1d3f1f', '#2e5f2c', '#55864a'], 3),
     ],
-    bush,
-    mountains: [21, 22, 23].map(mountain),
-    sea: paint(256, 128, 0, 0, (c) => {
-      c.fillStyle = '#1d5e89';
-      c.fillRect(0, 0, 256, 128);
-      const r = mulberry32(31);
-      c.lineWidth = 1.1;
-      for (let i = 0; i < 46; i++) {
-        const x = r() * 256;
-        const y = r() * 128;
-        const l = 8 + r() * 16;
-        c.strokeStyle = `rgba(${r() < 0.5 ? '255,255,255,0.08' : '10,40,70,0.18'})`;
-        for (const dx of [-256, 0, 256])
-          for (const dy of [-128, 0, 128]) {
-            c.beginPath();
-            c.moveTo(x + dx, y + dy);
-            c.quadraticCurveTo(x + dx + l / 2, y + dy - 2.5, x + dx + l, y + dy);
-            c.stroke();
-          }
-      }
-    }),
-    sparkle: paint(192, 96, 0, 0, (c) => {
-      const r = mulberry32(41);
-      c.fillStyle = 'rgba(255,255,255,0.22)';
-      for (let i = 0; i < 26; i++) c.fillRect(r() * 188, r() * 94, 3 + r() * 4, 0.8);
-    }),
-    halo: paint(256, 128, 128, 64, (c) => {
-      c.scale(1, 0.5);
-      const g = c.createRadialGradient(128, 128, 0, 128, 128, 128);
-      g.addColorStop(0, 'rgba(120,225,210,0.5)');
-      g.addColorStop(0.55, 'rgba(80,190,200,0.2)');
-      g.addColorStop(1, 'rgba(60,150,190,0)');
-      c.fillStyle = g;
-      c.fillRect(0, 0, 256, 256);
-    }),
-    cloud: paint(256, 256, 128, 128, (c) => {
-      const r = mulberry32(51);
-      for (let i = 0; i < 6; i++) {
-        const x = 70 + r() * 116;
-        const y = 70 + r() * 116;
-        const rad = 40 + r() * 50;
-        const g = c.createRadialGradient(x, y, 0, x, y, rad);
-        g.addColorStop(0, 'rgba(10,20,45,0.12)');
-        g.addColorStop(1, 'rgba(10,20,45,0)');
-        c.fillStyle = g;
-        c.fillRect(0, 0, 256, 256);
-      }
-    }),
+    broadleaves: [
+      broadleaf(4, LEAF_GREEN),
+      broadleaf(5, DARK_GREEN, 1.1),
+      broadleaf(6, OLIVE, 0.9),
+      broadleaf(7, AUTUMN),
+    ],
+    bushes: [bush(8, LEAF_GREEN), bush(9, DARK_GREEN)],
+    boulder,
+    mountains: [21, 22, 23, 24].map(mountain),
   };
 }
 

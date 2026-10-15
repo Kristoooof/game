@@ -39,7 +39,7 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Kézzel készített térkép betöltése (`?map=pelda`, ASCII formátum: `src/data/maps/`)
 - [x] Kamera: húzás, zoom (egér + érintés, pinch)
 - [x] Csempe kijelölés egérrel / érintéssel
-- [x] Nagyobb térkép (160×160) és nagyobb szigetek; terep chunkokra bontva, culling
+- [x] Nagyobb térkép (256×256, 8 sziget, 22–40 mező sugarú szigetek); terep chunkokra bontva, culling
 
 ### 2. Építés
 - [x] Építési menü (kategóriák)
@@ -81,6 +81,7 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 
 ### 7. Csiszolás
 - [x] Grafika v2: animált tenger, sekély part menti víz, tajték, megemelt szigetek sziklafallal, textúrázott terep, fák/bokrok/hegyek sprite-okból, részletes épületek, földutak, felhőárnyékok, középkori UI
+- [x] Grafika v3: GPU shaderes talaj és tenger (szerves partvonal, lágy terepátmenetek, domborzati árnyékolás, mélység szerinti víz, hullámok, tajték, csillogás, felhőárnyék), új fák/bokrok/sziklák/hegyek, összefüggő utak, távoli LOD
 - [ ] Grafika finomítása (épület sprite-ok, animációk, napszak?)
 - [ ] Hangok, zene
 - [ ] Teljesítmény (nagy térkép, culling)

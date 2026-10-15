@@ -33,11 +33,11 @@ function valueNoise(rand: () => number, width: number, height: number, cell: num
 }
 
 /** Archipelago: separate, noisy round islands in open sea. Deterministic for a given seed. */
-export function generateMap(seed: number, size = 160, islandCount = 7): GameMap {
+export function generateMap(seed: number, size = 256, islandCount = 8): GameMap {
   const rand = mulberry32(seed);
   const islands: { x: number; y: number; r: number }[] = [];
   for (let tries = 0; islands.length < islandCount && tries < 2000; tries++) {
-    const r = 12 + rand() * 12;
+    const r = 22 + rand() * 18;
     const margin = r * 1.3 + 2;
     const x = margin + rand() * (size - 2 * margin);
     const y = margin + rand() * (size - 2 * margin);
@@ -45,9 +45,9 @@ export function generateMap(seed: number, size = 160, islandCount = 7): GameMap 
     if (islands.every((i) => Math.hypot(i.x - x, i.y - y) > (i.r + r) * 1.3 + 3)) islands.push({ x, y, r });
   }
 
-  const shape = valueNoise(rand, size, size, 8);
-  const woods = valueNoise(rand, size, size, 10);
-  const rocks = valueNoise(rand, size, size, 6);
+  const shape = valueNoise(rand, size, size, 12);
+  const woods = valueNoise(rand, size, size, 14);
+  const rocks = valueNoise(rand, size, size, 9);
   const tiles: Terrain[] = [];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {

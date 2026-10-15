@@ -4,7 +4,7 @@ import pelda from './data/maps/pelda.txt?raw';
 import { createBuildingsView, drawBuilding, drawRoads, drawTerritory } from './render/buildings';
 import { attachCameraControls, screenToWorld, type Camera } from './render/camera';
 import { screenToTile, tileToScreen } from './render/iso';
-import { createTerrain, diamond, LIFT, liftAt } from './render/terrain';
+import { createTerrain, diamond } from './render/terrain';
 import { type GameMap, type Terrain, generateMap, parseMap, terrainAt } from './sim/map';
 import { buildingAt, createWorld, demolish, place, placementError, roadPath } from './sim/world';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
@@ -50,12 +50,12 @@ showResources();
 
 extensions.add(CullerPlugin);
 const app = new Application();
-await app.init({ resizeTo: window, background: '#1d5e89', antialias: true });
+// WebGL: the ground shader is GLSL only.
+await app.init({ resizeTo: window, background: '#0d4166', antialias: true, preference: 'webgl' });
 document.body.prepend(app.canvas);
 
 const scene = new Container();
 const terrain = createTerrain(map);
-const { layers } = terrain;
 const territory = new Graphics();
 const roads = new Graphics();
 const hover = new Graphics();
@@ -63,10 +63,9 @@ const selection = new Graphics();
 const preview = new Graphics();
 const ghost = new Graphics({ alpha: 0.6 });
 territory.visible = false;
-scene.addChild(layers.sea, layers.halos, layers.ground, layers.foam, roads, territory, layers.objects);
-scene.addChild(layers.clouds, hover, selection, preview, ghost);
+scene.addChild(terrain.ground, roads, territory, terrain.objects, hover, selection, preview, ghost);
 app.stage.addChild(scene);
-app.ticker.add((t) => terrain.update(t.deltaMS / 1000));
+app.ticker.add((t) => terrain.update(t.deltaMS / 1000, cam.scale));
 const syncBuildings = createBuildingsView(terrain.objectsAt);
 
 /** Redraw after a world change; `cleared` tiles lose their trees and decoration. */
@@ -96,18 +95,15 @@ const applyCamera = () => {
 };
 applyCamera();
 
-/** Tile under a screen point: raised land first, then the sea level behind it. */
 const tileAt = (sx: number, sy: number) => {
   const w = screenToWorld(cam, sx, sy);
-  const up = screenToTile(w.x, w.y + LIFT);
-  if (liftAt(map, up.x, up.y)) return up;
   const t = screenToTile(w.x, w.y);
   return terrainAt(map, t.x, t.y) ? t : undefined;
 };
 
 const outline = (g: Graphics, x: number, y: number, alpha: number, color = 0xffffff) =>
   g
-    .poly(diamond(x, y, liftAt(map, x, y)))
+    .poly(diamond(x, y))
     .fill({ color, alpha: alpha / 3 })
     .stroke({ width: 2, color, alpha });
 

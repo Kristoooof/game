@@ -1,8 +1,8 @@
 import { Graphics } from 'pixi.js';
 import { BUILDINGS, type BuildingId } from '../data/buildings';
-import type { Building, World } from '../sim/world';
+import type { World } from '../sim/world';
 import { tileToScreen } from './iso';
-import { diamond, LIFT } from './terrain';
+import { diamond } from './terrain';
 
 const shade = (color: number, k: number) =>
   (Math.min(255, Math.round(((color >> 16) & 255) * k)) << 16) |
@@ -12,7 +12,7 @@ const shade = (color: number, k: number) =>
 /** Screen point of tile coords (x, y) at height h above raised land. */
 const P = (x: number, y: number, h: number) => {
   const s = tileToScreen(x, y);
-  return [s.x, s.y - LIFT - h];
+  return [s.x, s.y - h];
 };
 
 const fill = (g: Graphics, pts: number[][], color: number) => g.poly(pts.flat()).fill(color);
@@ -209,39 +209,45 @@ export function createBuildingsView(objectsAt: (x: number, y: number) => { addCh
   };
 }
 
-/** Dirt roads: a border only where the road does not continue, plus some pebbles. */
+/** Dirt roads: a rounded track through each road tile's centre, joined to road neighbours. */
 export function drawRoads(g: Graphics, w: World) {
   g.clear();
-  const isRoad = (x: number, y: number) => {
-    const b: Building | undefined = w.buildings.get(w.occupied[y * w.map.width + x]);
-    return b?.type === 'road' && x >= 0 && y >= 0 && x < w.map.width && y < w.map.height;
-  };
+  const isRoad = (x: number, y: number) =>
+    x >= 0 &&
+    y >= 0 &&
+    x < w.map.width &&
+    y < w.map.height &&
+    w.buildings.get(w.occupied[y * w.map.width + x])?.type === 'road';
+  const segs: number[][] = [];
   for (const b of w.buildings.values()) {
     if (b.type !== 'road') continue;
-    const d = diamond(b.x, b.y, LIFT);
-    g.poly(d).fill(0xa98757);
-    const [tx, ty, rx, ry, bx, by, lx, ly] = d;
-    const sides: [boolean, number[]][] = [
-      [isRoad(b.x, b.y - 1), [tx, ty, rx, ry]],
-      [isRoad(b.x + 1, b.y), [rx, ry, bx, by]],
-      [isRoad(b.x, b.y + 1), [bx, by, lx, ly]],
-      [isRoad(b.x - 1, b.y), [lx, ly, tx, ty]],
-    ];
-    for (const [joined, [ax, ay, cx, cy]] of sides) if (!joined) g.moveTo(ax, ay).lineTo(cx, cy);
-    for (let k = 0; k < 4; k++) {
-      const u = ((b.x * 7 + b.y * 13 + k * 5) % 10) / 10;
-      const v = ((b.x * 11 + b.y * 3 + k * 7) % 10) / 10;
-      g.circle(tx + (u - v) * 26, ty + 3 + (u + v) * 13, 0.9);
-    }
+    const c = tileToScreen(b.x + 0.5, b.y + 0.5);
+    segs.push([c.x, c.y, c.x, c.y]);
+    for (const [dx, dy] of [
+      [1, 0],
+      [0, 1],
+    ])
+      if (isRoad(b.x + dx, b.y + dy)) {
+        const n = tileToScreen(b.x + dx + 0.5, b.y + dy + 0.5);
+        segs.push([c.x, c.y, n.x, n.y]);
+      }
   }
-  g.stroke({ width: 1.6, color: 0x6e5030, alpha: 0.9 });
+  // Layered strokes: dark verge, packed dirt, then a lighter worn centre.
+  for (const [width, color, alpha] of [
+    [26, 0x5b4a2e, 0.35],
+    [21, 0x9b7c50, 1],
+    [9, 0xb99a68, 0.7],
+  ]) {
+    for (const [ax, ay, bx, by] of segs) g.moveTo(ax, ay).lineTo(bx, by);
+    g.stroke({ width, color, alpha, cap: 'round', join: 'round' });
+  }
 }
 
 /** Light grid over the land the player may build on. */
 export function drawTerritory(g: Graphics, w: World) {
   g.clear();
   w.owned.forEach((o, i) => {
-    if (o) g.poly(diamond(i % w.map.width, Math.floor(i / w.map.width), LIFT));
+    if (o) g.poly(diamond(i % w.map.width, Math.floor(i / w.map.width)));
   });
   g.fill({ color: 0xffffff, alpha: 0.12 }).stroke({ width: 1, color: 0xffffff, alpha: 0.25 });
 }
