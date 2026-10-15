@@ -33,11 +33,11 @@ function valueNoise(rand: () => number, width: number, height: number, cell: num
 }
 
 /** Archipelago: separate, noisy round islands in open sea. Deterministic for a given seed. */
-export function generateMap(seed: number, size = 96, islandCount = 6): GameMap {
+export function generateMap(seed: number, size = 160, islandCount = 7): GameMap {
   const rand = mulberry32(seed);
   const islands: { x: number; y: number; r: number }[] = [];
   for (let tries = 0; islands.length < islandCount && tries < 2000; tries++) {
-    const r = 7 + rand() * 8;
+    const r = 12 + rand() * 12;
     const margin = r * 1.3 + 2;
     const x = margin + rand() * (size - 2 * margin);
     const y = margin + rand() * (size - 2 * margin);
@@ -45,9 +45,9 @@ export function generateMap(seed: number, size = 96, islandCount = 6): GameMap {
     if (islands.every((i) => Math.hypot(i.x - x, i.y - y) > (i.r + r) * 1.3 + 3)) islands.push({ x, y, r });
   }
 
-  const shape = valueNoise(rand, size, size, 5);
-  const woods = valueNoise(rand, size, size, 7);
-  const rocks = valueNoise(rand, size, size, 4);
+  const shape = valueNoise(rand, size, size, 8);
+  const woods = valueNoise(rand, size, size, 10);
+  const rocks = valueNoise(rand, size, size, 6);
   const tiles: Terrain[] = [];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
@@ -86,4 +86,34 @@ export function parseMap(text: string): GameMap {
     });
   });
   return { width, height: rows.length, tiles };
+}
+
+/** Island label per tile (4-neighbour flood fill): 0 for water, 1..n for each separate island. */
+export function labelIslands(map: GameMap) {
+  const labels = new Int32Array(map.tiles.length);
+  let next = 0;
+  map.tiles.forEach((t, start) => {
+    if (t === 'water' || labels[start]) return;
+    labels[start] = ++next;
+    const stack = [start];
+    while (stack.length) {
+      const i = stack.pop()!;
+      const x = i % map.width;
+      const y = Math.floor(i / map.width);
+      for (const [nx, ny] of [
+        [x + 1, y],
+        [x - 1, y],
+        [x, y + 1],
+        [x, y - 1],
+      ]) {
+        const j = ny * map.width + nx;
+        const t2 = terrainAt(map, nx, ny);
+        if (t2 && t2 !== 'water' && !labels[j]) {
+          labels[j] = next;
+          stack.push(j);
+        }
+      }
+    }
+  });
+  return labels;
 }

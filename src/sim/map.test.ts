@@ -1,38 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import pelda from '../data/maps/pelda.txt?raw';
-import { type GameMap, generateMap, parseMap, terrainAt } from './map';
+import { type GameMap, generateMap, labelIslands, parseMap, terrainAt } from './map';
 
-/** Sizes of connected land areas (4-neighbour flood fill). */
+/** Sizes of separate islands. */
 function landAreas(map: GameMap) {
-  const seen = new Set<number>();
-  const areas: number[] = [];
-  map.tiles.forEach((t, start) => {
-    if (t === 'water' || seen.has(start)) return;
-    let size = 0;
-    const stack = [start];
-    seen.add(start);
-    while (stack.length) {
-      const i = stack.pop()!;
-      size++;
-      const x = i % map.width;
-      const y = Math.floor(i / map.width);
-      for (const [nx, ny] of [
-        [x + 1, y],
-        [x - 1, y],
-        [x, y + 1],
-        [x, y - 1],
-      ]) {
-        const t2 = terrainAt(map, nx, ny);
-        const j = ny * map.width + nx;
-        if (t2 && t2 !== 'water' && !seen.has(j)) {
-          seen.add(j);
-          stack.push(j);
-        }
-      }
-    }
-    areas.push(size);
-  });
-  return areas;
+  const sizes: number[] = [];
+  for (const l of labelIslands(map)) if (l) sizes[l - 1] = (sizes[l - 1] ?? 0) + 1;
+  return sizes;
 }
 
 describe('generateMap', () => {

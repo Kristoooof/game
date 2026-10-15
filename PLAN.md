@@ -39,18 +39,19 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Kézzel készített térkép betöltése (`?map=pelda`, ASCII formátum: `src/data/maps/`)
 - [x] Kamera: húzás, zoom (egér + érintés, pinch)
 - [x] Csempe kijelölés egérrel / érintéssel
+- [x] Nagyobb térkép (160×160) és nagyobb szigetek; terep chunkokra bontva, culling
 
 ### 2. Építés
-- [ ] Építési menü (kategóriák)
-- [ ] Épület lerakás előnézettel, érvényesség-ellenőrzés (terep, ütközés)
-- [ ] Utak húzása
-- [ ] Bontás
-- [ ] Építési költség: pénz + anyag (fa, szerszám, tégla)
-- [ ] Kikötő/raktár hatósugár – csak ezen belül lehet építeni
+- [x] Építési menü (kategóriák)
+- [x] Épület lerakás előnézettel, érvényesség-ellenőrzés (terep, ütközés)
+- [x] Utak húzása
+- [x] Bontás
+- [x] Építési költség: pénz + anyag (fa, szerszám, tégla)
+- [x] Kikötő/raktár hatósugár – csak ezen belül lehet építeni
 
 ### 3. Gazdaság és termelési láncok
 - [ ] Szimulációs tick, játékidő, szünet és gyorsítás
-- [ ] Áruk és raktárkészlet szigetenként
+- [ ] Áruk és raktárkészlet szigetenként (most még egy közös készlet)
 - [ ] Termelő épületek (favágó, halász, birkafarm → szövöde, stb.)
 - [ ] Szállítók: piaci/raktári kocsik útkereséssel (A*) az utakon
 - [ ] Termelés hatékonyság kijelzése

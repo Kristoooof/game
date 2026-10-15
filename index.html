@@ -13,10 +13,10 @@
         background: #0b3a5a;
         touch-action: none;
       }
+      #resources,
       #hud {
         position: fixed;
-        left: 12px;
-        bottom: 12px;
+        left: 8px;
         padding: 6px 10px;
         border-radius: 6px;
         background: rgba(0, 0, 0, 0.55);
@@ -26,10 +26,63 @@
           sans-serif;
         pointer-events: none;
       }
+      #resources {
+        top: 8px;
+        font-weight: 600;
+      }
+      #hud {
+        bottom: 104px;
+        right: 8px;
+        width: fit-content;
+      }
+      #build {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font:
+          14px/1.2 system-ui,
+          sans-serif;
+      }
+      #build .tabs,
+      #build .items {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+      }
+      #build button {
+        flex: none;
+        min-height: 44px;
+        padding: 6px 12px;
+        border: 1px solid #6b5536;
+        border-radius: 8px;
+        background: #2b2116e6;
+        color: #f4ead2;
+        font: inherit;
+        cursor: pointer;
+      }
+      #build button small {
+        display: block;
+        opacity: 0.75;
+        font-size: 12px;
+      }
+      #build button.active {
+        background: #8b6a3e;
+        border-color: #f4d58d;
+      }
+      #build button.danger.active {
+        background: #9b2c2c;
+      }
     </style>
   </head>
   <body>
+    <div id="resources"></div>
     <div id="hud"></div>
+    <div id="build"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
