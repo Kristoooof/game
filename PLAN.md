@@ -34,11 +34,11 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Üres izometrikus vászon (élő oldal: alapértelmezett branchről deployol)
 
 ### 1. Térkép és kamera
-- [ ] Izometrikus csempe-rács (víz, part, föld, hegy, erdő)
-- [ ] Procedurális szigetgenerálás seed-del (több sziget egy tengeren)
-- [ ] Kézzel készített térkép betöltése
-- [ ] Kamera: húzás, zoom (egér + érintés, pinch)
-- [ ] Csempe kijelölés egérrel / érintéssel
+- [x] Izometrikus csempe-rács (víz, part, föld, hegy, erdő)
+- [x] Procedurális szigetgenerálás seed-del (több sziget egy tengeren, `?seed=123`)
+- [x] Kézzel készített térkép betöltése (`?map=pelda`, ASCII formátum: `src/data/maps/`)
+- [x] Kamera: húzás, zoom (egér + érintés, pinch)
+- [x] Csempe kijelölés egérrel / érintéssel
 
 ### 2. Építés
 - [ ] Építési menü (kategóriák)

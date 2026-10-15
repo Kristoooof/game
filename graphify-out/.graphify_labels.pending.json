@@ -7,7 +7,7 @@
   "5": "compilerOptions",
   "6": "caveman-commit",
   "7": "caveman-review",
-  "8": "Rules",
+  "8": "map.ts",
   "9": "Ponytail Help",
   "10": "devDependencies",
   "11": "ponytail-audit/SKILL.md",
@@ -15,5 +15,6 @@
   "13": "Ponytail",
   "14": "ponytail-debt/SKILL.md",
   "15": "CLAUDE.md",
-  "16": ".claude/CLAUDE.md"
+  "16": ".claude/CLAUDE.md",
+  "17": "camera.ts"
 }

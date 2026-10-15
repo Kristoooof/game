@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "src/main.ts": {
-    "mtime": 1792090917.5683942,
-    "seen": 1792090953.4236898,
-    "ast_hash": "8084990af60c0411413266c83bce9c70",
+    "mtime": 1792091405.438115,
+    "seen": 1792091470.2227213,
+    "ast_hash": "30581f00156c426ebf7d213741c8043f",
     "semantic_hash": ""
   },
   "src/render/iso.test.ts": {
@@ -132,9 +132,9 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1792090917.5835226,
-    "seen": 1792090953.4237235,
-    "ast_hash": "f55a540bd92e8ed9617eac8855b8d727",
+    "mtime": 1792091191.4341211,
+    "seen": 1792091470.2227783,
+    "ast_hash": "bcec8c9435167f50c4fefc6bb13a1467",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -144,15 +144,57 @@
     "semantic_hash": ""
   },
   "PLAN.md": {
-    "mtime": 1792090724.3821344,
-    "seen": 1792090953.423727,
-    "ast_hash": "f9709889fa93c910bd07fa101916b8a1",
+    "mtime": 1792091469.4100618,
+    "seen": 1792091470.2227821,
+    "ast_hash": "7401955216980229fdc534a76d765404",
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1792090917.5594292,
-    "seen": 1792090953.4237285,
-    "ast_hash": "91cedf32fe8d2b495bfbfc0bb0e56344",
+    "mtime": 1792091405.306115,
+    "seen": 1792091470.2227838,
+    "ast_hash": "d274ac9c1e76172d7d5d50b6b1418b78",
+    "semantic_hash": ""
+  },
+  "src/render/camera.test.ts": {
+    "mtime": 1792091389.6687005,
+    "seen": 1792091470.2227254,
+    "ast_hash": "285c55b9d4d11c48c0e55f7b24404648",
+    "semantic_hash": ""
+  },
+  "src/render/camera.ts": {
+    "mtime": 1792091389.666792,
+    "seen": 1792091470.2227278,
+    "ast_hash": "4056efdd13bd0cada0553e6a3d8d6239",
+    "semantic_hash": ""
+  },
+  "src/render/terrain.ts": {
+    "mtime": 1792091389.6708431,
+    "seen": 1792091470.222736,
+    "ast_hash": "29b4d16d43f1a668c12ca8d9025ed199",
+    "semantic_hash": ""
+  },
+  "src/sim/map.test.ts": {
+    "mtime": 1792091367.354396,
+    "seen": 1792091470.2227383,
+    "ast_hash": "8630e608731bf97cd8e1963490e29514",
+    "semantic_hash": ""
+  },
+  "src/sim/map.ts": {
+    "mtime": 1792091405.6461148,
+    "seen": 1792091470.22274,
+    "ast_hash": "c224605a8a5e43b6a51d22b87519ea60",
+    "semantic_hash": ""
+  },
+  "src/sim/rng.ts": {
+    "mtime": 1792091357.8866444,
+    "seen": 1792091470.222742,
+    "ast_hash": "e0bdcf1721e5ec570988ec4e774d85a8",
+    "semantic_hash": ""
+  },
+  "src/data/maps/pelda.txt": {
+    "mtime": 1792091357.8905447,
+    "seen": 1792091470.2227857,
+    "ast_hash": "4648d8ccca64de1fa7449b5d3d82c246",
     "semantic_hash": ""
   }
 }
