@@ -1,8 +1,7 @@
 import { Graphics } from 'pixi.js';
 import { BUILDINGS, type BuildingId } from '../data/buildings';
 import type { World } from '../sim/world';
-import { tileToScreen } from './iso';
-import { diamond } from './terrain';
+import { diamond, tileToScreen } from './iso';
 
 const shade = (color: number, k: number) =>
   (Math.min(255, Math.round(((color >> 16) & 255) * k)) << 16) |
@@ -260,29 +259,8 @@ export function chimneyAt(type: BuildingId, x: number, y: number) {
   return { x: px, y: py };
 }
 
-/** Keeps one Graphics per building in the terrain's depth-sorted object layer. */
-export function createBuildingsView(objectsAt: (x: number, y: number) => { addChild(g: Graphics): void }) {
-  const shown = new Map<number, Graphics>();
-  return (w: World) => {
-    for (const [id, g] of shown)
-      if (!w.buildings.has(id)) {
-        g.destroy();
-        shown.delete(id);
-      }
-    for (const b of w.buildings.values()) {
-      if (b.type === 'road' || shown.has(b.id)) continue;
-      const g = new Graphics();
-      drawBuilding(g, b.type, b.x, b.y, b.id);
-      g.zIndex = b.x + b.y + BUILDINGS[b.type].size;
-      objectsAt(b.x, b.y).addChild(g);
-      shown.set(b.id, g);
-    }
-  };
-}
-
-/** Dirt roads: a rounded track through each road tile's centre, joined to road neighbours. */
-export function drawRoads(g: Graphics, w: World) {
-  g.clear();
+/** Dirt roads on tiles [x0, x1) × [y0, y1): a rounded track joined to every road neighbour. */
+export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.width, y1 = w.map.height) {
   const isRoad = (x: number, y: number) =>
     x >= 0 &&
     y >= 0 &&
@@ -290,19 +268,24 @@ export function drawRoads(g: Graphics, w: World) {
     y < w.map.height &&
     w.buildings.get(w.occupied[y * w.map.width + x])?.type === 'road';
   const segs: number[][] = [];
-  for (const b of w.buildings.values()) {
-    if (b.type !== 'road') continue;
-    const c = tileToScreen(b.x + 0.5, b.y + 0.5);
-    segs.push([c.x, c.y, c.x, c.y]);
-    for (const [dx, dy] of [
-      [1, 0],
-      [0, 1],
-    ])
-      if (isRoad(b.x + dx, b.y + dy)) {
-        const n = tileToScreen(b.x + dx + 0.5, b.y + dy + 0.5);
-        segs.push([c.x, c.y, n.x, n.y]);
-      }
-  }
+  for (let y = y0; y < y1; y++)
+    for (let x = x0; x < x1; x++) {
+      if (!isRoad(x, y)) continue;
+      const c = tileToScreen(x + 0.5, y + 0.5);
+      segs.push([c.x, c.y, c.x, c.y]);
+      // All four directions: a neighbour in another chunk draws its own half.
+      for (const [dx, dy] of [
+        [1, 0],
+        [0, 1],
+        [-1, 0],
+        [0, -1],
+      ])
+        if (isRoad(x + dx, y + dy)) {
+          const n = tileToScreen(x + dx / 2 + 0.5, y + dy / 2 + 0.5);
+          segs.push([c.x, c.y, n.x, n.y]);
+        }
+    }
+  if (!segs.length) return;
   // Layered strokes: dark verge, packed dirt, then a lighter worn centre.
   for (const [width, color, alpha] of [
     [26, 0x5b4a2e, 0.35],

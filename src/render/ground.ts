@@ -17,12 +17,8 @@ void main() {
   vPos = aPosition;
 }`;
 
-/*
- * Ground and sea in one pass. Per-tile masks (land, sand, rock, forest) and distance
- * fields (sea depth, inland depth) are sampled smoothly and warped with noise, so
- * coastlines and terrain borders come out organic instead of following the tile grid.
- */
-const fragment = /* glsl */ `
+/** Shared GLSL: uniforms, baked-noise helpers, smooth per-tile sampling and the coastline. */
+const common = /* glsl */ `
 in vec2 vPos;
 out vec4 finalColor;
 uniform sampler2D uMask;
@@ -34,8 +30,8 @@ uniform float uFar;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 // Baked, tileable noise (see bakeNoise): r = 4-octave fbm, g = single octave, b = second fbm.
-float fbm(vec2 p) { return texture(uNoise, p / 32.0).r; }
-float fbm2(vec2 p) { return texture(uNoise, p / 32.0).b; }
+vec4 nz(vec2 p) { return texture(uNoise, p / 32.0); }
+float fbm(vec2 p) { return nz(p).r; }
 float noise(vec2 p) { return texture(uNoise, p / 64.0).g; }
 // Smooth (C1) sampling of a per-tile texture at tile-space point p.
 vec4 smp(sampler2D t, vec2 p) {
@@ -43,98 +39,113 @@ vec4 smp(sampler2D t, vec2 p) {
   f = f * f * (3.0 - 2.0 * f);
   return texture(t, (i + f + 0.5) / uSize);
 }
-float height(vec2 q) { return smp(uDist, q).g * 1.6 + fbm(q * 0.5) * 0.9; }
+// Screen-space world pixels back to continuous tile coordinates.
+vec2 tileCoord() {
+  return vec2(vPos.x / ${TILE_W.toFixed(1)} + vPos.y / ${TILE_H.toFixed(1)}, vPos.y / ${TILE_H.toFixed(1)} - vPos.x / ${TILE_W.toFixed(1)});
+}
+// The one coastline warp both shaders use, so surf meets the land exactly.
+vec2 coastWarp(vec2 p) { return p + (nz(p * 0.45).rb - 0.5) * 0.7; }
+`;
 
+/*
+ * Live sea, drawn every frame under the baked land: depth colour, swell crests, glints,
+ * waves rolling in and surf. Kept to ~10 texture reads; deep water skips the shore work.
+ */
+const waterFragment = /* glsl */ `${common}
 void main() {
-  // Screen-space world pixels back to continuous tile coordinates.
-  vec2 p = vec2(vPos.x / ${TILE_W.toFixed(1)} + vPos.y / ${TILE_H.toFixed(1)}, vPos.y / ${TILE_H.toFixed(1)} - vPos.x / ${TILE_W.toFixed(1)});
-  vec2 warp = vec2(fbm(p * 0.45), fbm2(p * 0.45)) - 0.5;
+  vec2 p = tileCoord();
+  float land = smp(uMask, coastWarp(p)).r;
+  // Hidden under baked land: stop before the expensive part.
+  if (land > 0.56) { finalColor = vec4(0.3, 0.45, 0.3, 1.0); return; }
+  float depthRaw = smp(uDist, p).r;
+  float t = uTime;
+  float depth = smoothstep(0.0, 0.75, depthRaw);
+  vec3 col = mix(vec3(0.24, 0.63, 0.66), vec3(0.09, 0.42, 0.58), smoothstep(0.0, 0.25, depth));
+  col = mix(col, vec3(0.05, 0.25, 0.42), smoothstep(0.3, 1.0, depth));
+  // Short, broken swell crests running diagonally, fading in and out in patches.
+  float w = sin(p.x * 1.3 + p.y * 0.5 + t * 1.1 + fbm(p * 0.3 + t * 0.04) * 7.0);
+  float patch = smoothstep(0.45, 0.7, noise(p * 0.35 + vec2(t * 0.05, 0.0)));
+  col += vec3(0.07, 0.09, 0.1) * smoothstep(0.9, 1.0, w) * patch * (0.3 + depth * 0.7);
+  float glint = noise(p * 5.0 + vec2(t * 0.9, t * 0.3));
+  col += vec3(0.6) * smoothstep(0.82, 0.9, glint) * depth * (1.0 - uFar * 0.8);
+  if (land > 0.01) {
+    col = mix(col, vec3(0.5, 0.76, 0.7), smoothstep(0.2, 0.5, land) * 0.5);
+    float roll = sin(land * 40.0 - t * 2.2 + fbm(p * 0.8) * 4.0);
+    col += vec3(0.2) * smoothstep(0.88, 0.99, roll) * smoothstep(0.02, 0.3, land);
+    float wave = 0.32 + 0.06 * sin(t * 1.4 + noise(p * 1.3) * 7.0);
+    float foam = smoothstep(wave - 0.04, wave + 0.02, land) * (0.6 + 0.4 * noise(p * 9.0 + t));
+    foam = max(foam, smoothstep(0.42, 0.49, land));
+    col = mix(col, vec3(0.94, 0.97, 0.96), clamp(foam, 0.0, 1.0) * 0.85);
+  }
+  finalColor = vec4(pow(col, vec3(0.95)) * vec3(1.04, 1.0, 0.94), 1.0);
+}`;
+
+/*
+ * Land, rendered once per chunk into a texture (never per frame): grass with patches,
+ * tufts and flowers, forest floor or canopy, ridged rock, beach and wet sand, lit by
+ * relief. Sea pixels come out transparent so the live water shows through.
+ */
+const landFragment = /* glsl */ `${common}
+float height(vec2 q) { return smp(uDist, q).g * 1.6 + fbm(q * 0.5) * 0.9; }
+void main() {
+  vec2 p = tileCoord();
+  float land = smp(uMask, coastWarp(p)).r;
+  if (land < 0.45) { finalColor = vec4(0.0); return; }
+  vec2 warp = nz(p * 0.45).rb - 0.5;
   vec2 warp2 = vec2(noise(p * 1.7), noise(p * 1.7 + 13.0)) - 0.5;
-  vec2 pw = p + warp * 0.55 + warp2 * 0.3;
   // Inland borders (forest, rock) may wander further than the coast, which must match the tiles.
   vec2 pf = p + warp * 1.2 + warp2 * 0.5;
   // Ground-plane coords aligned to the screen: fine detail here does not zigzag along tile diagonals.
   vec2 g = vec2(vPos.x, vPos.y * 2.0) / 32.0;
-  vec4 m = smp(uMask, pw);
-  vec4 d = smp(uDist, p);
-  float land = m.r;
-  float t = uTime;
-  vec3 col;
+  vec4 m = smp(uMask, p + warp * 0.7);
 
-  if (land < 0.5) {
-    // Sea: depth gradient, rolling wave crests, glints, surf along the shore.
-    float depth = smoothstep(0.0, 0.75, d.r);
-    vec3 deep = vec3(0.05, 0.25, 0.42), mid = vec3(0.09, 0.42, 0.58), shallow = vec3(0.24, 0.63, 0.66);
-    col = mix(shallow, mid, smoothstep(0.0, 0.25, depth));
-    col = mix(col, deep, smoothstep(0.3, 1.0, depth));
-    float sand = smoothstep(0.2, 0.5, land);
-    col = mix(col, vec3(0.5, 0.76, 0.7), sand * 0.5);
-    float caust = noise(p * 3.0 + vec2(t * 0.4, t * 0.25)) * noise(p * 3.7 - vec2(t * 0.3, -t * 0.2));
-    col += vec3(0.16, 0.2, 0.18) * smoothstep(0.25, 0.45, caust) * (1.0 - depth) * 0.6;
-    // Short, broken swell crests running diagonally, fading in and out in patches.
-    float w = sin(p.x * 1.3 + p.y * 0.5 + t * 1.1 + fbm(p * 0.3 + t * 0.04) * 7.0);
-    float patch = smoothstep(0.45, 0.7, noise(p * 0.35 + vec2(t * 0.05, 0.0)));
-    col += vec3(0.07, 0.09, 0.1) * smoothstep(0.9, 1.0, w) * patch * (0.3 + depth * 0.7);
-    col *= 1.0 - 0.06 * fbm(p * 0.6 - t * 0.03) * depth;
-    float glint = pow(noise(p * 5.0 + vec2(t * 0.9, t * 0.3)) * noise(p * 6.3 - vec2(t * 0.6, -t * 0.4)), 4.0);
-    col += vec3(1.0) * smoothstep(0.2, 0.35, glint) * 0.35 * depth * (1.0 - uFar * 0.8);
-    // Swells rolling in towards the shore, breaking up as they arrive.
-    // Driven by the smooth land mask, not the blocky BFS distance, so crests follow the coast.
-    float shoreBand = smoothstep(0.02, 0.3, land);
-    float roll = sin(land * 40.0 - t * 2.2 + fbm(p * 0.8) * 4.0);
-    col += vec3(0.45, 0.5, 0.5) * smoothstep(0.88, 0.99, roll) * shoreBand * noise(p * 2.5 + t * 0.2) * 0.45;
-    float wave = 0.32 + 0.06 * sin(t * 1.4 + fbm(p * 1.3) * 7.0);
-    float foam = smoothstep(wave - 0.04, wave + 0.02, land) * (0.6 + 0.4 * noise(p * 9.0 + t));
-    foam = max(foam, smoothstep(0.42, 0.49, land));
-    col = mix(col, vec3(0.94, 0.97, 0.96), clamp(foam, 0.0, 1.0) * 0.85);
-  } else {
-    // Land: grass with patches, forest floor or canopy, rock, beach; lit by relief.
-    float n = fbm(p * 0.22);
-    vec3 grass = mix(vec3(0.36, 0.6, 0.22), vec3(0.52, 0.7, 0.28), n);
-    grass = mix(grass, vec3(0.66, 0.68, 0.34), smoothstep(0.62, 0.8, fbm(p * 0.13 + 7.0)) * 0.7);
-    float fine = noise(g * 8.0) * 0.6 + noise(g * 19.0) * 0.4;
-    grass *= 0.9 + 0.2 * fine;
-    // Tufts and flowers as small round dots jittered inside a fine grid.
-    vec2 cb = g * 16.0, ib = floor(cb);
-    float blade = step(0.8, hash(ib)) * (1.0 - smoothstep(0.08, 0.2, length(fract(cb) - 0.25 - 0.5 * vec2(hash(ib + 1.0), hash(ib + 2.0)))));
-    grass = mix(grass, grass * 1.3, blade * 0.6);
-    vec2 cf = g * 6.0, iff = floor(cf);
-    float dot = 1.0 - smoothstep(0.06, 0.12, length(fract(cf) - 0.3 - 0.4 * vec2(hash(iff + 4.0), hash(iff + 5.0))));
-    vec3 flower = mix(vec3(1.0, 0.95, 0.75), vec3(0.95, 0.6, 0.75), hash(iff + 9.0));
-    grass = mix(grass, flower, dot * step(0.97, hash(iff + 3.0)) * step(0.6, noise(p * 0.7)) * (1.0 - uFar));
-    // Gusts of wind: brighter bands sweeping slowly across meadows.
-    float gust = fbm(p * 0.18 + vec2(-t * 0.35, t * 0.12));
-    grass *= 0.95 + 0.14 * smoothstep(0.45, 0.75, gust) * (1.0 - uFar);
-    col = grass;
+  float n = fbm(p * 0.22);
+  vec3 grass = mix(vec3(0.36, 0.6, 0.22), vec3(0.52, 0.7, 0.28), n);
+  grass = mix(grass, vec3(0.66, 0.68, 0.34), smoothstep(0.62, 0.8, fbm(p * 0.13 + 7.0)) * 0.7);
+  float fine = noise(g * 8.0) * 0.6 + noise(g * 19.0) * 0.4;
+  grass *= 0.9 + 0.2 * fine;
+  // Tufts and flowers as small round dots jittered inside a fine grid.
+  vec2 cb = g * 16.0, ib = floor(cb);
+  float blade = step(0.8, hash(ib)) * (1.0 - smoothstep(0.08, 0.2, length(fract(cb) - 0.25 - 0.5 * vec2(hash(ib + 1.0), hash(ib + 2.0)))));
+  grass = mix(grass, grass * 1.3, blade * 0.6);
+  vec2 cf = g * 6.0, iff = floor(cf);
+  float dot = 1.0 - smoothstep(0.06, 0.12, length(fract(cf) - 0.3 - 0.4 * vec2(hash(iff + 4.0), hash(iff + 5.0))));
+  vec3 flower = mix(vec3(1.0, 0.95, 0.75), vec3(0.95, 0.6, 0.75), hash(iff + 9.0));
+  grass = mix(grass, flower, dot * step(0.97, hash(iff + 3.0)) * step(0.6, noise(p * 0.7)) * (1.0 - uFar));
+  vec3 col = grass;
 
-    vec3 floorCol = vec3(0.23, 0.38, 0.16) * (0.85 + 0.3 * fine);
-    float bumps = noise(p * 4.0) * 0.6 + noise(p * 9.0) * 0.4;
-    vec3 canopy = mix(vec3(0.12, 0.27, 0.13), vec3(0.3, 0.48, 0.2), bumps);
-    vec3 forest = mix(floorCol, canopy, uFar);
-    col = mix(col, forest, smoothstep(0.3, 0.7, 0.5 * (smp(uDist, pf + 0.3).b + smp(uDist, pf - 0.3).b)));
+  vec3 floorCol = vec3(0.23, 0.38, 0.16) * (0.85 + 0.3 * fine);
+  float bumps = noise(p * 4.0) * 0.6 + noise(p * 9.0) * 0.4;
+  vec3 canopy = mix(vec3(0.12, 0.27, 0.13), vec3(0.3, 0.48, 0.2), bumps);
+  col = mix(col, mix(floorCol, canopy, uFar), smoothstep(0.3, 0.7, smp(uDist, pf).b));
 
-    vec3 rock = mix(vec3(0.46, 0.43, 0.39), vec3(0.66, 0.63, 0.57), fbm(p * vec2(1.5, 0.6)));
-    rock *= 0.85 + 0.3 * noise(g * 5.0);
-    col = mix(col, rock, smoothstep(0.22, 0.55, 0.5 * (smp(uMask, pf + vec2(0.3, -0.3)).b + smp(uMask, pf - vec2(0.3, -0.3)).b)));
+  // Rock: ridged noise gives crevices and ledges; scree and moss where it meets the grass.
+  float rockMask = smoothstep(0.22, 0.55, smp(uMask, pf).b);
+  float ridge = 1.0 - abs(noise(p * vec2(2.2, 0.9)) * 2.0 - 1.0);
+  float strata = 0.5 + 0.5 * sin((p.x - p.y) * 6.0 + fbm(p * 1.2) * 8.0);
+  vec3 rock = mix(vec3(0.42, 0.39, 0.35), vec3(0.62, 0.58, 0.52), ridge * 0.7 + strata * 0.3);
+  rock = mix(rock, vec3(0.3, 0.27, 0.24), smoothstep(0.75, 0.95, 1.0 - ridge) * 0.6);
+  rock *= 0.88 + 0.24 * noise(g * 6.0);
+  vec3 scree = mix(vec3(0.5, 0.47, 0.4), vec3(0.42, 0.45, 0.32), noise(g * 3.0));
+  col = mix(col, scree, smoothstep(0.08, 0.3, rockMask) * (1.0 - rockMask));
+  col = mix(col, rock, smoothstep(0.3, 0.6, rockMask));
 
-    vec3 sandCol = vec3(0.9, 0.81, 0.58) * (0.94 + 0.12 * noise(g * 10.0));
-    sandCol -= 0.03 * sin((p.x + p.y) * 9.0 + noise(p * 2.0) * 4.0);
-    // Low threshold: a one-tile beach only reaches ~0.375 after the mask blur.
-    float beach = smoothstep(0.16, 0.34, m.g);
-    col = mix(col, sandCol, beach);
-    col = mix(col, vec3(0.68, 0.6, 0.42), (1.0 - smoothstep(0.5, 0.58, land)) * 0.8);
+  vec3 sandCol = vec3(0.9, 0.81, 0.58) * (0.94 + 0.12 * noise(g * 10.0));
+  sandCol -= 0.03 * sin((p.x + p.y) * 9.0 + noise(p * 2.0) * 4.0);
+  // Low threshold: a one-tile beach only reaches ~0.375 after the mask blur.
+  col = mix(col, sandCol, smoothstep(0.16, 0.34, m.g));
+  col = mix(col, vec3(0.68, 0.6, 0.42), (1.0 - smoothstep(0.5, 0.58, land)) * 0.8);
 
-    // Relief: height from inland distance plus noise, lit from the upper left.
-    float h0 = height(p);
-    float lit = 1.0 + ((height(p + vec2(0.35, 0.0)) - h0) * 0.9 + (height(p + vec2(0.0, 0.35)) - h0) * 0.35) * 0.9;
-    col *= clamp(lit, 0.7, 1.25);
-  }
+  // Relief: height from inland distance plus noise (rock raised), lit from the upper left.
+  float h0 = height(p) + rockMask * ridge * 0.4;
+  float hx = height(p + vec2(0.35, 0.0)) + smp(uMask, pf + vec2(0.35, 0.0)).b * ridge * 0.4;
+  float hy = height(p + vec2(0.0, 0.35)) + smp(uMask, pf + vec2(0.0, 0.35)).b * ridge * 0.4;
+  col *= clamp(1.0 + ((hx - h0) * 0.9 + (hy - h0) * 0.35) * 0.9, 0.65, 1.3);
 
-  // Drifting cloud shadows and a warm afternoon grade.
-  float cloud = fbm(vPos * 0.0011 + vec2(t * 0.012, t * 0.004));
-  col *= 1.0 - 0.2 * smoothstep(0.5, 0.72, cloud);
   col = pow(col, vec3(0.95)) * vec3(1.04, 1.0, 0.94);
-  finalColor = vec4(col, 1.0);
+  // Premultiplied alpha with a soft coastline edge.
+  float a = smoothstep(0.45, 0.52, land);
+  finalColor = vec4(col * a, a);
 }`;
 
 const N = 256;
@@ -260,41 +271,56 @@ export function createGround(map: GameMap) {
   const maskSrc = new BufferImageSource({ resource: mask, ...opts, addressMode: 'clamp-to-edge' });
   const distSrc = new BufferImageSource({ resource: dist, ...opts, addressMode: 'clamp-to-edge' });
 
-  const shader = Shader.from({
-    gl: { vertex, fragment, name: 'ground' },
-    resources: {
-      uMask: maskSrc,
-      uDist: distSrc,
-      uNoise: bakeNoise(),
-      ground: {
-        uSize: { value: new Float32Array([W, H]), type: 'vec2<f32>' },
-        uTime: { value: 0, type: 'f32' },
-        uFar: { value: 0, type: 'f32' },
-      },
+  const resources = (name: string) => ({
+    uMask: maskSrc,
+    uDist: distSrc,
+    uNoise: noise,
+    [name]: {
+      uSize: { value: new Float32Array([W, H]), type: 'vec2<f32>' },
+      uTime: { value: 0, type: 'f32' },
+      uFar: { value: 0, type: 'f32' },
     },
+  });
+  const noise = bakeNoise();
+  const waterShader = Shader.from({
+    gl: { vertex, fragment: waterFragment, name: 'water' },
+    resources: resources('water'),
+  });
+  const landShader = Shader.from({
+    gl: { vertex, fragment: landFragment, name: 'land' },
+    resources: resources('land'),
   });
 
   // Map diamond plus a wide margin of open sea.
   const M = 6000;
-  const x0 = -H * (TILE_W / 2) - M;
-  const x1 = W * (TILE_W / 2) + M;
-  const y0 = -M;
-  const y1 = (W + H) * (TILE_H / 2) + M;
-  const geometry = new Geometry({
-    attributes: { aPosition: [x0, y0, x1, y0, x1, y1, x0, y1] },
-    indexBuffer: [0, 1, 2, 0, 2, 3],
+  const quad = (x0: number, y0: number, x1: number, y1: number) =>
+    new Geometry({ attributes: { aPosition: [x0, y0, x1, y0, x1, y1, x0, y1] }, indexBuffer: [0, 1, 2, 0, 2, 3] });
+  const water = new Mesh({
+    geometry: quad(-H * (TILE_W / 2) - M, -M, W * (TILE_W / 2) + M, (W + H) * (TILE_H / 2) + M),
+    shader: waterShader,
   });
-  const mesh = new Mesh({ geometry, shader });
-  const u = shader.resources.ground.uniforms;
+  const wu = waterShader.resources.water.uniforms;
 
   return {
-    mesh,
+    water,
     update(dt: number, far: number) {
-      u.uTime += dt;
-      u.uFar = far;
+      wu.uTime += dt;
+      wu.uFar = far;
     },
-    setForest(x: number, y: number, on: boolean) {
-      forestRaw[y * W + x] = on ? 1 : 0;
+    /** A mesh covering tiles [x0, x1) × [y0, y1), to render that chunk's land once. */
+    landMesh(x0: number, y0: number, x1: number, y1: number, far: number) {
+      landShader.resources.land.uniforms.uFar = far;
+      const pt = (x: number, y: number) => [((x - y) * TILE_W) / 2, ((x + y) * TILE_H) / 2];
+      const geometry = new Geometry({
+        attributes: { aPosition: [...pt(x0, y0), ...pt(x1, y0), ...pt(x1, y1), ...pt(x0, y1)] },
+        indexBuffer: [0, 1, 2, 0, 2, 3],
+      });
+      return new Mesh({ geometry, shader: landShader });
+    },
+    /** Forest gone from these tiles (cleared for building). */
+    clearForest(tiles: [number, number][]) {
+      if (!tiles.some(([x, y]) => forestRaw[y * W + x])) return;
+      for (const [x, y] of tiles) forestRaw[y * W + x] = 0;
       packForest();
       distSrc.update();
     },

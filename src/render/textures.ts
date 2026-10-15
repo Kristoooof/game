@@ -141,49 +141,76 @@ const boulder = paint(20, 14, 10, 11, (c) => {
   ]);
 });
 
-const mountain = (seed: number) => {
+/**
+ * A peak with a lit west face and shaded east face, each split into facets, a lower
+ * shoulder, crack lines and ledges, and (on high peaks only) snow with gullies.
+ */
+const mountain = (seed: number, snowy: boolean) => {
   const r = mulberry32(seed);
-  const h = 46 + r() * 22;
-  const px = 46 + r() * 10;
-  return paint(110, 100, 55, 84, (c) => {
-    shadow(c, 60, 84, 48, 13);
+  const h = (snowy ? 52 : 34) + r() * 18;
+  const px = 48 + r() * 12;
+  return paint(120, 100, 60, 84, (c) => {
+    shadow(c, 66, 84, 50, 12);
     const base = 86;
     const peak = [px, base - h];
-    // Jagged silhouette from left foot over the peak to the right foot.
-    const ridge = (x0: number, x1: number, y0: number, y1: number, n: number) =>
+    const jag = (x0: number, y0: number, x1: number, y1: number, n: number, amp: number) =>
       Array.from({ length: n + 1 }, (_, k) => {
         const t = k / n;
-        return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t + (k && k < n ? (r() - 0.5) * 6 : 0)];
+        return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t + (k && k < n ? (r() - 0.5) * amp : 0)];
       });
-    const leftRidge = ridge(6, peak[0], base, peak[1], 5);
-    const rightRidge = ridge(peak[0], 104, peak[1], base - 2, 5);
-    const spine = [peak, [peak[0] + 6, base - h * 0.45], [peak[0] + 2, base + 2]];
-    const lit = c.createLinearGradient(0, peak[1], 0, base);
-    lit.addColorStop(0, '#c4bcab');
-    lit.addColorStop(1, '#8f8676');
-    const dark = c.createLinearGradient(0, peak[1], 0, base);
-    dark.addColorStop(0, '#7d7568');
-    dark.addColorStop(1, '#575047');
-    poly(c, lit, [...leftRidge, ...spine.slice(1).reverse(), [6, base]]);
-    poly(c, dark, [...rightRidge, [104, base], [peak[0] + 2, base + 2], spine[1], peak]);
-    // Snow: a band hugging the peak with a ragged lower edge.
-    const sh = h * 0.32;
-    const snow = [peak];
-    for (let k = 0; k <= 6; k++) {
-      const t = k / 6;
-      snow.push([peak[0] - sh * 0.9 + t * sh * 1.9, peak[1] + sh * (0.75 + (k % 2) * 0.35 + r() * 0.15)]);
-    }
-    poly(c, '#f5f7fa', snow.slice(0, 5).concat([[peak[0] + 3, peak[1] + sh * 0.6]]));
-    poly(c, '#c3ccd8', [peak, [peak[0] + 3, peak[1] + sh * 0.6], ...snow.slice(4)]);
-    c.strokeStyle = 'rgba(40,34,28,0.28)';
-    c.lineWidth = 0.8;
-    for (let i = 0; i < 6; i++) {
-      const x = 18 + r() * 74;
-      const y = base - 6 - r() * h * 0.5;
+    const grad = (top: string, bottom: string) => {
+      const g = c.createLinearGradient(0, peak[1], 0, base);
+      g.addColorStop(0, top);
+      g.addColorStop(1, bottom);
+      return g;
+    };
+    // Shoulder peak behind and to the side.
+    const sx = px + (r() < 0.5 ? -26 : 24);
+    const sp = [sx, base - h * 0.55];
+    poly(c, grad('#a99c86', '#7f7360'), [[sx - 30, base], sp, [sx + 4, base]]);
+    poly(c, grad('#6f6555', '#4f483d'), [sp, [sx + 30, base], [sx + 4, base]]);
+    // Main peak: west face in two facets, east face in two facets.
+    const mid = [px + 4 + r() * 4, base - h * 0.42];
+    const west = jag(8, base, peak[0], peak[1], 5, 7);
+    const east = jag(peak[0], peak[1], 112, base, 5, 7);
+    poly(c, grad('#c2b49b', '#8d7f69'), [...west, mid, [px - 6, base]]);
+    poly(c, grad('#ab9d84', '#7b6e5a'), [peak, mid, [px - 6, base], [px + 10, base]]);
+    poly(c, grad('#7b6f5d', '#544b3f'), [...east, [px + 10, base], mid]);
+    poly(c, grad('#685d4e', '#463f35'), [peak, mid, [px + 10, base]]);
+    // Cracks on the faces and pale ledges catching light.
+    c.lineWidth = 0.7;
+    for (let i = 0; i < 9; i++) {
+      const x = 20 + r() * 84;
+      const y = base - 4 - r() * h * 0.55;
+      c.strokeStyle = 'rgba(40,32,24,0.35)';
       c.beginPath();
       c.moveTo(x, y);
-      c.lineTo(x + (r() - 0.3) * 10, y + 8 + r() * 8);
+      c.lineTo(x + (r() - 0.5) * 6, y + 6 + r() * 8);
       c.stroke();
+      c.strokeStyle = 'rgba(235,225,205,0.35)';
+      c.beginPath();
+      c.moveTo(x - 4, y - 2);
+      c.lineTo(x + 3, y - 3.5);
+      c.stroke();
+    }
+    if (snowy) {
+      // Snow cap with a ragged lower edge and gullies running down the lit face.
+      const sh = h * 0.3;
+      const edge = Array.from({ length: 7 }, (_, k) => [
+        peak[0] - sh * 0.95 + (k / 6) * sh * 2,
+        peak[1] + sh * (0.7 + (k % 2) * 0.4 + r() * 0.2),
+      ]);
+      poly(c, '#f4f6f9', [peak, ...edge.slice(0, 4), [peak[0] + 2, peak[1] + sh * 0.7]]);
+      poly(c, '#bcc6d3', [peak, [peak[0] + 2, peak[1] + sh * 0.7], ...edge.slice(3)]);
+      c.strokeStyle = 'rgba(244,246,249,0.85)';
+      c.lineWidth = 1.2;
+      for (let i = 0; i < 3; i++) {
+        const [x, y] = edge[i];
+        c.beginPath();
+        c.moveTo(x, y - 1);
+        c.lineTo(x - 2 - r() * 3, y + 5 + r() * 6);
+        c.stroke();
+      }
     }
   });
 };
@@ -209,7 +236,8 @@ export function makeArt() {
     ],
     bushes: [bush(8, LEAF_GREEN), bush(9, DARK_GREEN)],
     boulder,
-    mountains: [21, 22, 23, 24].map(mountain),
+    peaks: [21, 22, 23].map((k) => mountain(k, true)),
+    hills: [24, 25, 26, 27].map((k) => mountain(k, false)),
   };
 }
 

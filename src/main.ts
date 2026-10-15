@@ -1,11 +1,11 @@
-import { Application, Container, CullerPlugin, extensions, Graphics, Rectangle } from 'pixi.js';
+import { Application, Container, Graphics, Rectangle } from 'pixi.js';
 import { BUILDINGS, GOOD_NAMES, type Good } from './data/buildings';
 import pelda from './data/maps/pelda.txt?raw';
-import { chimneyAt, createBuildingsView, drawBuilding, drawRoads, drawTerritory } from './render/buildings';
+import { chimneyAt, drawBuilding, drawTerritory } from './render/buildings';
 import { createEffects } from './render/effects';
 import { attachCameraControls, screenToWorld, type Camera } from './render/camera';
-import { screenToTile, tileToScreen } from './render/iso';
-import { createTerrain, diamond } from './render/terrain';
+import { diamond, screenToTile, tileToScreen } from './render/iso';
+import { createTerrain, FAR_SCALE } from './render/terrain';
 import { type GameMap, type Terrain, generateMap, parseMap, terrainAt } from './sim/map';
 import { buildingAt, createWorld, demolish, place, placementError, roadPath } from './sim/world';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
@@ -49,11 +49,10 @@ const showResources = () =>
   ].join(''));
 showResources();
 
-extensions.add(CullerPlugin);
 const app = new Application();
 // WebGL: the ground shader is GLSL only.
-// Sharp on high-DPI screens, capped lower on touch devices to spare phone GPUs.
-const resolution = Math.min(devicePixelRatio, matchMedia('(pointer: coarse)').matches ? 1.5 : 2);
+// Above 1.5× the extra sharpness is hard to see but costs fill rate on big screens.
+const resolution = Math.min(devicePixelRatio, 1.5);
 await app.init({
   resizeTo: window,
   background: '#0d4166',
@@ -65,35 +64,32 @@ await app.init({
 document.body.prepend(app.canvas);
 
 const scene = new Container();
-const terrain = createTerrain(map);
+const terrain = createTerrain(world, app.renderer);
 const territory = new Graphics();
-const roads = new Graphics();
 const hover = new Graphics();
 const selection = new Graphics();
 const preview = new Graphics();
 const ghost = new Graphics({ alpha: 0.6 });
 territory.visible = false;
 const effects = createEffects(map);
-scene.addChild(terrain.ground, roads, territory, terrain.objects, effects.layer, hover, selection, preview, ghost);
+scene.addChild(terrain.water, terrain.ground, territory, terrain.objects, effects.layer);
+scene.addChild(hover, selection, preview, ghost);
 app.stage.addChild(scene);
 const view = new Rectangle();
 app.ticker.add((t) => {
   const dt = t.deltaMS / 1000;
-  terrain.update(dt, cam.scale);
   const tl = screenToWorld(cam, 0, 0);
   view.x = tl.x;
   view.y = tl.y;
   view.width = app.screen.width / cam.scale;
   view.height = app.screen.height / cam.scale;
-  effects.update(dt, view, cam.scale < 0.3);
+  terrain.update(dt, view, cam.scale);
+  effects.update(dt, view, cam.scale < FAR_SCALE);
 });
-const syncBuildings = createBuildingsView(terrain.objectsAt);
 
-/** Redraw after a world change; `cleared` tiles lose their trees and decoration. */
-const refresh = (cleared: [number, number][] = []) => {
-  for (const [x, y] of cleared) terrain.clearTile(x, y);
-  syncBuildings(world);
-  drawRoads(roads, world);
+/** Redraw after a world change in `tiles` (built on, cleared or demolished). */
+const refresh = (tiles: [number, number][] = []) => {
+  terrain.changed(tiles);
   effects.setChimneys([...world.buildings.values()].flatMap((b) => chimneyAt(b.type, b.x, b.y) ?? []));
   drawTerritory(territory, world);
   showResources();
@@ -188,8 +184,9 @@ const showPreview = (t: { x: number; y: number } | undefined) => {
 };
 
 const demolishAt = (t: { x: number; y: number } | undefined) => {
-  if (!t || !demolish(world, t.x, t.y)) return;
-  refresh();
+  const b = t && demolish(world, t.x, t.y);
+  if (!b) return;
+  refresh(footprint(b.x, b.y, BUILDINGS[b.type].size));
   showPreview(t);
 };
 

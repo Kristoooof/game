@@ -86,7 +86,8 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Optimalizálás: sütött zajtextúra a shaderben (mipmappel), CPU-n elmosott maszkok, effektek csak a képernyőn látható részen
 - [ ] Grafika finomítása (épület sprite-ok, animációk, napszak?)
 - [ ] Hangok, zene
-- [ ] Teljesítmény (nagy térkép, culling)
+- [x] Teljesítmény: statikus világ darabonként textúrába sütve (zoomhoz igazított felbontás, csak a változott darab sül újra, nem látott darabok felszabadulnak), élő csak a víz-shader; JS idő/képkocka 9,5 → 1,1 ms
+- [x] Hegyek újrarajzolva: csupasz és havas csúcsok, ritkább elhelyezés, rétegzett sziklatalaj
 - [ ] Egyensúlyozás
 
 ### Később (nem MVP)

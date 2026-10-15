@@ -12,3 +12,9 @@ export function screenToTile(sx: number, sy: number) {
   const b = sy / (TILE_H / 2);
   return { x: Math.floor((a + b) / 2), y: Math.floor((b - a) / 2) };
 }
+
+/** Corners (top, right, bottom, left) of tile (x, y) as a flat polygon. */
+export const diamond = (x: number, y: number) => {
+  const s = tileToScreen(x, y);
+  return [s.x, s.y, s.x + TILE_W / 2, s.y + TILE_H / 2, s.x, s.y + TILE_H, s.x - TILE_W / 2, s.y + TILE_H / 2];
+};

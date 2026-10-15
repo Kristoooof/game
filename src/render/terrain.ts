@@ -1,157 +1,270 @@
-import { Container, Rectangle, type Sprite } from 'pixi.js';
-import { type GameMap, terrainAt } from '../sim/map';
+import {
+  Container,
+  Graphics,
+  Matrix,
+  Mesh,
+  MeshGeometry,
+  Rectangle,
+  type Renderer,
+  RenderTexture,
+  Sprite,
+  Texture,
+} from 'pixi.js';
+import { BUILDINGS } from '../data/buildings';
+import { terrainAt } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
+import type { World } from '../sim/world';
+import { drawBuilding, drawRoads } from './buildings';
 import { createGround } from './ground';
-import { TILE_H, TILE_W, tileToScreen } from './iso';
+import { tileToScreen } from './iso';
 import { type Art, makeArt, sprite } from './textures';
-
-export const diamond = (x: number, y: number) => {
-  const s = tileToScreen(x, y);
-  return [s.x, s.y, s.x + TILE_W / 2, s.y + TILE_H / 2, s.x, s.y + TILE_H, s.x - TILE_W / 2, s.y + TILE_H / 2];
-};
 
 const CHUNK = 16;
 
-/** Below this zoom, trees and peaks are hidden and the ground shader paints canopy instead. */
-const FAR_SCALE = 0.3;
+/** Below this zoom, trees are left out and the land shader paints forest canopy instead. */
+export const FAR_SCALE = 0.3;
+/** Time per frame spent baking chunks; at least one chunk is always baked. */
+const BAKE_BUDGET_MS = 6;
+/** Highest chunk texture resolution; phones get less to stay within their memory. */
+const MAX_TIER = matchMedia('(pointer: coarse)').matches ? 1 : 2;
+/** Chunks unseen for this many frames give their textures back. */
+const EVICT_FRAMES = 240;
+
+interface Chunk {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  /** World-pixel bounds of the land diamond, and of everything standing on it. */
+  ground: Rectangle;
+  objects: Rectangle;
+  /** Land drawn as the chunk's diamond, not its bounding box: no overdraw between chunks. */
+  groundMesh: Mesh<MeshGeometry>;
+  objectSprite: Sprite;
+  /** Bake key ("tier/far") of the textures shown, or '' when nothing is baked. */
+  baked: string;
+  dirty: boolean;
+  lastSeen: number;
+}
 
 /**
- * Shader-drawn ground and sea, plus trees, bushes and peaks as sprites in culled
- * CHUNK×CHUNK containers. Buildings join the same containers so everything standing
- * on the map is depth-sorted together (zIndex = x + y of the object's front).
+ * The static world (land, roads, trees, peaks, buildings) is rendered once per
+ * CHUNK×CHUNK piece into textures, at a resolution matching the zoom. A frame then
+ * draws only the live water shader and a few dozen chunk sprites. Changes rebake the
+ * chunks they touch; textures of chunks long off screen are released.
  */
-export function createTerrain(map: GameMap) {
+export function createTerrain(world: World, renderer: Renderer) {
+  const { map } = world;
   const art = makeArt();
-  leafArt = art.broadleaves;
+  const leaf = (k: number) => art.broadleaves[k < 0.08 ? 3 : Math.floor(k * 3) % 3];
   const ground = createGround(map);
   const { width: W, height: H } = map;
   const at = (x: number, y: number) => terrainAt(map, x, y) ?? 'water';
-  const objects = new Container({ sortableChildren: true });
-  const cols = Math.ceil(W / CHUNK);
-  const chunks: Container[] = [];
-  const nature = new Map<number, Sprite[]>();
-  const allNature: Sprite[] = [];
-  /** Trees and bushes per chunk; only chunks on screen are animated. */
-  const sway: Sprite[][] = [];
-  let time = 0;
+  const groundLayer = new Container();
+  const objectLayer = new Container({ sortableChildren: true });
 
   // Mountain tiles deep inside a range get taller peaks.
   const rockDepth = new Uint8Array(W * H);
   for (let pass = 1; pass <= 3; pass++)
-    for (let y = 0; y < H; y++)
-      for (let x = 0; x < W; x++) {
+    for (let y = 1; y < H - 1; y++)
+      for (let x = 1; x < W - 1; x++) {
         const i = y * W + x;
         if (at(x, y) !== 'mountain' || rockDepth[i] !== pass - 1) continue;
-        const n = [rockDepth[i - 1], rockDepth[i + 1], rockDepth[i - W], rockDepth[i + W]];
-        if (
-          n.every((v) => v >= pass - 1) &&
-          [at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1)].every((t) => t === 'mountain')
-        )
+        if ([i - 1, i + 1, i - W, i + W].every((j) => map.tiles[j] === 'mountain' && rockDepth[j] >= pass - 1))
           rockDepth[i] = pass;
       }
 
-  for (let cy = 0; cy < Math.ceil(H / CHUNK); cy++) {
+  /** Trees, bushes, boulders and peaks standing on free tiles of a chunk. */
+  function addNature(c: Chunk, into: Container, far: boolean) {
+    for (let y = c.y0; y < c.y1; y++)
+      for (let x = c.x0; x < c.x1; x++) {
+        if (world.occupied[y * W + x]) continue;
+        const t = at(x, y);
+        const r = mulberry32(x * 92821 + y * 68917 + 7);
+        const put = (a: Art, u: number, v: number, scale: number) => {
+          const s = tileToScreen(x + u, y + v);
+          const sp = sprite(a, s.x, s.y, scale);
+          sp.zIndex = x + y + u + v;
+          into.addChild(sp);
+        };
+        if (t === 'forest' && !far) {
+          const n = 2 + Math.floor(r() * 3);
+          for (let i = 0; i < n; i++) {
+            const u = 0.1 + r() * 0.8;
+            const v = 0.1 + r() * 0.8;
+            const k = r();
+            if (k < 0.6) put(art.conifers[Math.floor(r() * 3)], u, v, 0.75 + r() * 0.45);
+            else if (k < 0.93) put(leaf(r()), u, v, 0.7 + r() * 0.4);
+            else put(art.bushes[Math.floor(r() * 2)], u, v, 0.8 + r() * 0.4);
+          }
+        } else if (t === 'mountain') {
+          // Sparse peaks on a checkerboard so they do not stack into rows; snow only deep inside a range.
+          const d = rockDepth[y * W + x];
+          const p = r();
+          const k = r();
+          if ((x + y) % 2 === 0 && p < 0.45 + d * 0.15) {
+            const kinds = d >= 2 ? art.peaks : art.hills;
+            put(kinds[Math.floor(k * kinds.length)], 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.7 + d * 0.22 + r() * 0.3);
+          } else if (p < 0.5 && !far) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.8);
+        } else if (t === 'grass' && !far) {
+          const p = r();
+          if (p < 0.035) put(leaf(r()), 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.75 + r() * 0.35);
+          else if (p < 0.09) put(art.bushes[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.7 + r() * 0.5);
+          else if (p < 0.105) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.6 + r() * 0.5);
+        }
+      }
+  }
+
+  /** Diamond over tiles [x0, x1) × [y0, y1), its UVs mapping into a texture of bounds `r`. */
+  const diamondMesh = (x0: number, y0: number, x1: number, y1: number, r: Rectangle) => {
+    const pts = [tileToScreen(x0, y0), tileToScreen(x1, y0), tileToScreen(x1, y1), tileToScreen(x0, y1)];
+    const geometry = new MeshGeometry({
+      positions: new Float32Array(pts.flatMap((p) => [p.x, p.y])),
+      uvs: new Float32Array(pts.flatMap((p) => [(p.x - r.x) / r.width, (p.y - r.y) / r.height])),
+      indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+    });
+    return new Mesh({ geometry, texture: Texture.EMPTY, visible: false });
+  };
+
+  const chunks: Chunk[] = [];
+  const cols = Math.ceil(W / CHUNK);
+  for (let cy = 0; cy < Math.ceil(H / CHUNK); cy++)
     for (let cx = 0; cx < cols; cx++) {
       const x0 = cx * CHUNK;
       const y0 = cy * CHUNK;
       const x1 = Math.min(W, x0 + CHUNK);
       const y1 = Math.min(H, y0 + CHUNK);
-      const left = tileToScreen(x0, y1).x - 2 * TILE_W;
-      const right = tileToScreen(x1, y0).x + 2 * TILE_W;
-      const top = tileToScreen(x0, y0).y - 160;
-      const bottom = tileToScreen(x1, y1).y + 2 * TILE_H;
-      const c = new Container({ cullable: true, sortableChildren: true, zIndex: cx + cy });
-      c.cullArea = new Rectangle(left, top, right - left, bottom - top);
+      // Open sea: nothing to bake.
+      let hasLand = false;
+      for (let y = y0; y < y1 && !hasLand; y++) for (let x = x0; x < x1; x++) if (at(x, y) !== 'water') hasLand = true;
+      if (!hasLand) continue;
+      const left = tileToScreen(x0, y1).x;
+      const right = tileToScreen(x1, y0).x;
+      const top = tileToScreen(x0, y0).y;
+      const bottom = tileToScreen(x1, y1).y;
+      const c: Chunk = {
+        x0,
+        y0,
+        x1,
+        y1,
+        ground: new Rectangle(left - 16, top - 16, right - left + 32, bottom - top + 32),
+        objects: new Rectangle(left - 80, top - 180, right - left + 160, bottom - top + 204),
+        groundMesh: diamondMesh(
+          x0,
+          y0,
+          x1,
+          y1,
+          new Rectangle(left - 16, top - 16, right - left + 32, bottom - top + 32),
+        ),
+        objectSprite: new Sprite({ visible: false, zIndex: cx + cy }),
+        baked: '',
+        dirty: false,
+        lastSeen: -1e9,
+      };
+      groundLayer.addChild(c.groundMesh);
+      objectLayer.addChild(c.objectSprite);
       chunks.push(c);
-      const swaying: Sprite[] = [];
-      sway.push(swaying);
-      objects.addChild(c);
-
-      for (let y = y0; y < y1; y++) {
-        for (let x = x0; x < x1; x++) {
-          const t = at(x, y);
-          const r = mulberry32(x * 92821 + y * 68917 + 7);
-          const list: Sprite[] = [];
-          const put = (a: Art, u: number, v: number, scale: number) => {
-            const s = sprite(a, ...xy(x + u, y + v), scale);
-            s.zIndex = x + y + u + v;
-            if (a !== art.boulder && !art.mountains.includes(a)) swaying.push(s);
-            list.push(s);
-            c.addChild(s);
-          };
-          if (t === 'forest') {
-            const n = 2 + Math.floor(r() * 3);
-            for (let i = 0; i < n; i++) {
-              const u = 0.1 + r() * 0.8;
-              const v = 0.1 + r() * 0.8;
-              const k = r();
-              if (k < 0.6) put(art.conifers[Math.floor(r() * 3)], u, v, 0.75 + r() * 0.45);
-              else if (k < 0.93) put(leaf(r()), u, v, 0.7 + r() * 0.4);
-              else put(art.bushes[Math.floor(r() * 2)], u, v, 0.8 + r() * 0.4);
-            }
-          } else if (t === 'mountain') {
-            const d = rockDepth[y * W + x];
-            // Sparse peaks; the ground shader paints the rock between them.
-            const p = r();
-            if (p < 0.3 + d * 0.12)
-              put(art.mountains[Math.floor(r() * 4)], 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.6 + d * 0.25 + r() * 0.25);
-            else if (p < 0.55) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.8);
-          } else if (t === 'grass') {
-            const p = r();
-            if (p < 0.035) put(leaf(r()), 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.75 + r() * 0.35);
-            else if (p < 0.09) put(art.bushes[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.7 + r() * 0.5);
-            else if (p < 0.105) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.6 + r() * 0.5);
-          }
-          if (list.length) {
-            nature.set(y * W + x, list);
-            allNature.push(...list);
-          }
-        }
-      }
     }
+
+  const render = (container: Container, r: Rectangle, tier: number) => {
+    const target = RenderTexture.create({ width: Math.ceil(r.width), height: Math.ceil(r.height), resolution: tier });
+    renderer.render({ container, target, clear: true, transform: new Matrix().translate(-r.x, -r.y) });
+    return target;
+  };
+  /** Show `texture` (or nothing) on a chunk sprite or mesh and free the texture it replaces. */
+  const swap = (s: Sprite | Mesh<MeshGeometry>, texture: RenderTexture | null, r?: Rectangle) => {
+    const old = s.texture;
+    s.texture = texture ?? Texture.EMPTY;
+    if (r) s.position.set(r.x, r.y);
+    if (old instanceof RenderTexture && old !== texture) old.destroy(true);
+  };
+
+  function bake(c: Chunk, tier: number, far: boolean) {
+    const g = new Container();
+    // Bake a little past the diamond so its edge texels are fully covered: no seams.
+    const land = ground.landMesh(c.x0 - 0.25, c.y0 - 0.25, c.x1 + 0.25, c.y1 + 0.25, far ? 1 : 0);
+    const roads = new Graphics();
+    drawRoads(roads, world, c.x0, c.y0, c.x1, c.y1);
+    g.addChild(land, roads);
+    const groundTex = render(g, c.ground, tier);
+    land.geometry.destroy();
+    g.destroy({ children: true });
+
+    const o = new Container({ sortableChildren: true });
+    addNature(c, o, far);
+    for (const b of world.buildings.values()) {
+      if (b.type === 'road' || b.x < c.x0 || b.x >= c.x1 || b.y < c.y0 || b.y >= c.y1) continue;
+      const bg = new Graphics({ zIndex: b.x + b.y + BUILDINGS[b.type].size });
+      drawBuilding(bg, b.type, b.x, b.y, b.id);
+      o.addChild(bg);
+    }
+    // Trim the object texture to what is actually there: less transparent overdraw.
+    let objTex: RenderTexture | null = null;
+    let objRect: Rectangle | undefined;
+    if (o.children.length) {
+      const b = o.getLocalBounds();
+      objRect = new Rectangle(
+        Math.floor(b.minX) - 2,
+        Math.floor(b.minY) - 2,
+        Math.ceil(b.width) + 4,
+        Math.ceil(b.height) + 4,
+      );
+      objTex = render(o, objRect, tier);
+    }
+    o.destroy({ children: true });
+
+    swap(c.groundMesh, groundTex);
+    swap(c.objectSprite, objTex, objRect);
+    c.baked = `${tier}/${far}`;
+    c.dirty = false;
   }
 
-  let far = false;
+  let frame = 0;
   return {
-    ground: ground.mesh,
-    objects,
-    /** Object container for tile (x, y): add buildings here, depth-sorted by zIndex. */
-    objectsAt: (x: number, y: number) => chunks[Math.floor(y / CHUNK) * cols + Math.floor(x / CHUNK)],
-    /** Remove trees and decoration from a tile (forest cleared for building). */
-    clearTile(x: number, y: number) {
-      const i = y * W + x;
-      const swaying = sway[Math.floor(y / CHUNK) * cols + Math.floor(x / CHUNK)];
-      nature.get(i)?.forEach((s) => {
-        allNature.splice(allNature.indexOf(s), 1);
-        if (swaying.includes(s)) swaying.splice(swaying.indexOf(s), 1);
-        s.destroy();
-      });
-      nature.delete(i);
-      ground.setForest(x, y, false);
+    water: ground.water,
+    ground: groundLayer,
+    objects: objectLayer,
+    /** Rebake the chunks covering these tiles, including neighbours their objects overhang. */
+    invalidate(tiles: [number, number][]) {
+      for (const [x, y] of tiles)
+        for (const c of chunks) if (x >= c.x0 - 1 && x <= c.x1 && y >= c.y0 - 1 && y <= c.y1) c.dirty = true;
     },
-    update(dt: number, scale: number) {
-      time += dt;
-      const nowFar = scale < FAR_SCALE;
-      if (nowFar !== far) {
-        far = nowFar;
-        for (const s of allNature) s.visible = !far;
-      }
-      if (!far)
-        chunks.forEach((c, i) => {
-          if (c.culled) return;
-          // Shear about the trunk base: tops lean with gusts that travel across the map.
-          for (const s of sway[i]) s.skew.x = Math.sin(time * 1.4 + s.x * 0.004 + s.y * 0.007) * 0.035;
-        });
+    /** Tiles changed by building or demolishing: clear their forest and rebake around them. */
+    changed(tiles: [number, number][]) {
+      ground.clearForest(tiles);
+      this.invalidate(tiles);
+    },
+    update(dt: number, view: Rectangle, scale: number) {
+      frame++;
+      const far = scale < FAR_SCALE;
       ground.update(dt, Math.min(1, Math.max(0, (FAR_SCALE + 0.08 - scale) / 0.08)));
+      // Power-of-two texture resolution per zoom level, so zooming does not rebake constantly.
+      const tier = Math.min(MAX_TIER, Math.max(1 / 16, 2 ** Math.ceil(Math.log2(scale * renderer.resolution))));
+      const key = `${tier}/${far}`;
+      const queue: Chunk[] = [];
+      for (const c of chunks) {
+        const visible = c.objects.intersects(view);
+        c.groundMesh.visible = c.objectSprite.visible = visible && c.baked !== '';
+        if (visible) {
+          c.lastSeen = frame;
+          if (c.dirty || c.baked !== key) queue.push(c);
+        } else if (c.baked && frame - c.lastSeen > EVICT_FRAMES && tier > 0.125) {
+          swap(c.groundMesh, null);
+          swap(c.objectSprite, null);
+          c.baked = '';
+        }
+      }
+      // Missing chunks first, then the ones nearest the view centre.
+      const cx = view.x + view.width / 2;
+      const cy = view.y + view.height / 2;
+      const dist = (c: Chunk) =>
+        Math.hypot(c.ground.x + c.ground.width / 2 - cx, c.ground.y + c.ground.height / 2 - cy);
+      queue.sort((a, b) => (a.baked ? 1 : 0) - (b.baked ? 1 : 0) || dist(a) - dist(b));
+      const start = performance.now();
+      for (const c of queue) {
+        bake(c, tier, far);
+        if (performance.now() - start > BAKE_BUDGET_MS) break;
+      }
     },
   };
 }
-
-/** Mostly green broadleaves, the odd autumn one. */
-let leafArt: Art[] = [];
-const leaf = (k: number) => leafArt[k < 0.08 ? 3 : Math.floor(k * 3) % 3];
-
-const xy = (x: number, y: number): [number, number] => {
-  const s = tileToScreen(x, y);
-  return [s.x, s.y];
-};
