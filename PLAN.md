@@ -31,7 +31,7 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Terv elkészítése
 - [x] Vite + TS + PixiJS projekt, Vitest, ESLint/Prettier
 - [x] GitHub Actions: build + teszt + GitHub Pages deploy
-- [x] Üres izometrikus vászon (élő oldal: main-re merge + Pages bekapcsolása után)
+- [x] Üres izometrikus vászon (élő oldal: alapértelmezett branchről deployol)
 
 ### 1. Térkép és kamera
 - [ ] Izometrikus csempe-rács (víz, part, föld, hegy, erdő)

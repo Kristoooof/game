@@ -26,13 +26,13 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
-      - if: github.ref == 'refs/heads/main'
+      - if: github.ref_name == github.event.repository.default_branch
         uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref_name == github.event.repository.default_branch
     needs: build
     runs-on: ubuntu-latest
     environment:
