@@ -80,6 +80,7 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [ ] Főmenü, új játék seed-del
 
 ### 7. Csiszolás
+- [x] Grafika v2: animált tenger, sekély part menti víz, tajték, megemelt szigetek sziklafallal, textúrázott terep, fák/bokrok/hegyek sprite-okból, részletes épületek, földutak, felhőárnyékok, középkori UI
 - [ ] Grafika finomítása (épület sprite-ok, animációk, napszak?)
 - [ ] Hangok, zene
 - [ ] Teljesítmény (nagy térkép, culling)

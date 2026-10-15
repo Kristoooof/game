@@ -7,7 +7,7 @@
   "5": "compilerOptions",
   "6": "caveman-commit",
   "7": "caveman-review",
-  "8": "map.ts",
+  "8": "terrain.ts",
   "9": "Ponytail Help",
   "10": "render/buildings.ts",
   "11": "ponytail-audit/SKILL.md",
@@ -17,5 +17,5 @@
   "15": "CLAUDE.md",
   "16": ".claude/CLAUDE.md",
   "17": "camera.ts",
-  "18": "buildMenu.ts"
+  "18": "world.ts"
 }

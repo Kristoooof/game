@@ -13,8 +13,6 @@ export interface BuildingDef {
   radius?: number;
   /** Can be built outside claimed land: how new islands are settled. */
   settles?: boolean;
-  color: number;
-  height: number;
 }
 
 export const GOOD_NAMES: Record<Good, string> = { wood: 'Fa', tools: 'Szerszám', bricks: 'Tégla' };
@@ -35,8 +33,6 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     coast: true,
     radius: 14,
     settles: true,
-    color: 0x8b5a2b,
-    height: 22,
   },
   warehouse: {
     name: 'Raktár',
@@ -44,18 +40,14 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     size: 2,
     cost: { gold: 400, wood: 4, tools: 2 },
     radius: 10,
-    color: 0xa0703c,
-    height: 18,
   },
-  road: { name: 'Út', category: 'infra', size: 1, cost: { gold: 5 }, color: 0xb59a6a, height: 0 },
-  house: { name: 'Paraszt ház', category: 'housing', size: 2, cost: { gold: 0, wood: 3 }, color: 0xc0392b, height: 16 },
+  road: { name: 'Út', category: 'infra', size: 1, cost: { gold: 5 } },
+  house: { name: 'Paraszt ház', category: 'housing', size: 2, cost: { gold: 0, wood: 3 } },
   lumberjack: {
     name: 'Favágó',
     category: 'production',
     size: 2,
     cost: { gold: 50, wood: 2 },
-    color: 0x6e4b2a,
-    height: 14,
   },
   fisher: {
     name: 'Halászkunyhó',
@@ -63,15 +55,11 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     size: 2,
     cost: { gold: 100, wood: 3, tools: 2 },
     coast: true,
-    color: 0x3b6e8f,
-    height: 14,
   },
   chapel: {
     name: 'Kápolna',
     category: 'public',
     size: 2,
     cost: { gold: 300, wood: 2, bricks: 4 },
-    color: 0xe8e0d0,
-    height: 26,
   },
 };

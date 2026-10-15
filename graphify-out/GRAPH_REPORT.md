@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-15)
 
 ## Corpus Check
-- 35 files · ~12,520 words
+- 36 files · ~16,225 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 256 nodes · 407 edges · 19 communities (17 shown, 2 thin omitted)
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
+- 290 nodes · 516 edges · 19 communities (17 shown, 2 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e890130a`
+- Built from commit: `c01f2c47`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -24,7 +24,7 @@
 - compilerOptions
 - caveman-commit
 - caveman-review
-- map.ts
+- terrain.ts
 - Ponytail Help
 - render/buildings.ts
 - ponytail-audit/SKILL.md
@@ -34,31 +34,31 @@
 - CLAUDE.md
 - .claude/CLAUDE.md
 - camera.ts
-- buildMenu.ts
+- world.ts
 
 ## God Nodes (most connected - your core abstractions)
-1. `showPreview()` - 13 edges
-2. `attachCameraControls()` - 11 edges
-3. `compilerOptions` - 10 edges
-4. `Rules` - 10 edges
-5. `Mérföldkövek` - 10 edges
-6. `tileAt()` - 9 edges
-7. `terrainAt()` - 9 edges
-8. `tileToScreen()` - 8 edges
-9. `diamond()` - 8 edges
-10. `scripts` - 7 edges
+1. `showPreview()` - 14 edges
+2. `drawBuilding()` - 12 edges
+3. `terrainAt()` - 12 edges
+4. `fill()` - 11 edges
+5. `attachCameraControls()` - 11 edges
+6. `mulberry32()` - 11 edges
+7. `tileAt()` - 10 edges
+8. `compilerOptions` - 10 edges
+9. `Rules` - 10 edges
+10. `Mérföldkövek` - 10 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `World` --references--> `Good`  [EXTRACTED]
-  src/sim/world.ts → src/data/buildings.ts
+- `refresh()` --calls--> `drawRoads()`  [EXTRACTED]
+  src/main.ts → src/render/buildings.ts
+- `refresh()` --calls--> `drawTerritory()`  [EXTRACTED]
+  src/main.ts → src/render/buildings.ts
 - `tileAt()` --calls--> `screenToWorld()`  [EXTRACTED]
   src/main.ts → src/render/camera.ts
 - `tileAt()` --calls--> `screenToTile()`  [EXTRACTED]
   src/main.ts → src/render/iso.ts
 - `outline()` --calls--> `diamond()`  [EXTRACTED]
   src/main.ts → src/render/terrain.ts
-- `menu` --calls--> `costText()`  [EXTRACTED]
-  src/main.ts → src/ui/buildMenu.ts
 
 ## Import Cycles
 - None detected.
@@ -82,8 +82,8 @@ Cohesion: 0.09
 Nodes (20): caveman, Example output, How to invoke, See also, What it does, 1. Answer first, 2. Kill ceremony, 3. Short word (+12 more)
 
 ### Community 4 - "main.ts"
-Cohesion: 0.10
-Nodes (37): anchorFor(), app, buildings, cam, demolishAt(), end(), hover, MAPS (+29 more)
+Cohesion: 0.09
+Nodes (39): anchorFor(), app, cam, demolishAt(), end(), footprint(), ghost, hover (+31 more)
 
 ### Community 5 - "compilerOptions"
 Cohesion: 0.17
@@ -97,17 +97,17 @@ Nodes (9): caveman-commit, Example output, How to invoke, See also, What it does
 Cohesion: 0.18
 Nodes (9): caveman-review, Example output, How to invoke, See also, What it does, Auto-Clarity, Boundaries, Examples (+1 more)
 
-### Community 8 - "map.ts"
+### Community 8 - "terrain.ts"
 Cohesion: 0.23
-Nodes (11): CHARS, GameMap, generateMap(), labelIslands(), lerp(), parseMap(), smooth(), landAreas() (+3 more)
+Nodes (19): createTerrain(), hash(), LIFT, tintAt(), Art, broadleaf(), bush, conifer() (+11 more)
 
 ### Community 9 - "Ponytail Help"
 Cohesion: 0.25
 Nodes (7): Configure Default Mode, Deactivate, Levels, More, Ponytail Help, Skills, Update
 
 ### Community 10 - "render/buildings.ts"
-Cohesion: 0.22
-Nodes (15): refresh(), showResources(), drawBox(), drawBuildings(), drawTerritory(), shade(), screenToTile(), TILE_H (+7 more)
+Cohesion: 0.21
+Nodes (21): Box, createBuildingsView(), drawBuilding(), drawRoads(), drawTerritory(), edge(), fill(), gabled() (+13 more)
 
 ### Community 11 - "ponytail-audit/SKILL.md"
 Cohesion: 0.40
@@ -129,29 +129,29 @@ Nodes (3): Boundaries, Output, Scan
 Cohesion: 0.20
 Nodes (13): vitest, active(), attachCameraControls(), Camera, cancel(), end(), Handlers, MAX_SCALE (+5 more)
 
-### Community 18 - "buildMenu.ts"
-Cohesion: 0.23
-Nodes (12): BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, GOOD_NAMES, Building (+4 more)
+### Community 18 - "world.ts"
+Cohesion: 0.11
+Nodes (29): BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, GOOD_NAMES, CHARS (+21 more)
 
 ## Knowledge Gaps
 - **3 isolated node(s):** `eslint`, `prettier`, `typescript`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 135 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 141 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `pixi.js` connect `package.json` to `render/buildings.ts`, `main.ts`?**
-  _High betweenness centrality (0.077) - this node is a cross-community bridge._
+- **Why does `pixi.js` connect `package.json` to `terrain.ts`, `render/buildings.ts`, `main.ts`?**
+  _High betweenness centrality (0.096) - this node is a cross-community bridge._
 - **What connects `eslint`, `prettier`, `typescript` to the rest of the system?**
   _3 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.06666666666666667 - nodes in this community are weakly interconnected._
-- **Why does `vitest` connect `camera.ts` to `package.json`, `map.ts`, `render/buildings.ts`, `main.ts`?**
-  _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Should `Caveman Help` be split into smaller, more focused modules?**
   _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._
 - **Should `Mérföldkövek` be split into smaller, more focused modules?**
   _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._
 - **Should `caveman` be split into smaller, more focused modules?**
   _Cohesion score 0.09090909090909091 - nodes in this community are weakly interconnected._
+- **Should `main.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.09059233449477352 - nodes in this community are weakly interconnected._

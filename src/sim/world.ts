@@ -20,8 +20,6 @@ export interface World {
   // shortcut: one global stock, split per island in milestone 3 (warehouse storage).
   stock: Record<Good, number>;
   nextId: number;
-  /** Bumped when terrain changes (forest cleared), so the renderer knows to redraw. */
-  terrainRev: number;
 }
 
 export function createWorld(map: GameMap): World {
@@ -35,7 +33,6 @@ export function createWorld(map: GameMap): World {
     gold: 5000,
     stock: { wood: 50, tools: 30, bricks: 20 },
     nextId: 1,
-    terrainRev: 0,
   };
 }
 
@@ -82,10 +79,7 @@ export function place(w: World, type: BuildingId, x: number, y: number): string 
   for (const [tx, ty] of footprint(type, x, y)) {
     const i = ty * w.map.width + tx;
     w.occupied[i] = id;
-    if (w.map.tiles[i] === 'forest') {
-      w.map.tiles[i] = 'grass';
-      w.terrainRev++;
-    }
+    if (w.map.tiles[i] === 'forest') w.map.tiles[i] = 'grass';
   }
   w.gold -= def.cost.gold;
   for (const g of Object.keys(GOOD_NAMES) as Good[]) w.stock[g] -= def.cost[g] ?? 0;
