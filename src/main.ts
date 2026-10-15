@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Rectangle } from 'pixi.js';
+import { Application, Container, Graphics, Matrix, Rectangle, RenderTexture, Sprite } from 'pixi.js';
 import { BUILDINGS, GOOD_NAMES, type Good } from './data/buildings';
 import pelda from './data/maps/pelda.txt?raw';
 import { chimneyAt, drawBuilding, drawTerritory } from './render/buildings';
@@ -73,9 +73,20 @@ const preview = new Graphics();
 const ghost = new Graphics({ alpha: 0.6 });
 territory.visible = false;
 const effects = createEffects(map);
-scene.addChild(terrain.water, terrain.ground, territory, terrain.objects, effects.layer);
+scene.addChild(terrain.ground, territory, terrain.objects, effects.layer);
 scene.addChild(hover, selection, preview, ghost);
 app.stage.addChild(scene);
+
+// The sea is the costliest per-pixel work and soft anyway: render it at half resolution
+// into a texture each frame, then stretch it under the scene.
+const WATER_SCALE = 0.5;
+const waterScene = new Container({ children: [terrain.water] });
+const waterTexture = RenderTexture.create({ width: app.screen.width, height: app.screen.height });
+const resizeWater = () =>
+  waterTexture.resize(app.screen.width, app.screen.height, app.renderer.resolution * WATER_SCALE);
+resizeWater();
+app.stage.addChildAt(new Sprite(waterTexture), 0);
+const waterTransform = new Matrix();
 
 const fxaa = createFxaa();
 // A fixed filter area: measuring the huge sea mesh for bounds every frame is wasted work.
@@ -83,10 +94,13 @@ app.stage.filterArea = app.screen;
 const applySettings = () => {
   app.stage.filters = settings.antialias === 'fxaa' ? [fxaa] : [];
   const r = resolutionOf(settings);
-  if (r !== app.renderer.resolution) app.renderer.resize(app.screen.width, app.screen.height, r);
+  if (r !== app.renderer.resolution) app.renderer.resize(innerWidth, innerHeight, r);
+  resizeWater();
 };
 applySettings();
 createSettingsPanel(document.getElementById('settings')!, settings, applySettings);
+// 'Auto' resolution depends on the window size.
+addEventListener('resize', applySettings);
 const countFps = createFpsCounter(document.getElementById('fps')!);
 const view = new Rectangle();
 app.ticker.add((t) => {
@@ -97,6 +111,8 @@ app.ticker.add((t) => {
   view.width = app.screen.width / cam.scale;
   view.height = app.screen.height / cam.scale;
   terrain.update(dt, view, cam.scale);
+  waterTransform.set(cam.scale, 0, 0, cam.scale, cam.x, cam.y);
+  app.renderer.render({ container: waterScene, target: waterTexture, transform: waterTransform });
   effects.update(dt, view, cam.scale < FAR_SCALE);
   countFps(settings.fps);
 });
@@ -265,4 +281,5 @@ app.renderer.on('resize', (w: number, h: number) => {
   cam.y += (h - size.h) / 2;
   size = { w, h };
   applyCamera();
+  resizeWater();
 });

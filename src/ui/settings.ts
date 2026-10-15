@@ -8,7 +8,8 @@ export interface Settings {
 }
 
 const KEY = 'szigetek.settings';
-const DEFAULTS: Settings = { resolution: 'auto', antialias: 'msaa', fps: false };
+// MSAA off by default: the baked world is already smooth, and MSAA is costly on big screens.
+const DEFAULTS: Settings = { resolution: 'auto', antialias: 'off', fps: false };
 
 export function loadSettings(): Settings {
   try {
@@ -26,7 +27,13 @@ const save = (s: Settings) => {
   }
 };
 
-export const resolutionOf = (s: Settings) => (s.resolution === 'auto' ? Math.min(devicePixelRatio, 1.5) : s.resolution);
+/** Pixels 'auto' aims for: about a 1080p frame, so a big window stays as fast as a small one. */
+const AUTO_PIXELS = 2_200_000;
+
+export const resolutionOf = (s: Settings) =>
+  s.resolution === 'auto'
+    ? Math.max(0.5, Math.min(devicePixelRatio, 1.5, Math.sqrt(AUTO_PIXELS / (innerWidth * innerHeight))))
+    : s.resolution;
 
 const RESOLUTIONS: [Settings['resolution'], string][] = [
   ['auto', 'Automatikus'],

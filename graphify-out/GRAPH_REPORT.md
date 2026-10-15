@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-15)
 
 ## Corpus Check
-- 40 files · ~21,373 words
+- 40 files · ~21,518 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 324 nodes · 598 edges · 19 communities (17 shown, 2 thin omitted)
+- 328 nodes · 603 edges · 19 communities (17 shown, 2 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2696ba2c`
+- Built from commit: `74572169`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -82,8 +82,8 @@ Cohesion: 0.09
 Nodes (20): caveman, Example output, How to invoke, See also, What it does, 1. Answer first, 2. Kill ceremony, 3. Short word (+12 more)
 
 ### Community 4 - "main.ts"
-Cohesion: 0.06
-Nodes (52): pixi.js, anchorFor(), app, applySettings(), cam, countFps, demolishAt(), effects (+44 more)
+Cohesion: 0.05
+Nodes (56): anchorFor(), app, applySettings(), cam, countFps, demolishAt(), effects, end() (+48 more)
 
 ### Community 5 - "compilerOptions"
 Cohesion: 0.17
@@ -99,7 +99,7 @@ Nodes (9): caveman-review, Example output, How to invoke, See also, What it does
 
 ### Community 8 - "terrain.ts"
 Cohesion: 0.11
-Nodes (37): drawRoads(), createEffects(), Puff, puffTexture(), bakeNoise(), blur(), createGround(), distance() (+29 more)
+Nodes (37): pixi.js, drawRoads(), createEffects(), Puff, puffTexture(), bakeNoise(), blur(), createGround() (+29 more)
 
 ### Community 9 - "Ponytail Help"
 Cohesion: 0.25
@@ -135,13 +135,13 @@ Nodes (29): BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, 
 
 ## Knowledge Gaps
 - **3 isolated node(s):** `eslint`, `prettier`, `typescript`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 155 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 158 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `pixi.js` connect `main.ts` to `package.json`, `terrain.ts`, `render/buildings.ts`?**
+- **Why does `pixi.js` connect `terrain.ts` to `package.json`, `render/buildings.ts`, `main.ts`?**
   _High betweenness centrality (0.104) - this node is a cross-community bridge._
 - **What connects `eslint`, `prettier`, `typescript` to the rest of the system?**
   _3 weakly-connected nodes found - possible documentation gaps or missing edges._
@@ -154,4 +154,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `caveman` be split into smaller, more focused modules?**
   _Cohesion score 0.09090909090909091 - nodes in this community are weakly interconnected._
 - **Should `main.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.05952380952380952 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.054098360655737705 - nodes in this community are weakly interconnected._
