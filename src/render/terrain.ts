@@ -31,6 +31,9 @@ export function createTerrain(map: GameMap) {
   const chunks: Container[] = [];
   const nature = new Map<number, Sprite[]>();
   const allNature: Sprite[] = [];
+  /** Trees and bushes per chunk; only chunks on screen are animated. */
+  const sway: Sprite[][] = [];
+  let time = 0;
 
   // Mountain tiles deep inside a range get taller peaks.
   const rockDepth = new Uint8Array(W * H);
@@ -60,6 +63,8 @@ export function createTerrain(map: GameMap) {
       const c = new Container({ cullable: true, sortableChildren: true, zIndex: cx + cy });
       c.cullArea = new Rectangle(left, top, right - left, bottom - top);
       chunks.push(c);
+      const swaying: Sprite[] = [];
+      sway.push(swaying);
       objects.addChild(c);
 
       for (let y = y0; y < y1; y++) {
@@ -70,6 +75,7 @@ export function createTerrain(map: GameMap) {
           const put = (a: Art, u: number, v: number, scale: number) => {
             const s = sprite(a, ...xy(x + u, y + v), scale);
             s.zIndex = x + y + u + v;
+            if (a !== art.boulder && !art.mountains.includes(a)) swaying.push(s);
             list.push(s);
             c.addChild(s);
           };
@@ -114,19 +120,28 @@ export function createTerrain(map: GameMap) {
     /** Remove trees and decoration from a tile (forest cleared for building). */
     clearTile(x: number, y: number) {
       const i = y * W + x;
+      const swaying = sway[Math.floor(y / CHUNK) * cols + Math.floor(x / CHUNK)];
       nature.get(i)?.forEach((s) => {
-        s.destroy();
         allNature.splice(allNature.indexOf(s), 1);
+        if (swaying.includes(s)) swaying.splice(swaying.indexOf(s), 1);
+        s.destroy();
       });
       nature.delete(i);
       ground.setForest(x, y, false);
     },
     update(dt: number, scale: number) {
+      time += dt;
       const nowFar = scale < FAR_SCALE;
       if (nowFar !== far) {
         far = nowFar;
         for (const s of allNature) s.visible = !far;
       }
+      if (!far)
+        chunks.forEach((c, i) => {
+          if (c.culled) return;
+          // Shear about the trunk base: tops lean with gusts that travel across the map.
+          for (const s of sway[i]) s.skew.x = Math.sin(time * 1.4 + s.x * 0.004 + s.y * 0.007) * 0.035;
+        });
       ground.update(dt, Math.min(1, Math.max(0, (FAR_SCALE + 0.08 - scale) / 0.08)));
     },
   };

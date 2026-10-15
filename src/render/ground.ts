@@ -1,5 +1,6 @@
 import { BufferImageSource, Geometry, Mesh, Shader } from 'pixi.js';
 import type { GameMap } from '../sim/map';
+import { mulberry32 } from '../sim/rng';
 import { TILE_H, TILE_W } from './iso';
 
 const vertex = /* glsl */ `
@@ -26,21 +27,16 @@ in vec2 vPos;
 out vec4 finalColor;
 uniform sampler2D uMask;
 uniform sampler2D uDist;
+uniform sampler2D uNoise;
 uniform vec2 uSize;
 uniform float uTime;
 uniform float uFar;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise(vec2 p) {
-  vec2 i = floor(p), f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
-}
-float fbm(vec2 p) {
-  float v = 0.0, a = 0.5;
-  for (int i = 0; i < 4; i++) { v += a * noise(p); p = p * 2.03 + 17.0; a *= 0.5; }
-  return v;
-}
+// Baked, tileable noise (see bakeNoise): r = 4-octave fbm, g = single octave, b = second fbm.
+float fbm(vec2 p) { return texture(uNoise, p / 32.0).r; }
+float fbm2(vec2 p) { return texture(uNoise, p / 32.0).b; }
+float noise(vec2 p) { return texture(uNoise, p / 64.0).g; }
 // Smooth (C1) sampling of a per-tile texture at tile-space point p.
 vec4 smp(sampler2D t, vec2 p) {
   vec2 q = p - 0.5, i = floor(q), f = fract(q);
@@ -52,9 +48,11 @@ float height(vec2 q) { return smp(uDist, q).g * 1.6 + fbm(q * 0.5) * 0.9; }
 void main() {
   // Screen-space world pixels back to continuous tile coordinates.
   vec2 p = vec2(vPos.x / ${TILE_W.toFixed(1)} + vPos.y / ${TILE_H.toFixed(1)}, vPos.y / ${TILE_H.toFixed(1)} - vPos.x / ${TILE_W.toFixed(1)});
-  vec2 warp = vec2(fbm(p * 0.45), fbm(p * 0.45 + 31.0)) - 0.5;
+  vec2 warp = vec2(fbm(p * 0.45), fbm2(p * 0.45)) - 0.5;
   vec2 warp2 = vec2(noise(p * 1.7), noise(p * 1.7 + 13.0)) - 0.5;
   vec2 pw = p + warp * 0.55 + warp2 * 0.3;
+  // Inland borders (forest, rock) may wander further than the coast, which must match the tiles.
+  vec2 pf = p + warp * 1.2 + warp2 * 0.5;
   // Ground-plane coords aligned to the screen: fine detail here does not zigzag along tile diagonals.
   vec2 g = vec2(vPos.x, vPos.y * 2.0) / 32.0;
   vec4 m = smp(uMask, pw);
@@ -80,6 +78,11 @@ void main() {
     col *= 1.0 - 0.06 * fbm(p * 0.6 - t * 0.03) * depth;
     float glint = pow(noise(p * 5.0 + vec2(t * 0.9, t * 0.3)) * noise(p * 6.3 - vec2(t * 0.6, -t * 0.4)), 4.0);
     col += vec3(1.0) * smoothstep(0.2, 0.35, glint) * 0.35 * depth * (1.0 - uFar * 0.8);
+    // Swells rolling in towards the shore, breaking up as they arrive.
+    // Driven by the smooth land mask, not the blocky BFS distance, so crests follow the coast.
+    float shoreBand = smoothstep(0.02, 0.3, land);
+    float roll = sin(land * 40.0 - t * 2.2 + fbm(p * 0.8) * 4.0);
+    col += vec3(0.45, 0.5, 0.5) * smoothstep(0.88, 0.99, roll) * shoreBand * noise(p * 2.5 + t * 0.2) * 0.45;
     float wave = 0.32 + 0.06 * sin(t * 1.4 + fbm(p * 1.3) * 7.0);
     float foam = smoothstep(wave - 0.04, wave + 0.02, land) * (0.6 + 0.4 * noise(p * 9.0 + t));
     foam = max(foam, smoothstep(0.42, 0.49, land));
@@ -99,21 +102,25 @@ void main() {
     float dot = 1.0 - smoothstep(0.06, 0.12, length(fract(cf) - 0.3 - 0.4 * vec2(hash(iff + 4.0), hash(iff + 5.0))));
     vec3 flower = mix(vec3(1.0, 0.95, 0.75), vec3(0.95, 0.6, 0.75), hash(iff + 9.0));
     grass = mix(grass, flower, dot * step(0.97, hash(iff + 3.0)) * step(0.6, noise(p * 0.7)) * (1.0 - uFar));
+    // Gusts of wind: brighter bands sweeping slowly across meadows.
+    float gust = fbm(p * 0.18 + vec2(-t * 0.35, t * 0.12));
+    grass *= 0.95 + 0.14 * smoothstep(0.45, 0.75, gust) * (1.0 - uFar);
     col = grass;
 
     vec3 floorCol = vec3(0.23, 0.38, 0.16) * (0.85 + 0.3 * fine);
     float bumps = noise(p * 4.0) * 0.6 + noise(p * 9.0) * 0.4;
     vec3 canopy = mix(vec3(0.12, 0.27, 0.13), vec3(0.3, 0.48, 0.2), bumps);
     vec3 forest = mix(floorCol, canopy, uFar);
-    col = mix(col, forest, smoothstep(0.3, 0.7, smp(uDist, pw).b));
+    col = mix(col, forest, smoothstep(0.3, 0.7, 0.5 * (smp(uDist, pf + 0.3).b + smp(uDist, pf - 0.3).b)));
 
     vec3 rock = mix(vec3(0.46, 0.43, 0.39), vec3(0.66, 0.63, 0.57), fbm(p * vec2(1.5, 0.6)));
     rock *= 0.85 + 0.3 * noise(g * 5.0);
-    col = mix(col, rock, smoothstep(0.3, 0.7, m.b));
+    col = mix(col, rock, smoothstep(0.22, 0.55, 0.5 * (smp(uMask, pf + vec2(0.3, -0.3)).b + smp(uMask, pf - vec2(0.3, -0.3)).b)));
 
     vec3 sandCol = vec3(0.9, 0.81, 0.58) * (0.94 + 0.12 * noise(g * 10.0));
     sandCol -= 0.03 * sin((p.x + p.y) * 9.0 + noise(p * 2.0) * 4.0);
-    float beach = smoothstep(0.38, 0.62, m.g);
+    // Low threshold: a one-tile beach only reaches ~0.375 after the mask blur.
+    float beach = smoothstep(0.16, 0.34, m.g);
     col = mix(col, sandCol, beach);
     col = mix(col, vec3(0.68, 0.6, 0.42), (1.0 - smoothstep(0.5, 0.58, land)) * 0.8);
 
@@ -129,6 +136,80 @@ void main() {
   col = pow(col, vec3(0.95)) * vec3(1.04, 1.0, 0.94);
   finalColor = vec4(col, 1.0);
 }`;
+
+const N = 256;
+
+/** Tileable value noise on an N×N grid with `cells` lattice cells per side. */
+function valueNoise(seed: number, cells: number) {
+  const r = mulberry32(seed);
+  const lattice = Float32Array.from({ length: cells * cells }, r);
+  const at = (i: number, j: number) => lattice[(j % cells) * cells + (i % cells)];
+  const out = new Float32Array(N * N);
+  const step = N / cells;
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      const fx = x / step;
+      const fy = y / step;
+      const i = Math.floor(fx);
+      const j = Math.floor(fy);
+      const tx = (fx - i) * (fx - i) * (3 - 2 * (fx - i));
+      const ty = (fy - j) * (fy - j) * (3 - 2 * (fy - j));
+      const a = at(i, j) + (at(i + 1, j) - at(i, j)) * tx;
+      const b = at(i, j + 1) + (at(i + 1, j + 1) - at(i, j + 1)) * tx;
+      out[y * N + x] = a + (b - a) * ty;
+    }
+  return out;
+}
+
+/**
+ * Noise baked once instead of hashed per pixel: far cheaper on the GPU, and mipmaps
+ * stop high-frequency detail from shimmering when zoomed out.
+ */
+function bakeNoise() {
+  const fbm = (seed: number) => {
+    const o = [8, 16, 32, 64].map((c, k) => valueNoise(seed + k, c));
+    return o[0].map((_, i) => o[0][i] * 0.5 + o[1][i] * 0.25 + o[2][i] * 0.125 + o[3][i] * 0.0625);
+  };
+  const r = fbm(1);
+  const g = valueNoise(9, 64);
+  const b = fbm(11);
+  const data = new Uint8Array(N * N * 4);
+  for (let i = 0; i < N * N; i++) data.set([r[i] * 255, g[i] * 255, b[i] * 255, 255], i * 4);
+  return new BufferImageSource({
+    resource: data,
+    width: N,
+    height: N,
+    format: 'rgba8unorm',
+    scaleMode: 'linear',
+    mipmapFilter: 'linear',
+    autoGenerateMipmaps: true,
+    addressMode: 'repeat',
+  });
+}
+
+/**
+ * Two passes of a 3×3 [1 2 1] blur. Binary tile masks blurred like this have a 0.5
+ * contour that rounds staircase corners into smooth diagonals.
+ */
+function blur(src: Float32Array, W: number, H: number) {
+  let a = src;
+  for (let pass = 0; pass < 2; pass++) {
+    const h = new Float32Array(W * H);
+    const v = new Float32Array(W * H);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        h[i] = (a[x > 0 ? i - 1 : i] + 2 * a[i] + a[x < W - 1 ? i + 1 : i]) / 4;
+      }
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        v[i] = (h[y > 0 ? i - W : i] + 2 * h[i] + h[y < H - 1 ? i + W : i]) / 4;
+      }
+    a = v;
+  }
+  return a;
+}
 
 /** Multi-source BFS distance (in tiles, 4-neighbour) from every tile where `src` is true. */
 function distance(W: number, H: number, src: (i: number) => boolean) {
@@ -159,12 +240,22 @@ export function createGround(map: GameMap) {
   const dist = new Uint8Array(W * H * 4);
   const toSea = distance(W, H, (i) => tiles[i] !== 'water');
   const toShore = distance(W, H, (i) => tiles[i] === 'water' || tiles[i] === 'beach');
-  tiles.forEach((t, i) => {
-    // Alpha stays 255 in both: a zero alpha would wipe the other channels (premultiplied upload).
-    mask.set([t === 'water' ? 0 : 255, t === 'beach' ? 255 : 0, t === 'mountain' ? 255 : 0, 255], i * 4);
-    const forest = t === 'forest' ? 255 : 0;
-    dist.set([Math.min(255, (toSea[i] - 1) * 28), Math.min(255, toShore[i] * 22), forest, 255], i * 4);
+  const is = (k: string) => Float32Array.from(tiles, (t) => (t === k ? 1 : 0));
+  const land = blur(
+    Float32Array.from(tiles, (t) => (t === 'water' ? 0 : 1)),
+    W,
+    H,
+  );
+  const sand = blur(is('beach'), W, H);
+  const rock = blur(is('mountain'), W, H);
+  const forestRaw = is('forest');
+  // Alpha stays 255 in both: a zero alpha would wipe the other channels (premultiplied upload).
+  const packForest = () => blur(forestRaw, W, H).forEach((v, i) => (dist[i * 4 + 2] = v * 255));
+  tiles.forEach((_, i) => {
+    mask.set([land[i] * 255, sand[i] * 255, rock[i] * 255, 255], i * 4);
+    dist.set([Math.min(255, (toSea[i] - 1) * 28), Math.min(255, toShore[i] * 22), 0, 255], i * 4);
   });
+  packForest();
   const opts = { width: W, height: H, format: 'rgba8unorm' as const, scaleMode: 'linear' as const };
   const maskSrc = new BufferImageSource({ resource: mask, ...opts, addressMode: 'clamp-to-edge' });
   const distSrc = new BufferImageSource({ resource: dist, ...opts, addressMode: 'clamp-to-edge' });
@@ -174,6 +265,7 @@ export function createGround(map: GameMap) {
     resources: {
       uMask: maskSrc,
       uDist: distSrc,
+      uNoise: bakeNoise(),
       ground: {
         uSize: { value: new Float32Array([W, H]), type: 'vec2<f32>' },
         uTime: { value: 0, type: 'f32' },
@@ -202,7 +294,8 @@ export function createGround(map: GameMap) {
       u.uFar = far;
     },
     setForest(x: number, y: number, on: boolean) {
-      dist[(y * W + x) * 4 + 2] = on ? 255 : 0;
+      forestRaw[y * W + x] = on ? 1 : 0;
+      packForest();
       distSrc.update();
     },
   };

@@ -36,6 +36,13 @@ function walls(g: Graphics, b: Box, h0: number, h1: number, color: number, top =
   if (top) fill(g, [P(x0, y0, h1), P(x1, y0, h1), P(x1, y1, h1), P(x0, y1, h1)], color);
   edge(g, left, shade(color, 0.5));
   edge(g, right, shade(color, 0.45));
+  if (h0 === 0 && h1 > 8) {
+    // Stone plinth with a darker contact line where the wall meets the ground.
+    onLeft(g, b, 0, 1, 0, 2.2, 0x8c867a);
+    onRight(g, b, 0, 1, 0, 2.2, 0x6e695f);
+    onLeft(g, b, 0, 1, 0, 0.7, 0x4a463f);
+    onRight(g, b, 0, 1, 0, 0.7, 0x3c3934);
+  }
 }
 
 /** A rectangle drawn on the left face (y = y1) between fractions t0..t1 along x. */
@@ -56,18 +63,45 @@ function gabled(g: Graphics, b: Box, wall: number, roof: number, wallColor: numb
   const o = 0.08;
   const top = wall + roof;
   walls(g, b, 0, wall, wallColor, false);
+  // Shadow cast by the eaves on the walls below.
+  onLeft(g, b, 0, 1, wall - 3, wall, shade(wallColor, 0.55));
+  onRight(g, b, 0, 1, wall - 3, wall, shade(wallColor, 0.45));
   fill(g, [P(x1, y0, wall), P(x1, y1, wall), P(x1, yc, top)], shade(wallColor, 0.72));
   const north = [P(x0 - o, y0 - o, wall - 1), P(x1 + o, y0 - o, wall - 1), P(x1 + o, yc, top), P(x0 - o, yc, top)];
   const south = [P(x0 - o, y1 + o, wall - 1), P(x1 + o, y1 + o, wall - 1), P(x1 + o, yc, top), P(x0 - o, yc, top)];
   fill(g, north, shade(roofColor, 0.75));
   fill(g, south, roofColor);
-  // Roof tiles: a few lines parallel to the eave.
-  for (const k of [0.33, 0.66]) {
-    const a = P(x0 - o, y1 + o - k * (y1 + o - yc), wall - 1 + k * (top - wall + 1));
-    const c = P(x1 + o, y1 + o - k * (y1 + o - yc), wall - 1 + k * (top - wall + 1));
+  // Roof tiles: rows parallel to the eave, with staggered joints between rows.
+  const rows = 6;
+  const at = (k: number, u: number) =>
+    P(x0 - o + u * (x1 - x0 + 2 * o), y1 + o - k * (y1 + o - yc), wall - 1 + k * (top - wall + 1));
+  for (let r = 1; r < rows; r++) {
+    const a = at(r / rows, 0);
+    const c = at(r / rows, 1);
     g.moveTo(a[0], a[1]).lineTo(c[0], c[1]);
   }
-  g.stroke({ width: 0.7, color: shade(roofColor, 0.6), alpha: 0.7 });
+  g.stroke({ width: 0.8, color: shade(roofColor, 0.55), alpha: 0.8 });
+  const cols = Math.round((x1 - x0) * 7);
+  for (let r = 0; r < rows; r++)
+    for (let c = 1; c < cols; c++) {
+      const u = (c + (r % 2) * 0.5) / cols;
+      const a = at(r / rows, u);
+      const e = at((r + 1) / rows, u);
+      g.moveTo(a[0], a[1]).lineTo(e[0], e[1]);
+    }
+  g.stroke({ width: 0.5, color: shade(roofColor, 0.6), alpha: 0.55 });
+  // Light catching the lower edge of each row.
+  for (let r = 0; r < rows; r++) {
+    const a = at(r / rows + 0.02, 0);
+    const c = at(r / rows + 0.02, 1);
+    g.moveTo(a[0], a[1]).lineTo(c[0], c[1]);
+  }
+  g.stroke({ width: 0.6, color: shade(roofColor, 1.35), alpha: 0.5 });
+  const r0 = P(x0 - o, yc, top);
+  const r1 = P(x1 + o, yc, top);
+  g.moveTo(r0[0], r0[1])
+    .lineTo(r1[0], r1[1])
+    .stroke({ width: 2, color: shade(roofColor, 0.55) });
   edge(g, south, shade(roofColor, 0.45), 1);
 }
 
@@ -77,6 +111,27 @@ const timber = (g: Graphics, b: Box, wall: number) => {
   onLeft(g, b, 0, 1, wall * 0.48, wall * 0.55, beam);
   for (const t of [0, 1]) onRight(g, b, t - 0.03, t + 0.03, 0, wall, beam);
 };
+
+/** Framed window with glass glint and a pair of shutters, on the left (y = y1) face. */
+function windowLeft(g: Graphics, b: Box, t: number, w: number, h0: number, h1: number, shutter: number) {
+  const sw = w * 0.55;
+  onLeft(g, b, t - sw, t, h0, h1, shutter);
+  onLeft(g, b, t + w, t + w + sw, h0, h1, shade(shutter, 0.85));
+  onLeft(g, b, t - 0.01, t + w + 0.01, h0 - 0.8, h1 + 0.8, 0xe8e2d2);
+  onLeft(g, b, t + 0.01, t + w - 0.01, h0, h1, 0x2c3a4a);
+  onLeft(g, b, t + 0.015, t + w * 0.45, h1 - (h1 - h0) * 0.45, h1 - 0.4, 0x6f8fae);
+}
+function windowRight(g: Graphics, b: Box, t: number, w: number, h0: number, h1: number) {
+  onRight(g, b, t - 0.01, t + w + 0.01, h0 - 0.8, h1 + 0.8, 0xc8c2b2);
+  onRight(g, b, t + 0.01, t + w - 0.01, h0, h1, 0x222e3a);
+}
+function door(g: Graphics, b: Box, t: number, w: number, h: number, color: number) {
+  onLeft(g, b, t - 0.015, t + w + 0.015, 0, h + 1, 0x6e6658);
+  onLeft(g, b, t, t + w, 0, h, color);
+  onLeft(g, b, t + w * 0.5 - 0.004, t + w * 0.5 + 0.004, 0, h, shade(color, 0.6));
+}
+
+const SHUTTERS = [0x3f6b4a, 0x4a5f8a, 0x8a3a2a, 0x6a5a2a];
 
 const ROOFS = [0xb5452b, 0xa0522d, 0x9b3b2b, 0x8e5a3a];
 
@@ -100,17 +155,25 @@ export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number
       const b = box(0.2, 0.25, 1.8, 1.75);
       gabled(g, b, 13, 11, 0xece0c4, ROOFS[variant % ROOFS.length]);
       timber(g, b, 13);
-      onLeft(g, b, 0.42, 0.58, 0, 8, 0x6b4426);
-      for (const t of [0.12, 0.72]) onLeft(g, b, t, t + 0.14, 5, 9, 0x3b4a5a);
-      onRight(g, b, 0.35, 0.65, 6, 10, 0x3b4a5a);
-      walls(g, box(0.45, 0.45, 0.62, 0.62), 16, 27, 0x8a5a44);
+      door(g, b, 0.43, 0.14, 8, 0x6b4426);
+      const sh = SHUTTERS[variant % SHUTTERS.length];
+      for (const t of [0.14, 0.72]) {
+        windowLeft(g, b, t, 0.12, 5, 9.5, sh);
+        // Flower box under the window.
+        onLeft(g, b, t - 0.02, t + 0.14, 3.6, 5, 0x6b4426);
+        onLeft(g, b, t, t + 0.12, 4.6, 5.6, [0xd04a5a, 0xe8c040, 0xe07aa8][variant % 3]);
+      }
+      windowRight(g, b, 0.38, 0.24, 6, 10);
+      const ch = box(0.45, 0.45, 0.62, 0.62);
+      walls(g, ch, 16, 27, 0x8a5a44);
+      walls(g, box(0.42, 0.42, 0.65, 0.65), 27, 28.5, 0x5e3e30);
       break;
     }
     case 'harbor': {
       const b = box(0.15, 0.2, 1.75, 1.6);
       gabled(g, b, 15, 12, 0xa87b4f, 0x6b3f22);
       for (const t of [0.25, 0.5, 0.75]) onLeft(g, b, 0, 1, t * 15 - 0.4, t * 15 + 0.4, 0x7d5733);
-      onLeft(g, b, 0.35, 0.65, 0, 11, 0x4a2f1a);
+      door(g, b, 0.35, 0.3, 11, 0x4a2f1a);
       walls(g, box(1.45, 1.6, 1.8, 1.95), 0, 6, 0xb08850);
       walls(g, box(1.1, 1.65, 1.4, 1.95), 0, 5, 0x9c7444);
       const pole = P(x + 1.85, y + 0.35, 0);
@@ -123,8 +186,9 @@ export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number
       const b = box(0.1, 0.2, 1.9, 1.7);
       gabled(g, b, 14, 13, 0xc9a46c, 0x7a4a2a);
       timber(g, b, 14);
-      onLeft(g, b, 0.36, 0.64, 0, 11, 0x5a3a20);
-      onRight(g, b, 0.3, 0.7, 8, 11, 0x3b4a5a);
+      door(g, b, 0.36, 0.28, 11, 0x5a3a20);
+      onLeft(g, b, 0.36, 0.64, 10.6, 11.2, 0x3a2412);
+      windowRight(g, b, 0.3, 0.4, 8, 11.5);
       walls(g, box(1.55, 1.75, 1.9, 1.98), 0, 5, 0xa07a46);
       break;
     }
@@ -187,6 +251,13 @@ export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number
     case 'road':
       break;
   }
+}
+
+/** World point where smoke leaves a building's chimney, if it has one. */
+export function chimneyAt(type: BuildingId, x: number, y: number) {
+  if (type !== 'house') return null;
+  const [px, py] = P(x + 0.535, y + 0.535, 29);
+  return { x: px, y: py };
 }
 
 /** Keeps one Graphics per building in the terrain's depth-sorted object layer. */
