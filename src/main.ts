@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Matrix, Rectangle, RenderTexture, Sprite } from 'pixi.js';
+import { Application, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { BUILDINGS, GOOD_NAMES, type Good } from './data/buildings';
 import pelda from './data/maps/pelda.txt?raw';
 import { chimneyAt, drawBuilding, drawTerritory } from './render/buildings';
@@ -73,20 +73,23 @@ const preview = new Graphics();
 const ghost = new Graphics({ alpha: 0.6 });
 territory.visible = false;
 const effects = createEffects(map);
-scene.addChild(terrain.ground, territory, terrain.objects, effects.layer);
+scene.addChild(terrain.water, terrain.ground, territory, terrain.objects, effects.layer);
 scene.addChild(hover, selection, preview, ghost);
 app.stage.addChild(scene);
 
-// The sea is the costliest per-pixel work and soft anyway: render it at half resolution
-// into a texture each frame, then stretch it under the scene.
-const WATER_SCALE = 0.5;
-const waterScene = new Container({ children: [terrain.water] });
-const waterTexture = RenderTexture.create({ width: app.screen.width, height: app.screen.height });
-const resizeWater = () =>
-  waterTexture.resize(app.screen.width, app.screen.height, app.renderer.resolution * WATER_SCALE);
-resizeWater();
-app.stage.addChildAt(new Sprite(waterTexture), 0);
-const waterTransform = new Matrix();
+// Vignette inside the canvas: as a CSS overlay the browser would blend it over the whole
+// window at full screen resolution every frame, whatever the game's own resolution.
+const vignetteCanvas = Object.assign(document.createElement('canvas'), { width: 256, height: 256 });
+const vctx = vignetteCanvas.getContext('2d')!;
+const vg = vctx.createRadialGradient(128, 128, 70, 128, 128, 181);
+vg.addColorStop(0, 'rgba(5,15,30,0)');
+vg.addColorStop(1, 'rgba(5,15,30,0.45)');
+vctx.fillStyle = vg;
+vctx.fillRect(0, 0, 256, 256);
+const vignette = new Sprite({ texture: Texture.from(vignetteCanvas), eventMode: 'none' });
+const fitVignette = () => vignette.setSize(app.screen.width, app.screen.height);
+fitVignette();
+app.stage.addChild(vignette);
 
 const fxaa = createFxaa();
 // A fixed filter area: measuring the huge sea mesh for bounds every frame is wasted work.
@@ -95,7 +98,6 @@ const applySettings = () => {
   app.stage.filters = settings.antialias === 'fxaa' ? [fxaa] : [];
   const r = resolutionOf(settings);
   if (r !== app.renderer.resolution) app.renderer.resize(innerWidth, innerHeight, r);
-  resizeWater();
 };
 applySettings();
 createSettingsPanel(document.getElementById('settings')!, settings, applySettings);
@@ -111,10 +113,12 @@ app.ticker.add((t) => {
   view.width = app.screen.width / cam.scale;
   view.height = app.screen.height / cam.scale;
   terrain.update(dt, view, cam.scale);
-  waterTransform.set(cam.scale, 0, 0, cam.scale, cam.x, cam.y);
-  app.renderer.render({ container: waterScene, target: waterTexture, transform: waterTransform });
   effects.update(dt, view, cam.scale < FAR_SCALE);
-  countFps(settings.fps);
+  const { width, height } = app.canvas;
+  countFps(
+    settings.fps,
+    `${width}×${height} px · ${settings.antialias.toUpperCase()} · ${terrain.stats.visible} darab, ${terrain.stats.pending} sütésre vár`,
+  );
 });
 
 /** Redraw after a world change in `tiles` (built on, cleared or demolished). */
@@ -281,5 +285,5 @@ app.renderer.on('resize', (w: number, h: number) => {
   cam.y += (h - size.h) / 2;
   size = { w, h };
   applyCamera();
-  resizeWater();
+  fitVignette();
 });

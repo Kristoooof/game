@@ -23,8 +23,11 @@ const CHUNK = 16;
 
 /** Below this zoom, trees are left out and the land shader paints forest canopy instead. */
 export const FAR_SCALE = 0.3;
-/** Time per frame spent baking chunks; at least one chunk is always baked. */
-const BAKE_BUDGET_MS = 6;
+/**
+ * Chunks baked per frame. A count, not a time budget: the bake's real cost is GPU work
+ * that JS timing does not see, and a big window can need dozens of chunks at once.
+ */
+const BAKES_PER_FRAME = 2;
 /** Highest chunk texture resolution; phones get less to stay within their memory. */
 const MAX_TIER = matchMedia('(pointer: coarse)').matches ? 1 : 2;
 /** Chunks unseen for this many frames give their textures back. */
@@ -220,7 +223,10 @@ export function createTerrain(world: World, renderer: Renderer) {
   }
 
   let frame = 0;
+  /** For the FPS overlay: chunks on screen and chunks waiting to be (re)baked. */
+  const stats = { visible: 0, pending: 0 };
   return {
+    stats,
     water: ground.water,
     ground: groundLayer,
     objects: objectLayer,
@@ -260,11 +266,9 @@ export function createTerrain(world: World, renderer: Renderer) {
       const dist = (c: Chunk) =>
         Math.hypot(c.ground.x + c.ground.width / 2 - cx, c.ground.y + c.ground.height / 2 - cy);
       queue.sort((a, b) => (a.baked ? 1 : 0) - (b.baked ? 1 : 0) || dist(a) - dist(b));
-      const start = performance.now();
-      for (const c of queue) {
-        bake(c, tier, far);
-        if (performance.now() - start > BAKE_BUDGET_MS) break;
-      }
+      for (const c of queue.slice(0, BAKES_PER_FRAME)) bake(c, tier, far);
+      stats.visible = chunks.filter((c) => c.lastSeen === frame).length;
+      stats.pending = queue.length;
     },
   };
 }

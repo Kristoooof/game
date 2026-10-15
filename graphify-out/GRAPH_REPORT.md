@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-15)
 
 ## Corpus Check
-- 40 files · ~21,518 words
+- 40 files · ~21,581 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 328 nodes · 603 edges · 19 communities (17 shown, 2 thin omitted)
+- 328 nodes · 602 edges · 19 communities (17 shown, 2 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `74572169`
+- Built from commit: `71c686be`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -83,7 +83,7 @@ Nodes (20): caveman, Example output, How to invoke, See also, What it does, 1. A
 
 ### Community 4 - "main.ts"
 Cohesion: 0.05
-Nodes (56): anchorFor(), app, applySettings(), cam, countFps, demolishAt(), effects, end() (+48 more)
+Nodes (55): anchorFor(), app, applySettings(), cam, countFps, demolishAt(), effects, end() (+47 more)
 
 ### Community 5 - "compilerOptions"
 Cohesion: 0.17
@@ -135,7 +135,7 @@ Nodes (29): BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, 
 
 ## Knowledge Gaps
 - **3 isolated node(s):** `eslint`, `prettier`, `typescript`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 158 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 159 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -154,4 +154,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `caveman` be split into smaller, more focused modules?**
   _Cohesion score 0.09090909090909091 - nodes in this community are weakly interconnected._
 - **Should `main.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.054098360655737705 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.053551912568306013 - nodes in this community are weakly interconnected._

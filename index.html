@@ -18,13 +18,6 @@
         --gold: #e8c67a;
         --ink: #f6ead0;
       }
-      body::after {
-        content: '';
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        background: radial-gradient(ellipse at center, transparent 55%, rgba(5, 15, 30, 0.45) 100%);
-      }
       #resources,
       #hud,
       #build {
@@ -179,6 +172,7 @@
         font:
           13px/1.2 ui-monospace,
           monospace;
+        white-space: pre;
         pointer-events: none;
       }
     </style>

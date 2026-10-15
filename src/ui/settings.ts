@@ -110,12 +110,13 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
 export function createFpsCounter(el: HTMLElement) {
   let frames = 0;
   let since = performance.now();
-  return (visible: boolean) => {
+  /** `detail` is appended as a second line, e.g. render size and chunk counts. */
+  return (visible: boolean, detail = '') => {
     el.hidden = !visible;
     frames++;
     const now = performance.now();
     if (now - since < 500) return;
-    el.textContent = `${Math.round((frames * 1000) / (now - since))} FPS · ${((now - since) / frames).toFixed(1)} ms`;
+    el.textContent = `${Math.round((frames * 1000) / (now - since))} FPS · ${((now - since) / frames).toFixed(1)} ms\n${detail}`;
     frames = 0;
     since = now;
   };
