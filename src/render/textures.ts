@@ -194,6 +194,12 @@ const mountain = (seed: number, snowy: boolean) => {
       c.stroke();
     }
     if (snowy) {
+      // Clip to the peak's silhouette so the snow can never hang over its outline.
+      c.save();
+      c.beginPath();
+      [...west, ...east.slice(1)].forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+      c.closePath();
+      c.clip();
       // Snow cap with a ragged lower edge and gullies running down the lit face.
       const sh = h * 0.3;
       const edge = Array.from({ length: 7 }, (_, k) => [
@@ -211,6 +217,7 @@ const mountain = (seed: number, snowy: boolean) => {
         c.lineTo(x - 2 - r() * 3, y + 5 + r() * 6);
         c.stroke();
       }
+      c.restore();
     }
   });
 };

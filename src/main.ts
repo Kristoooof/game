@@ -9,6 +9,8 @@ import { createTerrain, FAR_SCALE } from './render/terrain';
 import { type GameMap, type Terrain, generateMap, parseMap, terrainAt } from './sim/map';
 import { buildingAt, createWorld, demolish, place, placementError, roadPath } from './sim/world';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
+import { createFpsCounter, createSettingsPanel, loadSettings, resolutionOf } from './ui/settings';
+import { createFxaa } from './render/fxaa';
 
 const MAPS: Record<string, string> = { pelda };
 const TERRAIN_NAMES: Record<Terrain, string> = {
@@ -51,14 +53,13 @@ showResources();
 
 const app = new Application();
 // WebGL: the ground shader is GLSL only.
-// Above 1.5× the extra sharpness is hard to see but costs fill rate on big screens.
-const resolution = Math.min(devicePixelRatio, 1.5);
+const settings = loadSettings();
 await app.init({
   resizeTo: window,
   background: '#0d4166',
-  antialias: true,
+  antialias: settings.antialias === 'msaa',
   preference: 'webgl',
-  resolution,
+  resolution: resolutionOf(settings),
   autoDensity: true,
 });
 document.body.prepend(app.canvas);
@@ -75,6 +76,18 @@ const effects = createEffects(map);
 scene.addChild(terrain.water, terrain.ground, territory, terrain.objects, effects.layer);
 scene.addChild(hover, selection, preview, ghost);
 app.stage.addChild(scene);
+
+const fxaa = createFxaa();
+// A fixed filter area: measuring the huge sea mesh for bounds every frame is wasted work.
+app.stage.filterArea = app.screen;
+const applySettings = () => {
+  app.stage.filters = settings.antialias === 'fxaa' ? [fxaa] : [];
+  const r = resolutionOf(settings);
+  if (r !== app.renderer.resolution) app.renderer.resize(app.screen.width, app.screen.height, r);
+};
+applySettings();
+createSettingsPanel(document.getElementById('settings')!, settings, applySettings);
+const countFps = createFpsCounter(document.getElementById('fps')!);
 const view = new Rectangle();
 app.ticker.add((t) => {
   const dt = t.deltaMS / 1000;
@@ -85,6 +98,7 @@ app.ticker.add((t) => {
   view.height = app.screen.height / cam.scale;
   terrain.update(dt, view, cam.scale);
   effects.update(dt, view, cam.scale < FAR_SCALE);
+  countFps(settings.fps);
 });
 
 /** Redraw after a world change in `tiles` (built on, cleared or demolished). */

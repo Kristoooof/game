@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "src/main.ts": {
-    "mtime": 1792099776.0237548,
-    "seen": 1792099812.421422,
-    "ast_hash": "0906eca74f44c9ef979970b4e7abb114",
+    "mtime": 1792100397.2834902,
+    "seen": 1792100679.5490317,
+    "ast_hash": "c911f9e82e0c3b2834ac52373cf21eb9",
     "semantic_hash": ""
   },
   "src/render/iso.test.ts": {
@@ -144,15 +144,15 @@
     "semantic_hash": ""
   },
   "PLAN.md": {
-    "mtime": 1792099797.96283,
-    "seen": 1792099812.4215252,
-    "ast_hash": "009b0ff472046699cec1d693df68fbb8",
+    "mtime": 1792100678.3362248,
+    "seen": 1792100679.5491157,
+    "ast_hash": "88c6d175fa0b83b0862a43f3180c9549",
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1792094931.233974,
-    "seen": 1792095584.1132796,
-    "ast_hash": "3a35ac12d40f3d6efb2c219c0a104b56",
+    "mtime": 1792100398.1217036,
+    "seen": 1792100679.5491183,
+    "ast_hash": "da8de4fc3a4eda27c91fb0f49725fc96",
     "semantic_hash": ""
   },
   "src/render/camera.test.ts": {
@@ -228,9 +228,9 @@
     "semantic_hash": ""
   },
   "src/render/textures.ts": {
-    "mtime": 1792099776.0262349,
-    "seen": 1792099812.4214554,
-    "ast_hash": "bad26095aeb0d8c28aa6a76b64d93ba9",
+    "mtime": 1792100349.577705,
+    "seen": 1792100679.5490572,
+    "ast_hash": "ba7892f0f43a19fb1ba60581b402360a",
     "semantic_hash": ""
   },
   "src/render/ground.ts": {
@@ -243,6 +243,18 @@
     "mtime": 1792097734.6637394,
     "seen": 1792098403.4127765,
     "ast_hash": "e9c9d0f30f83d8b2e656e904f9c9e75a",
+    "semantic_hash": ""
+  },
+  "src/render/fxaa.ts": {
+    "mtime": 1792100568.9929335,
+    "seen": 1792100679.549046,
+    "ast_hash": "e0d80d1d167c05a3882d82346f8256ce",
+    "semantic_hash": ""
+  },
+  "src/ui/settings.ts": {
+    "mtime": 1792100482.6394422,
+    "seen": 1792100679.5490701,
+    "ast_hash": "882eae8d7e6945abb5e25450a4277770",
     "semantic_hash": ""
   }
 }

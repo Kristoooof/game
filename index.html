@@ -118,12 +118,77 @@
       #build button.danger.active {
         background: linear-gradient(180deg, #a83a32, #7a2620);
       }
+      #settings,
+      #fps {
+        position: fixed;
+        right: 8px;
+        z-index: 1;
+        font-family: 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+        color: var(--ink);
+      }
+      #settings {
+        top: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+      }
+      #settings .gear {
+        width: 44px;
+        height: 44px;
+        border: 1px solid #8a6a3a;
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--ink);
+        font-size: 22px;
+        cursor: pointer;
+      }
+      #settings .panel {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid #8a6a3a;
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+        font-size: 15px;
+      }
+      #settings .panel[hidden] {
+        display: none;
+      }
+      #settings label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      #settings select {
+        min-height: 32px;
+        font: inherit;
+      }
+      #settings small {
+        max-width: 220px;
+        opacity: 0.7;
+      }
+      #fps {
+        top: 60px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.6);
+        font:
+          13px/1.2 ui-monospace,
+          monospace;
+        pointer-events: none;
+      }
     </style>
   </head>
   <body>
     <div id="resources"></div>
     <div id="hud"></div>
     <div id="build"></div>
+    <div id="settings"></div>
+    <div id="fps" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
