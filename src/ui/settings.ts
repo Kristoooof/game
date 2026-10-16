@@ -1,15 +1,15 @@
 export type Antialias = 'off' | 'msaa' | 'fxaa';
 
 export interface Settings {
-  /** Render resolution as a multiple of CSS pixels, or 'auto' (screen density, at most 1.5). */
-  resolution: number | 'auto';
+  /** Render width in device pixels; the height follows the window's aspect ratio. 'auto' picks one. */
+  width: number | 'auto';
   antialias: Antialias;
   fps: boolean;
 }
 
 const KEY = 'szigetek.settings';
 // MSAA off by default: the baked world is already smooth, and MSAA is costly on big screens.
-const DEFAULTS: Settings = { resolution: 'auto', antialias: 'off', fps: false };
+const DEFAULTS: Settings = { width: 'auto', antialias: 'off', fps: false };
 
 export function loadSettings(): Settings {
   try {
@@ -30,18 +30,20 @@ const save = (s: Settings) => {
 /** Pixels 'auto' aims for: about a 1080p frame, so a big window stays as fast as a small one. */
 const AUTO_PIXELS = 2_200_000;
 
+/** Canvas scale (render pixels per CSS pixel) for the chosen render width. */
 export const resolutionOf = (s: Settings) =>
-  s.resolution === 'auto'
+  s.width === 'auto'
     ? Math.max(0.5, Math.min(devicePixelRatio, 1.5, Math.sqrt(AUTO_PIXELS / (innerWidth * innerHeight))))
-    : s.resolution;
+    : Math.min(4, Math.max(0.25, s.width / innerWidth));
 
-const RESOLUTIONS: [Settings['resolution'], string][] = [
+const WIDTHS: [Settings['width'], string][] = [
   ['auto', 'Automatikus'],
-  [0.5, '50%'],
-  [0.75, '75%'],
-  [1, '100%'],
-  [1.5, '150%'],
-  [2, '200%'],
+  [960, '960 px'],
+  [1280, '1280 px'],
+  [1600, '1600 px'],
+  [1920, '1920 px'],
+  [2560, '2560 px'],
+  [3840, '3840 px'],
 ];
 const ANTIALIAS: [Antialias, string][] = [
   ['off', 'Ki'],
@@ -87,7 +89,7 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
   };
 
   panel.append(
-    select('Felbontás', RESOLUTIONS, s.resolution, (resolution) => update({ resolution })),
+    select('Renderelési szélesség', WIDTHS, s.width, (width) => update({ width })),
     select('Élsimítás', ANTIALIAS, s.antialias, (antialias) => update({ antialias })),
     fps,
     note,
