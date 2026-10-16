@@ -33,6 +33,8 @@ uniform float uFar;
 uniform vec3 uAmbient;
 uniform vec3 uSun;
 uniform vec3 uMoon;
+// Weather: x fog, y rain, z cloud cover (0..1).
+uniform vec3 uWeather;
 uniform sampler2D uRocks;
 uniform sampler2D uRiver;
 uniform sampler2D uLevel;
@@ -135,7 +137,16 @@ void main() {
   vec3 n = normalize(vec3(-grad * 0.5, 1.0));
   vec3 sunH = normalize(vec3(-0.45, -0.55, 0.7) + vec3(0.0, 0.0, 1.0));
   float glint = pow(max(dot(n, sunH), 0.0), 600.0);
-  col += uSun * glint * 0.45 * (1.0 - uFar * 0.8) * (1.0 - depth * 0.4);
+  col += uSun * glint * 0.45 * (1.0 - uFar * 0.8) * (1.0 - depth * 0.4) * (1.0 - uWeather.z * 0.7);
+  // Rain: tiny rings spreading where drops land, a different few in every cell each moment.
+  if (uWeather.y > 0.01) {
+    vec2 rc = p * 3.0;
+    vec2 ci = floor(rc);
+    float ph = fract(t * 1.3 + hash(ci) * 7.0);
+    float dr = length(fract(rc) - 0.5 - (vec2(hash(ci + 3.0), hash(ci + 5.0)) - 0.5) * 0.5);
+    float ring = smoothstep(0.03, 0.0, abs(dr - ph * 0.35)) * (1.0 - ph) * step(hash(ci + floor(t * 1.3 + hash(ci) * 7.0)), uWeather.y * 0.6);
+    col += vec3(0.25, 0.28, 0.3) * ring * (1.0 - uFar);
+  }
   // Crest lines: ridged noise, thin and bright, only where the sea is open.
   float ridge = 1.0 - abs(noise(p * 1.3 + warpN(p)) * 2.0 - 1.0);
   col += vec3(0.6, 0.66, 0.68) * smoothstep(0.96, 0.995, ridge) * 0.07 * (1.0 - uFar) * (0.4 + depth * 0.6);
@@ -196,6 +207,9 @@ void main() {
     // In a river only a thin rim of foam along the banks.
     col = mix(col, vec3(0.94, 0.97, 0.96), clamp(foam, 0.0, 1.0) * 0.85 * (1.0 - river * 0.85));
   }
+  // Fog banks drifting over open water.
+  float fogBank = smoothstep(0.35, 0.75, fbm(p * 0.06 + vec2(t * 0.012, t * 0.004))) * uWeather.x;
+  col = mix(col, vec3(0.78, 0.84, 0.88), fogBank * smoothstep(0.05, 0.5, depth) * 0.85);
   col = pow(col, vec3(0.95)) * vec3(1.04, 1.0, 0.94) * uAmbient;
   // Moonlight: a glittering column under the moon (uMoon: world x, half width, strength).
   if (uMoon.z > 0.0) {
@@ -611,6 +625,7 @@ export function createGround(map: GameMap) {
       uAmbient: { value: new Float32Array([1, 1, 1]), type: 'vec3<f32>' },
       uSun: { value: new Float32Array([1, 0.95, 0.8]), type: 'vec3<f32>' },
       uMoon: { value: new Float32Array([0, 1, 0]), type: 'vec3<f32>' },
+      uWeather: { value: new Float32Array([0, 0, 0]), type: 'vec3<f32>' },
     },
   });
   const noise = bakeNoise();
@@ -642,10 +657,11 @@ export function createGround(map: GameMap) {
       wu.uFar = far;
     },
     /** Time-of-day light on the sea: colour multiplier, sun glint colour, moon column (world x, half width, strength). */
-    light(ambient: number[], sun: number[], moon: number[]) {
+    light(ambient: number[], sun: number[], moon: number[], weather: number[]) {
       wu.uAmbient.set(ambient);
       wu.uSun.set(sun);
       wu.uMoon.set(moon);
+      wu.uWeather.set(weather);
     },
     /** A mesh covering tiles [x0, x1) × [y0, y1), to render that chunk's land once. */
     landMesh(x0: number, y0: number, x1: number, y1: number, far: number) {

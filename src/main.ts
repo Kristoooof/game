@@ -19,6 +19,7 @@ import { createTerrain, FAR_SCALE } from './render/terrain';
 import { type GameMap, type Terrain, generateMap, levelAt, parseMap, terrainAt } from './sim/map';
 import { buildingAt, createWorld, demolish, place, placementError, roadPath } from './sim/world';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
+import { createAtmosphere, type Weather } from './render/atmosphere';
 import { createConstruction } from './render/construction';
 import { daylight } from './render/daylight';
 import { createFpsCounter, createSettingsPanel, loadSettings, resolutionOf } from './ui/settings';
@@ -114,8 +115,19 @@ const construction = createConstruction(effects.dust, (id) => {
   const b = world.buildings.get(id);
   if (b) terrain.invalidate(footprint(b.x, b.y, BUILDINGS[b.type].size));
 });
+// Weather and air; `?idojaras=rain` (clear, cloudy, rain, fog) fixes it. Cloud shadows fall on the world.
+const fixedWeather = new URLSearchParams(location.search).get('idojaras') as Weather | null;
+const atmosphere = createAtmosphere(fixedWeather ?? undefined);
 const lit = new Container({
-  children: [terrain.reflections, terrain.ground, territory, terrain.objects, construction.layer, effects.layer],
+  children: [
+    terrain.reflections,
+    terrain.ground,
+    territory,
+    terrain.objects,
+    construction.layer,
+    atmosphere.world,
+    effects.layer,
+  ],
 });
 scene.addChild(lit, terrain.lights);
 scene.addChild(hover, selection, preview, ghost);
@@ -157,7 +169,8 @@ const fitVignette = () => {
   sunlight.setSize(app.screen.width, app.screen.height);
 };
 fitVignette();
-app.stage.addChild(vignette, sunlight);
+// Haze, sunbeams, dust and rain over the scene, under the vignette.
+app.stage.addChild(atmosphere.screen, vignette, sunlight);
 
 const fxaa = createFxaa();
 // A fixed filter area: measuring the huge sea mesh for bounds every frame is wasted work.
@@ -192,7 +205,16 @@ app.ticker.add((t) => {
   view.height = app.screen.height / cam.scale;
   if (fixedTime === null && settings.dayCycle) dayTime = (dayTime + dt / DAY_SECONDS) % 1;
   const day = daylight(fixedTime !== null || settings.dayCycle ? dayTime : 0.42);
-  lit.tint = hex(day.ambient);
+  // Weather dims and greys the light; clouds dull the sea's glints.
+  atmosphere.update(dt, view, app.screen, day.sunStrength, settings.weather);
+  const { cloud, rain, fog } = atmosphere.sky;
+  const dim = 1 - rain * 0.28 - cloud * 0.1;
+  const ambient = day.ambient.map((v, i, a) => {
+    const grey = (a[0] + a[1] + a[2]) / 3;
+    return (v + (grey - v) * rain * 0.35) * dim;
+  });
+  atmosphere.haze.tint = hex(ambient);
+  lit.tint = hex(ambient);
   terrain.lights.alpha = day.night;
   // Invisible layers are skipped, not drawn at zero opacity: full-screen blending is the main cost.
   terrain.lights.visible = day.night > 0.01;
@@ -202,9 +224,10 @@ app.ticker.add((t) => {
   sunlight.visible = day.sunStrength > 0.01;
   // The moon's glitter column stays at a fixed place on screen, like the real one as you move.
   terrain.light(
-    day.ambient,
+    ambient,
     day.sun.map((v) => v * day.sunStrength),
-    [view.x + view.width * 0.62, 50 / cam.scale, day.night],
+    [view.x + view.width * 0.62, 50 / cam.scale, day.night * (1 - cloud * 0.8)],
+    [fog, rain, cloud],
   );
   terrain.update(dt, view, cam.scale);
   construction.update(dt);

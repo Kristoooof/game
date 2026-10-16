@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "src/main.ts": {
-    "mtime": 1792173841.6399457,
-    "seen": 1792174209.6341138,
-    "ast_hash": "35ee953540b15d47c871ba301147b192",
+    "mtime": 1792174891.0291216,
+    "seen": 1792175216.5058494,
+    "ast_hash": "ad1c5687509ad9b0be2f4abfcc11e17f",
     "semantic_hash": ""
   },
   "src/render/iso.test.ts": {
@@ -144,9 +144,9 @@
     "semantic_hash": ""
   },
   "PLAN.md": {
-    "mtime": 1792174208.389062,
-    "seen": 1792174209.6341834,
-    "ast_hash": "70f2f4a454cb1bbb39a7e99b53bb7a40",
+    "mtime": 1792175215.252626,
+    "seen": 1792175216.505921,
+    "ast_hash": "c726716a10e8d2eb8a44620460c3f763",
     "semantic_hash": ""
   },
   "index.html": {
@@ -168,9 +168,9 @@
     "semantic_hash": ""
   },
   "src/render/terrain.ts": {
-    "mtime": 1792174769.017673,
-    "seen": 1792174773.0866504,
-    "ast_hash": "ba07f87eabd27c272a2084a68c6cef5c",
+    "mtime": 1792174891.029654,
+    "seen": 1792175216.5058787,
+    "ast_hash": "8921d7e2d4d50fed0a97981d3166db24",
     "semantic_hash": ""
   },
   "src/sim/map.test.ts": {
@@ -234,9 +234,9 @@
     "semantic_hash": ""
   },
   "src/render/ground.ts": {
-    "mtime": 1792174633.806694,
-    "seen": 1792174773.086644,
-    "ast_hash": "10fea0808b401c15d89d83deeadf3df2",
+    "mtime": 1792174850.958546,
+    "seen": 1792175216.5058732,
+    "ast_hash": "69916f3c3fc42c717fa75221ce765067",
     "semantic_hash": ""
   },
   "src/render/effects.ts": {
@@ -252,9 +252,9 @@
     "semantic_hash": ""
   },
   "src/ui/settings.ts": {
-    "mtime": 1792145477.5700798,
-    "seen": 1792145739.5174835,
-    "ast_hash": "f984504a2e783538e54712feac302896",
+    "mtime": 1792174864.7256284,
+    "seen": 1792175216.5058918,
+    "ast_hash": "d537ced72cb70911f8422822ef5f116b",
     "semantic_hash": ""
   },
   "src/render/daylight.test.ts": {
@@ -273,6 +273,12 @@
     "mtime": 1792173852.0562108,
     "seen": 1792174209.6341238,
     "ast_hash": "b34849750f6a169753469048f56a95fa",
+    "semantic_hash": ""
+  },
+  "src/render/atmosphere.ts": {
+    "mtime": 1792175158.0455189,
+    "seen": 1792175216.5058532,
+    "ast_hash": "5bc44ff97552f48cce806c66aa868522",
     "semantic_hash": ""
   }
 }

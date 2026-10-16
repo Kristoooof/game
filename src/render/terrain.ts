@@ -130,9 +130,11 @@ export function createTerrain(world: World, renderer: Renderer) {
         if (world.occupied[y * W + x]) continue;
         const t = at(x, y);
         const r = mulberry32(x * 92821 + y * 68917 + 7);
-        const put = (a: Art, u: number, v: number, scale: number) => {
+        /** `lean`: trees bend a little with the prevailing wind. */
+        const put = (a: Art, u: number, v: number, scale: number, lean = false) => {
           const s = groundToScreen(x + u, y + v);
           const sp = sprite(a, s.x, s.y, scale);
+          if (lean) sp.skew.x = -(0.05 + ((x * 7 + y * 13) % 5) * 0.012);
           sp.zIndex = x + y + u + v;
           into.addChild(sp);
           // Cast shadow: the silhouette laid flat along the sun's direction.
@@ -158,8 +160,8 @@ export function createTerrain(world: World, renderer: Renderer) {
             const u = 0.1 + r() * 0.8;
             const v = 0.1 + r() * 0.8;
             const k = r();
-            if (k < 0.6) put(art.conifers[Math.floor(r() * 3)], u, v, 0.75 + r() * 0.45);
-            else if (k < 0.93) put(leaf(r()), u, v, 0.7 + r() * 0.4);
+            if (k < 0.6) put(art.conifers[Math.floor(r() * 3)], u, v, 0.75 + r() * 0.45, true);
+            else if (k < 0.93) put(leaf(r()), u, v, 0.7 + r() * 0.4, true);
             else put(art.bushes[Math.floor(r() * 2)], u, v, 0.8 + r() * 0.4);
           }
         } else if (t === 'mountain') {
@@ -181,7 +183,7 @@ export function createTerrain(world: World, renderer: Renderer) {
           const coastal = [at(x + 1, y), at(x - 1, y), at(x, y + 1), at(x, y - 1)].includes('water');
           const p = r();
           if (coastal && p < 0.07)
-            put(art.palms[Math.floor(r() * 3)], 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.85 + r() * 0.3);
+            put(art.palms[Math.floor(r() * 3)], 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.85 + r() * 0.3, true);
           else if (coastal && p < 0.2)
             put(art.driftwood[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.9 + r() * 0.4);
           else if (p < 0.12) put(art.pebbles[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.5);
@@ -192,7 +194,7 @@ export function createTerrain(world: World, renderer: Renderer) {
           else if (p < 0.6) put(art.pebbles[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.9 + r() * 0.5);
         } else if (t === 'grass' && !far) {
           const p = r();
-          if (p < 0.035) put(leaf(r()), 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.75 + r() * 0.35);
+          if (p < 0.035) put(leaf(r()), 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.75 + r() * 0.35, true);
           else if (p < 0.09) put(art.bushes[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.7 + r() * 0.5);
           else if (p < 0.105) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.6 + r() * 0.5);
         }
