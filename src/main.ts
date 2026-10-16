@@ -9,6 +9,7 @@ import { createTerrain, FAR_SCALE } from './render/terrain';
 import { type GameMap, type Terrain, generateMap, parseMap, terrainAt } from './sim/map';
 import { buildingAt, createWorld, demolish, place, placementError, roadPath } from './sim/world';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
+import { createConstruction } from './render/construction';
 import { daylight } from './render/daylight';
 import { createFpsCounter, createSettingsPanel, loadSettings, resolutionOf } from './ui/settings';
 import { createFxaa } from './render/fxaa';
@@ -76,8 +77,14 @@ territory.visible = false;
 const effects = createEffects(map);
 // Reflections under the land: the baked land is opaque, so they only show on the sea.
 // The whole world takes the time of day as a tint; night lights and the UI overlays sit above it, untinted.
+// Buildings rise behind scaffolding; until then the terrain leaves them out of its baked chunks.
+const construction = createConstruction(effects.dust, (id) => {
+  terrain.hide(id, false);
+  const b = world.buildings.get(id);
+  if (b) terrain.invalidate(footprint(b.x, b.y, BUILDINGS[b.type].size));
+});
 const lit = new Container({
-  children: [terrain.reflections, terrain.ground, territory, terrain.objects, effects.layer],
+  children: [terrain.reflections, terrain.ground, territory, terrain.objects, construction.layer, effects.layer],
 });
 scene.addChild(lit, terrain.lights);
 scene.addChild(hover, selection, preview, ghost);
@@ -166,6 +173,7 @@ app.ticker.add((t) => {
     [view.x + view.width * 0.62, 50 / cam.scale, day.night],
   );
   terrain.update(dt, view, cam.scale);
+  construction.update(dt);
   // The target keeps CSS-pixel units; its own resolution does the downscaling.
   waterTransform.set(cam.scale, 0, 0, cam.scale, cam.x, cam.y);
   app.renderer.render({ container: waterScene, target: waterTexture, transform: waterTransform, clear: true });
@@ -276,6 +284,14 @@ const showPreview = (t: { x: number; y: number } | undefined) => {
 const demolishAt = (t: { x: number; y: number } | undefined) => {
   const b = t && demolish(world, t.x, t.y);
   if (!b) return;
+  construction.cancel(b.id);
+  terrain.hide(b.id, false);
+  // A cloud of dust over the footprint.
+  const size = BUILDINGS[b.type].size;
+  for (let k = 0; k < 18; k++) {
+    const p = tileToScreen(b.x + Math.random() * size, b.y + Math.random() * size);
+    effects.dust(p.x, p.y - Math.random() * 20);
+  }
   refresh(footprint(b.x, b.y, BUILDINGS[b.type].size));
   showPreview(t);
 };
@@ -320,6 +336,11 @@ attachCameraControls(app.canvas, cam, {
         const s = BUILDINGS[tool].size;
         const a = anchorFor(s, t);
         const err = place(world, tool, a.x, a.y);
+        const b = err ? undefined : buildingAt(world, a.x, a.y);
+        if (b) {
+          terrain.hide(b.id, true);
+          construction.start(b);
+        }
         say(err ?? `Megépült: ${BUILDINGS[tool].name}`);
         refresh(err ? [] : footprint(a.x, a.y, s));
       }

@@ -22,6 +22,11 @@ interface Puff {
   age: number;
   life: number;
   vx: number;
+  /** Rise speed, px/s. */
+  vy: number;
+  /** Final scale and opacity. */
+  size: number;
+  alpha: number;
 }
 
 const MAX_PUFFS = 300;
@@ -74,6 +79,23 @@ export function createEffects(map: GameMap) {
   let time = 0;
   return {
     layer,
+    /** A puff of brown building dust at world point (x, y): construction and demolition. */
+    dust(x: number, y: number) {
+      if (puffs.length >= MAX_PUFFS) return;
+      const s = new Sprite({ texture: puffTex, anchor: 0.5, tint: 0xc8b08a });
+      s.position.set(x, y);
+      layer.addChild(s);
+      const life = 0.9 + Math.random() * 0.8;
+      puffs.push({
+        s,
+        age: 0,
+        life,
+        vx: (Math.random() - 0.5) * 30,
+        vy: 6 + Math.random() * 8,
+        size: 0.4 + Math.random() * 0.3,
+        alpha: 0.7,
+      });
+    },
     setChimneys(points: { x: number; y: number }[]) {
       chimneys = points.map((p) => ({ ...p, next: Math.random() }));
     },
@@ -92,7 +114,15 @@ export function createEffects(map: GameMap) {
         s.anchor.set(0.5);
         s.position.set(c.x, c.y);
         layer.addChild(s);
-        puffs.push({ s, age: 0, life: 2.6 + Math.random(), vx: 6 + Math.random() * 6 });
+        puffs.push({
+          s,
+          age: 0,
+          life: 2.6 + Math.random(),
+          vx: 6 + Math.random() * 6,
+          vy: 14,
+          size: 0.35,
+          alpha: 0.55,
+        });
       }
       for (let i = puffs.length - 1; i >= 0; i--) {
         const p = puffs[i];
@@ -104,9 +134,9 @@ export function createEffects(map: GameMap) {
           continue;
         }
         p.s.x += p.vx * dt;
-        p.s.y -= 14 * dt;
-        p.s.scale.set(0.12 + k * 0.35);
-        p.s.alpha = 0.55 * Math.min(1, k * 5) * (1 - k);
+        p.s.y -= p.vy * dt;
+        p.s.scale.set(0.12 + k * p.size);
+        p.s.alpha = p.alpha * Math.min(1, k * 5) * (1 - k);
       }
 
       for (const g of gulls) {

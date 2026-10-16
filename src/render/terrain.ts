@@ -72,6 +72,8 @@ export function createTerrain(world: World, renderer: Renderer) {
   const objectLayer = new Container({ sortableChildren: true });
   const reflectionLayer = new Container();
   const lightLayer = new Container({ alpha: 0 });
+  /** Buildings still under construction: drawn live elsewhere, left out of the bake. */
+  const hidden = new Set<number>();
   /** Sun step for shadows (see daylight.ts); part of the bake key. */
   let sunStep = 3;
   let shade = sunShadow(sunStep);
@@ -137,7 +139,8 @@ export function createTerrain(world: World, renderer: Renderer) {
           }
         };
         const rock = t === 'water' && !far && ground.rockAt(x, y);
-        if (rock) put(art.boulder, rock[0], rock[1], rock[2]);
+        // Small rocks are always low ones; big ones may be tall stacks.
+        if (rock) put(art.seaRocks[rock[2] < 0.35 ? rock[3] % 3 : rock[3]], rock[0], rock[1], rock[2] * 1.4);
         else if (t === 'forest' && !far) {
           const n = 2 + Math.floor(r() * 3);
           for (let i = 0; i < n; i++) {
@@ -277,7 +280,7 @@ export function createTerrain(world: World, renderer: Renderer) {
     setSun(shade);
     addNature(c, o, refl, far);
     for (const b of world.buildings.values()) {
-      if (b.type === 'road' || b.x < c.x0 || b.x >= c.x1 || b.y < c.y0 || b.y >= c.y1) continue;
+      if (b.type === 'road' || hidden.has(b.id) || b.x < c.x0 || b.x >= c.x1 || b.y < c.y0 || b.y >= c.y1) continue;
       const size = BUILDINGS[b.type].size;
       const draw = () => {
         const bg = new Graphics({ zIndex: b.x + b.y + size });
@@ -337,6 +340,11 @@ export function createTerrain(world: World, renderer: Renderer) {
     invalidate(tiles: [number, number][]) {
       for (const [x, y] of tiles)
         for (const c of chunks) if (x >= c.x0 - 1 && x <= c.x1 && y >= c.y0 - 1 && y <= c.y1) c.dirty = true;
+    },
+    /** Leave building `id` out of the bake (under construction) or put it back. */
+    hide(id: number, on: boolean) {
+      if (on) hidden.add(id);
+      else hidden.delete(id);
     },
     /** Switch the look; chunks rebake on their next view because their key changes. */
     setPixel(on: boolean) {

@@ -3,9 +3,8 @@ import type { GameMap } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
 import { TILE_H, TILE_W } from './iso';
 
-/** Share of eligible coastal water tiles with a rock, and how far it may sit off the tile centre. */
-const ROCK_CHANCE = 0.1;
-const ROCK_SPREAD = 0.2;
+/** Largest offshore rock, in tiles across its foam collar; the rock texture stores size / ROCK_MAX. */
+const ROCK_MAX = 1.2;
 
 const vertex = /* glsl */ `
 in vec2 aPosition;
@@ -34,6 +33,7 @@ uniform float uFar;
 uniform vec3 uAmbient;
 uniform vec3 uSun;
 uniform vec3 uMoon;
+uniform sampler2D uRocks;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 // Baked, tileable noise (see bakeNoise): r = 4-octave fbm, g = single octave, b = second fbm.
@@ -102,20 +102,25 @@ void main() {
   float patchy = smoothstep(0.45, 0.8, noise(p * 0.9 + vec2(t * 0.03, 0.0)));
   float breaker = smoothstep(0.75, 1.0, swell) * patchy * (1.0 - smoothstep(0.03, 0.26, depthRaw)) * (1.0 - fade);
   col = mix(col, vec3(0.92, 0.96, 0.95), breaker * 0.5);
-  // Ripple rings and a foam collar around offshore rocks (rockAt places the same rocks on the CPU).
-  vec2 cell = floor(pc);
-  float rh = mod(cell.x * 37.0 + cell.y * 101.0 + cell.x * cell.y * 13.0, 97.0) / 97.0;
-  float rd0 = texture(uDist, (cell + 0.5) / uSize).r;
-  if (rh < ${ROCK_CHANCE} && rd0 > 0.02 && rd0 < 0.115 && fade < 1.0) {
-    vec2 off = vec2(mod(cell.x * 53.0 + cell.y * 29.0 + cell.x * cell.y * 7.0, 89.0) / 89.0,
-                    mod(cell.x * 17.0 + cell.y * 61.0 + cell.x * cell.y * 11.0, 83.0) / 83.0) - 0.5;
-    float d = length(pc - cell - 0.5 - off * ${ROCK_SPREAD});
+  // Offshore rocks (uRocks: r size, gb position in the tile): foam collar and ripple rings.
+  // The 3×3 neighbourhood, so a big rock's rings are not cut at its tile's edge.
+  if (depthRaw < 0.45 && fade < 1.0 && uFar < 1.0) {
     float rings = 0.0;
-    for (int k = 0; k < 2; k++) {
-      float ph = fract(t * 0.3 + rh * 7.0 + float(k) * 0.5);
-      rings += smoothstep(0.035, 0.0, abs(d - 0.12 - ph * 0.26)) * (1.0 - ph);
-    }
-    rings += smoothstep(0.17, 0.1, d) * (0.6 + 0.4 * noise(p * 9.0 + t));
+    vec2 c0 = floor(pc);
+    for (int j = -1; j <= 1; j++)
+      for (int i = -1; i <= 1; i++) {
+        vec2 cell = c0 + vec2(float(i), float(j));
+        vec4 rk = texture(uRocks, (cell + 0.5) / uSize);
+        if (rk.r < 0.01) continue;
+        float rad = rk.r * ${(ROCK_MAX * 0.75).toFixed(3)};
+        float d = length(pc - cell - rk.gb);
+        float seed = fract(cell.x * 0.37 + cell.y * 0.61);
+        for (int k = 0; k < 2; k++) {
+          float ph = fract(t * 0.3 + seed * 7.0 + float(k) * 0.5);
+          rings += smoothstep(0.035, 0.0, abs(d - rad - 0.04 - ph * 0.4)) * (1.0 - ph) * 0.8;
+        }
+        rings += smoothstep(rad + 0.08, rad - 0.02, d) * (0.6 + 0.4 * noise(p * 9.0 + t));
+      }
     col = mix(col, vec3(0.88, 0.94, 0.94), clamp(rings, 0.0, 1.0) * 0.6 * (1.0 - uFar) * (1.0 - fade));
   }
   if (land > 0.01) {
@@ -333,18 +338,49 @@ export function createGround(map: GameMap) {
   const dist = new Uint8Array(W * H * 4);
   const toSea = distance(W, H, (i) => tiles[i] !== 'water');
   /**
-   * Offshore rock on water tile (x, y), 1.4–2 tiles from land: [u, v, scale] within the tile, or null.
-   * Integer-exact hash so the sea shader finds the same rocks for their ripple rings.
+   * Offshore rocks, in clusters: many in some stretches of coast, almost none elsewhere; mostly
+   * small with the odd big one further out. [u, v, size, variant] per water tile, or null.
    */
-  const rockAt = (x: number, y: number): [number, number, number] | null => {
-    if (x < 0 || y < 0 || x >= W || y >= H) return null;
-    const i = y * W + x;
-    if (tiles[i] !== 'water' || toSea[i] < 1.2 || toSea[i] > 2.01) return null;
-    if (((x * 37 + y * 101 + x * y * 13) % 97) / 97 >= ROCK_CHANCE) return null;
-    const u = ((x * 53 + y * 29 + x * y * 7) % 89) / 89 - 0.5;
-    const v = ((x * 17 + y * 61 + x * y * 11) % 83) / 83 - 0.5;
-    return [0.5 + u * ROCK_SPREAD, 0.5 + v * ROCK_SPREAD, 0.45 + ((x * y) % 7) * 0.06];
-  };
+  const rocks: ([number, number, number, number] | null)[] = new Array(W * H).fill(null);
+  {
+    const r = mulberry32(4242);
+    const C = 10;
+    const cw = Math.ceil(W / C) + 2;
+    const lattice = Float32Array.from({ length: cw * (Math.ceil(H / C) + 2) }, r);
+    const cluster = (x: number, y: number) => {
+      const fx = x / C;
+      const fy = y / C;
+      const i = Math.floor(fx);
+      const j = Math.floor(fy);
+      const tx = (fx - i) * (fx - i) * (3 - 2 * (fx - i));
+      const ty = (fy - j) * (fy - j) * (3 - 2 * (fy - j));
+      const at = (a: number, b: number) => lattice[b * cw + a];
+      const top = at(i, j) + (at(i + 1, j) - at(i, j)) * tx;
+      const bottom = at(i, j + 1) + (at(i + 1, j + 1) - at(i, j + 1)) * tx;
+      return top + (bottom - top) * ty;
+    };
+    for (let y = 1; y < H - 1; y++)
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x;
+        const d = toSea[i];
+        if (tiles[i] !== 'water' || d < 1.2 || d > 4.5) continue;
+        const dense = Math.max(0, cluster(x, y) - 0.45) / 0.55;
+        if (r() > dense * dense * 0.75 + 0.004) continue;
+        // Squared: more small rocks than big; big ones only away from the beach.
+        let size = 0.2 + r() ** 2 * 0.95;
+        if (d < 2.1) size = Math.min(size, 0.45);
+        // Neighbours must leave room: no two rocks touching where either is big.
+        const near = [i - 1, i - W, i - W - 1, i - W + 1].some((k) => rocks[k] && (rocks[k]![2] > 0.35 || size > 0.35));
+        if (near) continue;
+        rocks[i] = [0.35 + r() * 0.3, 0.35 + r() * 0.3, size, Math.floor(r() * 6)];
+      }
+  }
+  const rockAt = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? null : rocks[y * W + x]);
+  const rockData = new Uint8Array(W * H * 4);
+  rocks.forEach((k, i) => {
+    if (k) rockData.set([(k[2] / ROCK_MAX) * 255, k[0] * 255, k[1] * 255, 255], i * 4);
+    else rockData[i * 4 + 3] = 255;
+  });
   const toShore = distance(W, H, (i) => tiles[i] === 'water' || tiles[i] === 'beach');
   const is = (k: string) => Float32Array.from(tiles, (t) => (t === k ? 1 : 0));
   const land = blur(
@@ -365,10 +401,12 @@ export function createGround(map: GameMap) {
   const opts = { width: W, height: H, format: 'rgba8unorm' as const, scaleMode: 'linear' as const };
   const maskSrc = new BufferImageSource({ resource: mask, ...opts, addressMode: 'clamp-to-edge' });
   const distSrc = new BufferImageSource({ resource: dist, ...opts, addressMode: 'clamp-to-edge' });
+  const rockSrc = new BufferImageSource({ resource: rockData, ...opts, addressMode: 'clamp-to-edge' });
 
   const resources = (name: string) => ({
     uMask: maskSrc,
     uDist: distSrc,
+    uRocks: rockSrc,
     uNoise: noise,
     [name]: {
       uSize: { value: new Float32Array([W, H]), type: 'vec2<f32>' },

@@ -326,6 +326,60 @@ function house(g: Graphics, x: number, y: number, variant: number) {
   walls(g, at(0.42, 0.42, 0.65, 0.65), wallH + 14, wallH + 15.5, 0x5e3e30);
 }
 
+/** Wooden crate on tile point (x, y), `s` tiles wide, standing at height h0. */
+function crate(g: Graphics, x: number, y: number, s: number, color: number, h0 = 0) {
+  const b = { x0: x, y0: y, x1: x + s, y1: y + s };
+  walls(g, b, h0, h0 + s * 16, color);
+  const a = P(x, y + s, h0);
+  const c = P(x + s, y + s, h0 + s * 16);
+  g.moveTo(a[0], a[1])
+    .lineTo(c[0], c[1])
+    .stroke({ width: 0.6, color: shade(color, 0.55) });
+}
+/** Barrel standing at tile point (x, y). */
+function barrel(g: Graphics, x: number, y: number) {
+  const [sx, sy] = P(x, y, 0);
+  g.roundRect(sx - 3, sy - 8, 6, 8, 2).fill(0x7a5230);
+  g.ellipse(sx, sy - 8, 3, 1.3).fill(0x9a6e40);
+  g.moveTo(sx - 3, sy - 2.5)
+    .lineTo(sx + 3, sy - 2.5)
+    .moveTo(sx - 3, sy - 6)
+    .lineTo(sx + 3, sy - 6);
+  g.stroke({ width: 0.6, color: 0x3a3a3a });
+}
+/** Grain sack at tile point (x, y). */
+function sack(g: Graphics, x: number, y: number) {
+  const [sx, sy] = P(x, y, 0);
+  g.ellipse(sx, sy - 3, 3.4, 3.2).fill(0xd2c29a);
+  g.ellipse(sx + 1, sy - 2, 2, 2).fill(0xbfae85);
+  g.rect(sx - 1, sy - 7, 2, 1.6).fill(0x8a7a5a);
+}
+/** Treadwheel crane: mast at tile point (x, y), jib reaching out, a crate on the rope. */
+function crane(g: Graphics, x: number, y: number) {
+  walls(g, { x0: x - 0.06, y0: y - 0.06, x1: x + 0.06, y1: y + 0.06 }, 0, 44, 0x6a4a2a);
+  const base = P(x, y, 40);
+  const tip = P(x + 0.8, y + 0.35, 50);
+  g.moveTo(base[0], base[1]).lineTo(tip[0], tip[1]).stroke({ width: 2.2, color: 0x5a3e22 });
+  const brace = P(x, y, 26);
+  g.moveTo(brace[0], brace[1])
+    .lineTo((base[0] + tip[0]) / 2, (base[1] + tip[1]) / 2)
+    .stroke({ width: 1.2, color: 0x5a3e22 });
+  g.moveTo(tip[0], tip[1])
+    .lineTo(tip[0], tip[1] + 26)
+    .stroke({ width: 0.6, color: 0x2a2018 });
+  g.rect(tip[0] - 3.5, tip[1] + 26, 7, 6)
+    .fill(0xa07a46)
+    .stroke({ width: 0.6, color: 0x5a3e22 });
+  // Treadwheel beside the mast.
+  const w = P(x - 0.3, y + 0.05, 9);
+  g.ellipse(w[0], w[1], 4.5, 9).stroke({ width: 1.6, color: 0x6a4a2a });
+  for (let k = 0; k < 4; k++) {
+    const a = (k * Math.PI) / 4;
+    g.moveTo(w[0] - Math.cos(a) * 4.5, w[1] - Math.sin(a) * 9).lineTo(w[0] + Math.cos(a) * 4.5, w[1] + Math.sin(a) * 9);
+  }
+  g.stroke({ width: 0.6, color: 0x5a3e22 });
+}
+
 /** Wooden pier over the tile box (x0, y0)–(x1, y1): a plank deck on posts standing in the sea. */
 export function drawPier(g: Graphics, x0: number, y0: number, x1: number, y1: number) {
   rnd = mulberry32(Math.round(x0 * 131 + y0 * 31));
@@ -365,73 +419,172 @@ export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number
       house(g, x, y, variant);
       break;
     case 'harbor': {
-      const b = box(0.15, 0.2, 1.75, 1.6);
-      gabled(g, b, 15, 12, 0xa87b4f, 0x6b3f22);
-      for (const t of [0.25, 0.5, 0.75]) onLeft(g, b, 0, 1, t * 15 - 0.4, t * 15 + 0.4, 0x7d5733);
-      door(g, b, 0.35, 0.3, 11, 0x4a2f1a);
-      walls(g, box(1.45, 1.6, 1.8, 1.95), 0, 6, 0xb08850);
-      walls(g, box(1.1, 1.65, 1.4, 1.95), 0, 5, 0x9c7444);
-      const pole = P(x + 1.85, y + 0.35, 0);
-      const tip = P(x + 1.85, y + 0.35, 40);
-      g.moveTo(pole[0], pole[1]).lineTo(tip[0], tip[1]).stroke({ width: 1.4, color: 0x4a3420 });
-      g.poly([tip[0], tip[1], tip[0] + 14, tip[1] + 4, tip[0], tip[1] + 8]).fill(0xc0392b);
+      // Harbour office: stone ground floor, timber gable, flag on the ridge.
+      const b = box(0.15, 0.15, 1.2, 1.25);
+      gabled(g, b, 16, 11, 0xb08a5a, 0x6b3f22);
+      walls(g, b, 0, 8, 0xa89e8a, false);
+      door(g, b, 0.4, 0.28, 10, 0x4a2f1a);
+      windowLeft(g, b, 0.12, 0.14, 11, 14.5, 0x5a3a20);
+      windowRight(g, b, 0.35, 0.3, 10, 14);
+      const pole = P(x + 0.68, y + 0.7, 27);
+      const tip = P(x + 0.68, y + 0.7, 46);
+      g.moveTo(pole[0], pole[1]).lineTo(tip[0], tip[1]).stroke({ width: 1.2, color: 0x4a3420 });
+      g.poly([tip[0], tip[1], tip[0] + 12, tip[1] + 3.5, tip[0], tip[1] + 7]).fill(0xc0392b);
+      // Cargo waiting on the quay.
+      crate(g, x + 1.35, y + 0.25, 0.3, 0xa07a46);
+      crate(g, x + 1.62, y + 0.3, 0.26, 0x8f6a3c);
+      crate(g, x + 1.4, y + 0.3, 0.22, 0xb08850, 0.3 * 16);
+      barrel(g, x + 1.3, y + 0.95);
+      barrel(g, x + 1.5, y + 1.05);
+      // Wooden treadwheel crane at the front corner.
+      crane(g, x + 1.6, y + 1.55);
       break;
     }
     case 'warehouse': {
-      const b = box(0.1, 0.2, 1.9, 1.7);
-      gabled(g, b, 14, 13, 0xc9a46c, 0x7a4a2a);
-      timber(g, b, 14);
-      door(g, b, 0.36, 0.28, 11, 0x5a3a20);
-      onLeft(g, b, 0.36, 0.64, 10.6, 11.2, 0x3a2412);
-      windowRight(g, b, 0.3, 0.4, 8, 11.5);
-      walls(g, box(1.55, 1.75, 1.9, 1.98), 0, 5, 0xa07a46);
+      // Long hall: stone below, timber above, big braced doors and a hoist at the gable.
+      const b = box(0.1, 0.12, 1.9, 1.45);
+      gabled(g, b, 17, 14, 0xc9a46c, 0x7a4a2a);
+      timber(g, b, 17);
+      walls(g, b, 0, 7, 0x9a9282, false);
+      onLeft(g, b, 0, 1, 6.6, 7.4, 0x6e6658);
+      for (const t of [0.22, 0.58]) {
+        onLeft(g, b, t, t + 0.2, 0, 12, 0x5a3a20);
+        const [a1, a2] = [P(b.x0 + t * 1.8, b.y1, 0), P(b.x0 + (t + 0.2) * 1.8, b.y1, 12)];
+        g.moveTo(a1[0], a1[1]).lineTo(a2[0], a2[1]).stroke({ width: 1, color: 0x3a2412 });
+        onLeft(g, b, t + 0.098, t + 0.102, 0, 12, 0x3a2412);
+      }
+      windowRight(g, b, 0.35, 0.3, 10, 14);
+      // Hoist beam over the loft door, rope and pulley.
+      onRight(g, b, 0.4, 0.6, 18, 25, 0x4a2f1a);
+      const h0 = P(b.x1, y + 0.78, 27);
+      const h1 = P(b.x1 + 0.3, y + 0.78, 27);
+      g.moveTo(h0[0], h0[1]).lineTo(h1[0], h1[1]).stroke({ width: 2, color: 0x4a3420 });
+      g.circle(h1[0], h1[1] + 1.5, 1.6).fill(0x2a2018);
+      g.moveTo(h1[0], h1[1] + 2)
+        .lineTo(h1[0], h1[1] + 20)
+        .stroke({ width: 0.6, color: 0x3a3020 });
+      // Goods out front: crates, barrels and sacks.
+      crate(g, x + 1.15, y + 1.55, 0.26, 0xa07a46);
+      crate(g, x + 1.45, y + 1.6, 0.3, 0x8f6a3c);
+      crate(g, x + 1.5, y + 1.65, 0.2, 0xb08850, 0.3 * 16);
+      barrel(g, x + 0.35, y + 1.75);
+      barrel(g, x + 0.6, y + 1.8);
+      sack(g, x + 0.85, y + 1.75);
+      sack(g, x + 0.95, y + 1.85);
       break;
     }
     case 'lumberjack': {
-      const b = box(0.15, 0.15, 1.15, 1.1);
-      gabled(g, b, 10, 9, 0x9c7448, 0x5e4a2e);
-      onLeft(g, b, 0.38, 0.62, 0, 7, 0x4a2f1a);
-      const logs = box(1.25, 1.15, 1.9, 1.85);
-      walls(g, logs, 0, 6, 0x8b5a2b);
-      for (const [t, h] of [
-        [0.2, 1.5],
-        [0.5, 1.5],
-        [0.8, 1.5],
-        [0.35, 4.4],
-        [0.65, 4.4],
-      ]) {
-        const c = P(logs.x1, logs.y0 + t * (logs.y1 - logs.y0), h);
-        g.ellipse(c[0], c[1], 2.6, 1.6).fill(0xdcb980).stroke({ width: 0.6, color: 0x7a4f25 });
+      // Log cabin: walls of stacked logs, shingle roof.
+      const b = box(0.15, 0.15, 1.1, 1.05);
+      gabled(g, b, 10, 9, 0x8a6238, 0x5e4a2e);
+      for (let h = 1.5; h < 10; h += 1.8) {
+        onLeft(g, b, 0, 1, h, h + 0.5, 0x5a3e22);
+        onRight(g, b, 0, 1, h, h + 0.5, 0x4a321c);
       }
+      door(g, b, 0.38, 0.26, 7, 0x4a2f1a);
+      windowRight(g, b, 0.35, 0.3, 4, 7);
+      // Big log pile: ends stacked in a pyramid on its front face.
+      const pile = box(1.2, 0.2, 1.85, 1.25);
+      walls(g, pile, 0, 9, 0x7a5028);
+      for (let row = 0; row < 3; row++)
+        for (let k = 0; k < 5 - row; k++) {
+          const c = P(pile.x0 + (0.1 + (k + row * 0.5) * 0.13) * 1, pile.y1, 1.6 + row * 3);
+          g.ellipse(c[0], c[1], 2.4, 1.6).fill(0xdcb980).stroke({ width: 0.6, color: 0x7a4f25 });
+        }
+      // Chopping block with an axe, chips, and a sawhorse with a log.
+      const stump = P(x + 0.55, y + 1.5, 0);
+      g.rect(stump[0] - 3, stump[1] - 4, 6, 4).fill(0x6a4626);
+      g.ellipse(stump[0], stump[1] - 4, 3, 1.3).fill(0xd2b07a);
+      g.moveTo(stump[0] + 1, stump[1] - 4)
+        .lineTo(stump[0] + 5, stump[1] - 10)
+        .stroke({ width: 1, color: 0x5a3a20 });
+      g.poly([stump[0] - 0.5, stump[1] - 3.5, stump[0] + 2.5, stump[1] - 5.5, stump[0] + 1, stump[1] - 2]).fill(
+        0x9aa0a6,
+      );
+      for (let k = 0; k < 8; k++) g.rect(stump[0] - 7 + rnd() * 14, stump[1] - 1 + rnd() * 3, 1.2, 0.8).fill(0xd8b880);
+      const s0 = P(x + 1.25, y + 1.55, 0);
+      const s1 = P(x + 1.75, y + 1.55, 0);
+      for (const sp of [s0, s1])
+        g.moveTo(sp[0] - 2, sp[1])
+          .lineTo(sp[0], sp[1] - 5)
+          .lineTo(sp[0] + 2, sp[1])
+          .stroke({ width: 0.8, color: 0x4a3420 });
+      g.moveTo(s0[0] - 3, s0[1] - 6.5)
+        .lineTo(s1[0] + 3, s1[1] - 6.5)
+        .stroke({ width: 3.2, color: 0x8b5a2b });
+      g.ellipse(s1[0] + 3, s1[1] - 6.5, 1.2, 1.6).fill(0xdcb980);
       break;
     }
     case 'fisher': {
-      const b = box(0.15, 0.2, 1.15, 1.2);
-      gabled(g, b, 10, 9, 0xb8b3a2, 0x4a6a7a);
-      onLeft(g, b, 0.38, 0.62, 0, 7, 0x4a3a2a);
-      const p1 = P(x + 1.5, y + 0.45, 0);
-      const p2 = P(x + 1.5, y + 1.7, 0);
-      const t1 = P(x + 1.5, y + 0.45, 14);
-      const t2 = P(x + 1.5, y + 1.7, 14);
-      g.poly([...t1, ...t2, p2[0], p2[1] - 4, p1[0], p1[1] - 4]).fill({ color: 0x9a8f6a, alpha: 0.45 });
-      for (let k = 1; k < 6; k++) {
-        const a = [t1[0] + ((t2[0] - t1[0]) * k) / 6, t1[1] + ((t2[1] - t1[1]) * k) / 6];
-        g.moveTo(a[0], a[1]).lineTo(a[0], a[1] + 10);
+      // Weathered plank hut with a thatched roof.
+      const b = box(0.15, 0.15, 1.0, 1.0);
+      gabled(g, b, 9, 10, 0x8fa3a6, 0x9a8650);
+      for (let t = 0.1; t < 1; t += 0.12) {
+        onLeft(g, b, t, t + 0.01, 0, 9, 0x6a7c80);
+        onRight(g, b, t, t + 0.01, 0, 9, 0x56676a);
       }
-      g.stroke({ width: 0.5, color: 0x5a5030, alpha: 0.7 });
+      door(g, b, 0.38, 0.28, 7, 0x4a3a2a);
+      // Net drying rack: two posts, a net with a mesh hanging between them.
+      const p1 = P(x + 1.45, y + 0.25, 0);
+      const p2 = P(x + 1.45, y + 1.15, 0);
+      const t1 = P(x + 1.45, y + 0.25, 15);
+      const t2 = P(x + 1.45, y + 1.15, 15);
+      g.poly([...t1, ...t2, p2[0], p2[1] - 4, p1[0], p1[1] - 4]).fill({ color: 0x8a8460, alpha: 0.35 });
+      for (let k = 1; k < 8; k++) {
+        const a = [t1[0] + ((t2[0] - t1[0]) * k) / 8, t1[1] + ((t2[1] - t1[1]) * k) / 8];
+        g.moveTo(a[0], a[1]).lineTo(a[0], a[1] + 11);
+      }
+      for (let k = 1; k < 4; k++) g.moveTo(t1[0], t1[1] + k * 3).lineTo(t2[0], t2[1] + k * 3);
+      g.stroke({ width: 0.4, color: 0x4a4430, alpha: 0.7 });
       g.moveTo(p1[0], p1[1]).lineTo(t1[0], t1[1]).moveTo(p2[0], p2[1]).lineTo(t2[0], t2[1]);
       g.stroke({ width: 1.4, color: 0x4a3420 });
+      // Fish drying on a pole.
+      const f0 = P(x + 0.3, y + 1.45, 11);
+      const f1 = P(x + 1.0, y + 1.45, 11);
+      g.moveTo(f0[0], f0[1])
+        .lineTo(f0[0], f0[1] + 11)
+        .moveTo(f1[0], f1[1])
+        .lineTo(f1[0], f1[1] + 11);
+      g.moveTo(f0[0], f0[1]).lineTo(f1[0], f1[1]).stroke({ width: 1, color: 0x4a3420 });
+      for (let k = 1; k < 7; k++) {
+        const fx = f0[0] + ((f1[0] - f0[0]) * k) / 7;
+        const fy = f0[1] + ((f1[1] - f0[1]) * k) / 7;
+        g.ellipse(fx, fy + 3, 0.9, 2.6).fill(k % 2 ? 0xb8c4c8 : 0x9aa8ae);
+      }
+      // Upturned rowing boat and a barrel.
+      const bt = P(x + 0.55, y + 1.8, 0);
+      g.ellipse(bt[0], bt[1] - 1.5, 9, 3.4).fill(0x6a4a2a);
+      g.ellipse(bt[0], bt[1] - 2.2, 8, 2.4).fill(0x8a6038);
+      g.moveTo(bt[0] - 8, bt[1] - 2)
+        .lineTo(bt[0] + 8, bt[1] - 2)
+        .stroke({ width: 0.5, color: 0x4a3018 });
+      barrel(g, x + 1.15, y + 1.8);
       break;
     }
     case 'chapel': {
       const nave = box(0.2, 0.4, 1.6, 1.55);
       gabled(g, nave, 14, 10, 0xe2dccd, 0x4f5866);
-      for (const t of [0.15, 0.45]) onLeft(g, nave, t, t + 0.1, 5, 11, 0x6a7fa0);
+      for (const t of [0.15, 0.45]) lit(onLeft(g, nave, t, t + 0.1, 5, 11, 0x6a7fa0));
+      // Round window in the front gable.
+      const rw = P(nave.x1, (nave.y0 + nave.y1) / 2, 18);
+      g.circle(rw[0], rw[1], 2.6).fill(0x6a7fa0).stroke({ width: 0.8, color: 0xb8b0a0 });
       const t = box(1.25, 1.2, 1.85, 1.8);
       walls(g, t, 0, 32, 0xd6cfbf);
       onLeft(g, t, 0.3, 0.7, 0, 9, 0x5a3a20);
       onLeft(g, t, 0.35, 0.65, 20, 27, 0x2b2b35);
       onRight(g, t, 0.35, 0.65, 20, 27, 0x2b2b35);
+      // Bell in the belfry opening.
+      const bell = P(t.x0 + 0.3, t.y1, 22.5);
+      g.poly([
+        bell[0] - 2.2,
+        bell[1] + 1.5,
+        bell[0] - 1.4,
+        bell[1] - 2.5,
+        bell[0] + 1.4,
+        bell[1] - 2.5,
+        bell[0] + 2.2,
+        bell[1] + 1.5,
+      ]).fill(0xc8a040);
       const apex = P(x + 1.55, y + 1.5, 52);
       const c = [P(t.x0, t.y1, 32), P(t.x1, t.y1, 32), P(t.x1, t.y0, 32)];
       fill(g, [c[0], c[1], apex], 0x5a6474);
@@ -441,6 +594,19 @@ export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number
         .moveTo(apex[0] - 3, apex[1] - 5.5)
         .lineTo(apex[0] + 3, apex[1] - 5.5);
       g.stroke({ width: 1.2, color: 0xd4af37 });
+      // Small churchyard: grave crosses on the left.
+      for (const [gx, gy] of [
+        [0.3, 1.75],
+        [0.6, 1.8],
+        [0.9, 1.75],
+      ]) {
+        const q = P(x + gx, y + gy, 0);
+        g.moveTo(q[0], q[1])
+          .lineTo(q[0], q[1] - 6)
+          .moveTo(q[0] - 2, q[1] - 4.5)
+          .lineTo(q[0] + 2, q[1] - 4.5);
+        g.stroke({ width: 1, color: 0x8a8478 });
+      }
       break;
     }
     case 'road':

@@ -352,6 +352,66 @@ const LEAF_GREEN = ['#2f5e1f', '#4f8a2e', '#9cc65a'];
 const OLIVE = ['#4a5a1c', '#7a8a2a', '#c4c45a'];
 const AUTUMN = ['#6a4a1a', '#a8742a', '#e0b048'];
 
+/** Rock standing in the sea: lit and shaded faces, a dark wet band with weed at the waterline. */
+const seaRock = (seed: number, tall: boolean) => {
+  const r = mulberry32(seed);
+  const h = tall ? 32 + r() * 14 : 17 + r() * 10;
+  return paint(64, 60, 32, 50, (c) => {
+    const base = 50;
+    const n = 7;
+    const top = Array.from({ length: n + 1 }, (_, k) => {
+      const t = k / n;
+      const env = Math.sin(Math.PI * t) ** (tall ? 0.6 : 1.2);
+      return [10 + 44 * t + (k && k < n ? (r() - 0.5) * 3 : 0), base - h * env * (0.75 + r() * 0.35)];
+    });
+    const peak = top.reduce((m, p, i) => (p[1] < top[m][1] ? i : m), 0);
+    const px = top[peak][0];
+    const grad = (a: string, b: string) => {
+      const g = c.createLinearGradient(0, base - h, 0, base);
+      g.addColorStop(0, a);
+      g.addColorStop(1, b);
+      return g;
+    };
+    poly(c, grad('#bdb6a8', '#7d766a'), [[10, base], ...top.slice(0, peak + 1), [px + 2, base]]);
+    poly(c, grad('#6e685d', '#3f3b35'), [[px + 2, base], ...top.slice(peak), [54, base]]);
+    // Everything below is clipped to the rock's outline.
+    c.save();
+    c.beginPath();
+    [[10, base], ...top, [54, base]].forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+    c.closePath();
+    c.clip();
+    c.lineWidth = 0.7;
+    for (let i = 0; i < 6; i++) {
+      const x = 14 + r() * 36;
+      const y = base - 3 - r() * h * 0.7;
+      c.strokeStyle = 'rgba(35,30,25,0.4)';
+      c.beginPath();
+      c.moveTo(x, y);
+      c.lineTo(x + (r() - 0.5) * 5, y + 4 + r() * 6);
+      c.stroke();
+    }
+    c.fillStyle = 'rgba(38,50,36,0.8)';
+    c.fillRect(0, base - 5, 64, 5);
+    for (let i = 0; i < 14; i++) {
+      c.fillStyle = r() < 0.5 ? 'rgba(60,82,46,0.8)' : 'rgba(28,36,28,0.8)';
+      c.fillRect(10 + r() * 44, base - 6 - r() * 3, 1.5, 1.5);
+    }
+    // Pale specks on top of tall stacks, where the gulls sit.
+    if (tall)
+      for (let i = 0; i < 10; i++) {
+        c.fillStyle = 'rgba(238,236,228,0.85)';
+        c.fillRect(px - 8 + r() * 14, top[peak][1] + r() * 8, 1.2, 1.2);
+      }
+    c.restore();
+    // Foam lip where the sea meets the rock.
+    c.strokeStyle = 'rgba(236,246,246,0.75)';
+    c.lineWidth = 1.2;
+    c.beginPath();
+    c.ellipse(32, base - 0.5, 23, 3.2, 0, 0, Math.PI);
+    c.stroke();
+  });
+};
+
 /** All object art, built once (needs a DOM canvas). */
 export function makeArt() {
   return {
@@ -371,6 +431,8 @@ export function makeArt() {
     driftwood: [driftwood(51), driftwood(52)],
     pebbles: [pebbles(61), pebbles(62)],
     boulder,
+    /** Sea rocks: three low ones, then three tall stacks. */
+    seaRocks: [71, 72, 73].map((k) => seaRock(k, false)).concat([74, 75, 76].map((k) => seaRock(k, true))),
     peaks: [21, 22, 23].map((k) => mountain(k, true)),
     hills: [24, 25, 26, 27].map((k) => mountain(k, false)),
   };
