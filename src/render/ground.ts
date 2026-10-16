@@ -1,6 +1,7 @@
 import { BufferImageSource, Geometry, Mesh, Shader } from 'pixi.js';
 import { type GameMap, levelAt, terrainAt } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
+import { TOP } from './massif';
 import { LEVEL_H, MAX_LEVEL, TILE_H, TILE_W } from './iso';
 
 /** Largest offshore rock, in tiles across its foam collar; the rock texture stores size / ROCK_MAX. */
@@ -38,6 +39,8 @@ uniform vec3 uWeather;
 uniform sampler2D uRocks;
 uniform sampler2D uRiver;
 uniform sampler2D uLevel;
+// Mountain ranges: r = height of the highest summit on the tile / TOP.
+uniform sampler2D uPeaks;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 // Baked, tileable noise (see bakeNoise): r = 4-octave fbm, g = single octave, b = second fbm.
@@ -377,6 +380,14 @@ void main() {
     foot = max(foot, smoothstep(-0.1, 0.3, levelAt(p + d) - sf.z - 0.5));
   }
   col *= (1.0 - 0.42 * min(fall, 1.0)) * (1.0 - 0.18 * foot);
+  // The mountain ranges' shadow, falling away from the sun over the land beside them.
+  float peakShade = 0.0;
+  for (int k = 1; k <= 12; k++) {
+    float t = float(k) * 0.5;
+    float ph = smp(uPeaks, p - vec2(t, t * 0.25)).r * ${TOP.toFixed(1)};
+    peakShade = max(peakShade, smoothstep(0.0, 14.0, ph - t * 24.0));
+  }
+  col *= 1.0 - 0.38 * peakShade;
 
   // Relief: height from inland distance plus noise (rock raised), lit from the upper left.
   float h0 = height(p) + rockMask * ridge * 0.4;
@@ -498,7 +509,8 @@ function distance(W: number, H: number, src: (i: number) => boolean) {
 }
 
 /** The whole ground and sea as one shaded quad. `setForest` updates a tile after clearing. */
-export function createGround(map: GameMap) {
+/** `peaks`: highest point of the mountain range on each tile, px (see massif.ts), for its cast shadow. */
+export function createGround(map: GameMap, peaks: Float32Array) {
   const { width: W, height: H, tiles } = map;
   const mask = new Uint8Array(W * H * 4);
   const dist = new Uint8Array(W * H * 4);
@@ -652,6 +664,9 @@ export function createGround(map: GameMap) {
   const levelSrc = new BufferImageSource({ resource: levelData, ...opts, addressMode: 'clamp-to-edge' });
   const rockSrc = new BufferImageSource({ resource: rockData, ...opts, addressMode: 'clamp-to-edge' });
   const riverSrc = new BufferImageSource({ resource: riverData, ...opts, addressMode: 'clamp-to-edge' });
+  const peakData = new Uint8Array(W * H * 4);
+  peaks.forEach((h, i) => peakData.set([Math.min(255, (h / TOP) * 255), 0, 0, 255], i * 4));
+  const peakSrc = new BufferImageSource({ resource: peakData, ...opts, addressMode: 'clamp-to-edge' });
 
   const resources = (name: string) => ({
     uMask: maskSrc,
@@ -659,6 +674,7 @@ export function createGround(map: GameMap) {
     uRocks: rockSrc,
     uRiver: riverSrc,
     uLevel: levelSrc,
+    uPeaks: peakSrc,
     uNoise: noise,
     [name]: {
       uSize: { value: new Float32Array([W, H]), type: 'vec2<f32>' },

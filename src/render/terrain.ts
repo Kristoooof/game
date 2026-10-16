@@ -17,6 +17,7 @@ import type { World } from '../sim/world';
 import { drawBuilding, drawPier, drawRoads, pierBox, setGlow, setSun } from './buildings';
 import { sunShadow } from './daylight';
 import { createGround } from './ground';
+import { createMassif } from './massif';
 import { groundToScreen, LEVEL_H, MAX_LEVEL, tileToScreen } from './iso';
 import { type Art, makeArt, sprite } from './textures';
 
@@ -65,7 +66,8 @@ export function createTerrain(world: World, renderer: Renderer) {
   const { map } = world;
   const art = makeArt();
   const leaf = (k: number) => art.broadleaves[k < 0.08 ? 3 : Math.floor(k * 3) % 3];
-  const ground = createGround(map);
+  const massif = createMassif(map);
+  const ground = createGround(map, massif.peaks);
   const { width: W, height: H } = map;
   const at = (x: number, y: number) => terrainAt(map, x, y) ?? 'water';
   const groundLayer = new Container();
@@ -84,7 +86,7 @@ export function createTerrain(world: World, renderer: Renderer) {
   let sunStep = 3;
   let shade = sunShadow(sunStep);
 
-  /** Tiles of `type` `depth` steps or more inside their patch (up to `max`): taller peaks, darker woods. */
+  /** Tiles of `type` `depth` steps or more inside their patch (up to `max`): darker woods. */
   const depthIn = (type: string, max: number) => {
     const depth = new Uint8Array(W * H);
     for (let pass = 1; pass <= max; pass++)
@@ -96,7 +98,6 @@ export function createTerrain(world: World, renderer: Renderer) {
         }
     return depth;
   };
-  const rockDepth = depthIn('mountain', 6);
   /** Boulders lie in screes, a few 3×3 patches of the highland, not sprinkled evenly over it. */
   const scree = (x: number, y: number) => mulberry32(Math.floor(x / 3) * 7919 + Math.floor(y / 3) * 104729)() < 0.35;
   const woodDepth = depthIn('forest', 3);
@@ -119,13 +120,6 @@ export function createTerrain(world: World, renderer: Renderer) {
         z = px >= b.x + size || py >= b.y + size ? Math.max(z, bz + 0.01) : Math.min(z, bz - 0.01);
       }
     return z;
-  };
-  /** Every tile within `r` of (x, y) on the same terrace. */
-  const flatAround = (x: number, y: number, r: number) => {
-    const l = levelAt(map, x, y);
-    for (let dy = -r; dy <= r; dy++)
-      for (let dx = -r; dx <= r; dx++) if (levelAt(map, x + dx, y + dy) !== l) return false;
-    return true;
   };
   /** Within two tiles of the sea: its reflections are drawn. */
   const nearWater = (x: number, y: number) => {
@@ -166,8 +160,7 @@ export function createTerrain(world: World, renderer: Renderer) {
         const k = sh.scale.x;
         sh.setFromMatrix(new Matrix(k, 0, -shade.dx * k, -shade.dy * k, s.x, s.y));
         sh.tint = 0x0a1a10;
-        // Mountains cast a heavier shadow: it is what gives them their size.
-        sh.alpha = (art.peaks.includes(a) || art.hills.includes(a) ? 0.34 : 0.22) * shade.alpha;
+        sh.alpha = 0.22 * shade.alpha;
         sh.zIndex = sp.zIndex - 0.5;
         into.addChild(sh);
         if (!far && nearWater(x, y)) {
@@ -195,21 +188,14 @@ export function createTerrain(world: World, renderer: Renderer) {
           else put(art.bushes[Math.floor(r() * 2)], u, v, 0.8 + r() * 0.4);
         }
       } else if (t === 'mountain') {
-        // A range: foothills along the edge rising to big snowy peaks inside, and here and there
-        // on the deepest ground a summit half as big again that the whole range leads up to.
-        const d = rockDepth[y * W + x];
-        const p = r();
-        const k = r();
-        // A peak spreads over its neighbours: on one terrace all round, or it would hang over a
-        // cliff edge or stand against the foot of one.
-        if ((x + y) % 2 === 0 && p < 0.5 + d * 0.08 && flatAround(x, y, 1)) {
-          // Near a cliff only a small hill, kept within its own tile.
-          const roomy = flatAround(x, y, 2);
-          const kinds = d >= 2 && roomy ? art.peaks : art.hills;
-          let size = roomy ? [0.6, 0.85, 1.0, 1.15, 1.25, 1.3, 1.35][d] + r() * 0.2 : 0.55;
-          if (d >= 3 && r() < 0.3 && flatAround(x, y, 3)) size *= 1.5;
-          put(kinds[Math.floor(k * kinds.length)], 0.4 + r() * 0.2, 0.4 + r() * 0.2, size);
-        } else if (!far && p < (scree(x, y) ? 0.75 : 0.08))
+        // The range itself (see massif.ts), and boulders in screes on the low ground at its edge.
+        const g = massif.piece(x, y);
+        if (g) {
+          const m = new Graphics(g);
+          m.zIndex = depthBeside(x + 0.5, y + 0.5, x + y + 1);
+          into.addChild(m);
+        }
+        if (!far && massif.peaks[y * W + x] < 6 && r() < (scree(x, y) ? 0.6 : 0.08))
           put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.8);
       } else if (t === 'beach' && !far) {
         // Coast: palms just back from the water, driftwood and pebbles along the tideline.

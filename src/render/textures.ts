@@ -214,7 +214,6 @@ interface Rock {
   facets: number;
   detail: number;
   amp: number;
-  snow?: number;
   /** Fade to `color` towards the foot: grass round a boulder, scree round a mountain. */
   foot?: { color: string; height: number };
   wet?: number;
@@ -316,22 +315,6 @@ const rock = (c: Ctx, r: () => number, o: Rock) => {
   face(0, pk, end, fi, [sil[0], bottom[end]], spine, true);
   face(pk, sil.length - 1, fi, 0, spine, [sil[sil.length - 1], bottom[0]], false);
 
-  if (o.snow !== undefined) {
-    // Snow cap: a ragged lower edge with tongues reaching down the gullies.
-    const xs = outline.map((q) => q[0]);
-    const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
-    const cap: P[] = [[x0, -10]];
-    for (let x = x0; x <= x1; x += 2.5)
-      cap.push([x, o.snow + r() * 3 + (r() < 0.3 ? 3 + r() * 7 : 0) + (x - top[0]) * 0.08]);
-    cap.push([x1, -10]);
-    trace(c, cap);
-    c.clip();
-    c.fillStyle = '#c4cee2';
-    c.fillRect(x0, -10, x1 - x0, 200);
-    trace(c, litFace);
-    c.fillStyle = '#f5f6f8';
-    c.fill();
-  }
   c.restore();
 
   if (o.foot || o.wet) {
@@ -387,65 +370,6 @@ const boulder = paint(20, 14, 10, 11, (c) => {
     foot: { color: '#6a8040', height: 3 },
   });
 });
-
-/** A peak with a lower shoulder beside it, painted in faceted faces, snow-capped when high. */
-const mountain = (seed: number, snowy: boolean) => {
-  const r = mulberry32(seed);
-  const H = (snowy ? 56 : 30) + r() * 16;
-  const colours = {
-    lit: ['#dccfb3', '#a49478'] as [string, string],
-    shade: ['#858592', '#5c5b66'] as [string, string],
-    detail: 3,
-    amp: 0.14,
-    // Scree the colour of the highland ground, so the mountain grows out of it.
-    foot: { color: '#aaa18c', height: snowy ? 16 : 20 },
-  };
-  return paint(120, 100, 60, 84, (c) => {
-    shadow(c, 66, 84, 50, 12);
-    const side = r() < 0.5 ? -1 : 1;
-    const sx = 60 + side * 26;
-    const sH = H * (0.42 + r() * 0.15);
-    rock(c, r, {
-      ...colours,
-      ridge: [
-        [sx - 26, 80],
-        [sx + (r() - 0.5) * 10, 82 - sH],
-        [sx + 26, 80],
-      ],
-      peak: 1,
-      depth: 5,
-      facets: 3,
-      snow: snowy && sH > 34 ? 82 - sH * 0.7 : undefined,
-    });
-    // Lone summit or a twin one with a saddle, set off centre.
-    const px = 60 + (r() - 0.5) * 24;
-    const twin = r() < 0.4;
-    rock(c, r, {
-      ...colours,
-      ridge: twin
-        ? [
-            [8, 82],
-            [px - 26, 84 - H * (0.4 + r() * 0.15)],
-            [px - 12, 84 - H * (0.82 + r() * 0.1)],
-            [px - 4, 84 - H * 0.7],
-            [px + 6, 84 - H],
-            [px + 22 + r() * 6, 84 - H * (0.45 + r() * 0.15)],
-            [112, 82],
-          ]
-        : [
-            [8, 82],
-            [px - 18 - r() * 8, 84 - H * (0.45 + r() * 0.15)],
-            [px, 84 - H],
-            [px + 14 + r() * 8, 84 - H * (0.5 + r() * 0.15)],
-            [112, 82],
-          ],
-      peak: twin ? 4 : 2,
-      depth: 6,
-      facets: 4,
-      snow: snowy ? 84 - H * 0.62 : undefined,
-    });
-  });
-};
 
 /** Palm: a leaning trunk with rings and a crown of arched fronds, lit from the upper left. */
 const palm = (seed: number) => {
@@ -612,8 +536,6 @@ export function makeArt() {
     boulder,
     /** Sea rocks: three low ones, then three tall stacks. */
     seaRocks: [71, 72, 73].map((k) => seaRock(k, false)).concat([74, 75, 76].map((k) => seaRock(k, true))),
-    peaks: [21, 22, 23, 28, 29].map((k) => mountain(k, true)),
-    hills: [24, 25, 26, 27, 30].map((k) => mountain(k, false)),
   };
 }
 
