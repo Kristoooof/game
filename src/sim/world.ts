@@ -1,5 +1,5 @@
 import { BUILDINGS, GOOD_NAMES, type BuildingId, type Good } from '../data/buildings';
-import { type GameMap, labelIslands, terrainAt } from './map';
+import { type GameMap, labelIslands, levelAt, terrainAt } from './map';
 
 export interface Building {
   id: number;
@@ -55,6 +55,9 @@ export function placementError(w: World, type: BuildingId, x: number, y: number)
     if (w.occupied[i]) return 'A hely foglalt';
     if (!def.settles && !w.owned[i]) return 'Saját területen kívül';
   }
+  // A building stands on one terrace, never across a cliff (roads may, as ramps).
+  if (type !== 'road' && new Set(tiles.map(([tx, ty]) => levelAt(w.map, tx, ty))).size > 1)
+    return 'Ide nem lehet építeni';
   const touchesWater = tiles.some(([tx, ty]) =>
     [
       [tx + 1, ty],

@@ -1,7 +1,7 @@
 import { Container, Graphics } from 'pixi.js';
 import { BUILDINGS, type BuildingId } from '../data/buildings';
 import { drawBuilding } from './buildings';
-import { tileToScreen } from './iso';
+import { groundToScreen } from './iso';
 
 const BUILD_SECONDS = 2.8;
 /** Rough height in pixels of each building, for the scaffold and the reveal. */
@@ -40,9 +40,9 @@ export function createConstruction(dust: (x: number, y: number) => void, done: (
     start(b: { id: number; type: BuildingId; x: number; y: number }) {
       const size = BUILDINGS[b.type].size;
       const h = HEIGHT[b.type] ?? 30;
-      const L = tileToScreen(b.x, b.y + size);
-      const F = tileToScreen(b.x + size, b.y + size);
-      const R = tileToScreen(b.x + size, b.y);
+      const L = groundToScreen(b.x, b.y + size);
+      const F = groundToScreen(b.x + size, b.y + size);
+      const R = groundToScreen(b.x + size, b.y);
       const body = new Graphics();
       drawBuilding(body, b.type, b.x, b.y, b.id);
       const mask = new Graphics();
@@ -72,7 +72,7 @@ export function createConstruction(dust: (x: number, y: number) => void, done: (
         scaffold,
         left: L.x - 90,
         right: R.x + 90,
-        top: tileToScreen(b.x, b.y).y - h - 20,
+        top: groundToScreen(b.x, b.y).y - h - 20,
         base: F.y + 6,
         nextDust: 0,
         finished: false,

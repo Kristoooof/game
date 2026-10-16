@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import pelda from '../data/maps/pelda.txt?raw';
-import { type GameMap, generateMap, labelIslands, parseMap, terrainAt } from './map';
+import { type GameMap, generateMap, labelIslands, levelAt, parseMap, terrainAt } from './map';
 
 /** Sizes of separate islands. */
 function landAreas(map: GameMap) {
@@ -55,6 +55,24 @@ describe('generateMap', () => {
     // Same islands as without rivers: a river counts as part of its island.
     const dry = { ...map, tiles: map.tiles.map((t) => (t === 'river' ? 'grass' : t)) };
     expect(Math.max(...labels)).toBe(Math.max(...labelIslands(dry)));
+  });
+});
+
+describe('terraces', () => {
+  test.each([1, 1234])('seed %i: coast at sea level, one cliff at a time, rivers fall at drops', (seed) => {
+    const map = generateMap(seed);
+    const W = map.width;
+    map.tiles.forEach((t, i) => {
+      const l = levelAt(map, i % W, Math.floor(i / W));
+      if (t === 'water' || t === 'beach' || t === 'rocky') expect(l).toBe(0);
+      // Level 2 only ever borders level 1, except where a river has cut down through it.
+      if (l === 2 && t !== 'river')
+        for (const j of [i + 1, i - 1, i + W, i - W])
+          if (map.tiles[j] !== 'river') expect(levelAt(map, j % W, Math.floor(j / W))).toBeGreaterThan(0);
+    });
+    expect(Math.max(...map.levels!)).toBe(2);
+    for (const f of map.waterfalls!)
+      expect(levelAt(map, f.x - f.dx, f.y - f.dy)).toBeGreaterThan(levelAt(map, f.x, f.y));
   });
 });
 

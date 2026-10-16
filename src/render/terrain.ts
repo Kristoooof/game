@@ -17,7 +17,7 @@ import type { World } from '../sim/world';
 import { drawBuilding, drawPier, drawRoads, setGlow, setSun } from './buildings';
 import { sunShadow } from './daylight';
 import { createGround } from './ground';
-import { tileToScreen } from './iso';
+import { groundToScreen, LEVEL_H, MAX_LEVEL, tileToScreen } from './iso';
 import { type Art, makeArt, sprite } from './textures';
 
 const CHUNK = 16;
@@ -124,7 +124,7 @@ export function createTerrain(world: World, renderer: Renderer) {
         const t = at(x, y);
         const r = mulberry32(x * 92821 + y * 68917 + 7);
         const put = (a: Art, u: number, v: number, scale: number) => {
-          const s = tileToScreen(x + u, y + v);
+          const s = groundToScreen(x + u, y + v);
           const sp = sprite(a, s.x, s.y, scale);
           sp.zIndex = x + y + u + v;
           into.addChild(sp);
@@ -220,14 +220,25 @@ export function createTerrain(world: World, renderer: Renderer) {
         y0,
         x1,
         y1,
-        ground: new Rectangle(left - 16, top - 16, right - left + 32, bottom - top + 32),
+        // Raised terraces of tiles in front reach up into this chunk's area.
+        ground: new Rectangle(
+          left - 16,
+          top - 16 - MAX_LEVEL * LEVEL_H,
+          right - left + 32,
+          bottom - top + 32 + MAX_LEVEL * LEVEL_H,
+        ),
         objects: new Rectangle(left - 80, top - 180, right - left + 160, bottom - top + 204),
         groundMesh: diamondMesh(
           x0,
           y0,
           x1,
           y1,
-          new Rectangle(left - 16, top - 16, right - left + 32, bottom - top + 32),
+          new Rectangle(
+            left - 16,
+            top - 16 - MAX_LEVEL * LEVEL_H,
+            right - left + 32,
+            bottom - top + 32 + MAX_LEVEL * LEVEL_H,
+          ),
         ),
         objectSprite: new Sprite({ visible: false, zIndex: cx + cy }),
         reflectionSprite: new Sprite({ visible: false, tint: 0x2a6a8a, alpha: 0.22 }),

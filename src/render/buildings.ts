@@ -2,7 +2,7 @@ import { Graphics } from 'pixi.js';
 import { BUILDINGS, type BuildingId } from '../data/buildings';
 import type { World } from '../sim/world';
 import { mulberry32 } from '../sim/rng';
-import { diamond, tileToScreen } from './iso';
+import { diamond, groundToScreen, liftAt, tileToScreen } from './iso';
 
 const shade = (color: number, k: number) =>
   (Math.min(255, Math.round(((color >> 16) & 255) * k)) << 16) |
@@ -11,10 +11,12 @@ const shade = (color: number, k: number) =>
 
 /** Mirror mode: heights go down instead of up, the building's reflection in still water. */
 let flip = false;
+/** Terrace height of the building being drawn: all of it stands on one level. */
+let lift = 0;
 /** Screen point of tile coords (x, y) at height h above raised land (below it in mirror mode). */
 const P = (x: number, y: number, h: number) => {
   const s = tileToScreen(x, y);
-  return [s.x, flip ? s.y + h : s.y - h];
+  return [s.x, (flip ? s.y + h : s.y - h) - lift];
 };
 
 const fill = (g: Graphics, pts: number[][], color: number) => g.poly(pts.flat()).fill(color);
@@ -386,6 +388,7 @@ function crane(g: Graphics, x: number, y: number) {
 /** Wooden pier over the tile box (x0, y0)–(x1, y1): a plank deck on posts standing in the sea. */
 export function drawPier(g: Graphics, x0: number, y0: number, x1: number, y1: number, mirrored = false) {
   flip = mirrored;
+  lift = 0;
   rnd = mulberry32(Math.round(x0 * 131 + y0 * 31));
   const along = x1 - x0 > y1 - y0;
   const len = along ? x1 - x0 : y1 - y0;
@@ -418,6 +421,7 @@ export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number
   const size = BUILDINGS[type].size;
   rnd = mulberry32(variant * 7919 + x * 131 + y * 31 + type.length);
   flip = mirrored;
+  lift = liftAt(x, y);
   if (!flip) shadow(g, x, y, size);
   const box = (a: number, b: number, c: number, d: number): Box => ({ x0: x + a, y0: y + b, x1: x + c, y1: y + d });
   switch (type) {
@@ -624,6 +628,7 @@ export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number
 /** World point where smoke leaves a building's chimney, if it has one. */
 export function chimneyAt(type: BuildingId, x: number, y: number) {
   if (type !== 'house') return null;
+  lift = liftAt(x, y);
   const [px, py] = P(x + 0.535, y + 0.535, 29);
   return { x: px, y: py };
 }
@@ -642,7 +647,7 @@ export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.widt
   for (let y = y0; y < y1; y++)
     for (let x = x0; x < x1; x++) {
       if (!isRoad(x, y)) continue;
-      const c = tileToScreen(x + 0.5, y + 0.5);
+      const c = groundToScreen(x + 0.5, y + 0.5);
       const over = w.map.tiles[y * w.map.width + x] === 'river' ? bridges : segs;
       over.push([c.x, c.y, c.x, c.y]);
       // All four directions: a neighbour in another chunk draws its own half.
@@ -653,8 +658,9 @@ export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.widt
         [0, -1],
       ])
         if (isRoad(x + dx, y + dy)) {
-          const n = tileToScreen(x + dx / 2 + 0.5, y + dy / 2 + 0.5);
-          over.push([c.x, c.y, n.x, n.y]);
+          // Halfway to the neighbour's (maybe raised) centre: across a cliff the road is a ramp.
+          const o = groundToScreen(x + dx + 0.5, y + dy + 0.5);
+          over.push([c.x, c.y, (c.x + o.x) / 2, (c.y + o.y) / 2]);
         }
     }
   // Bridge: dark rails either side of a plank deck, with planks across it.

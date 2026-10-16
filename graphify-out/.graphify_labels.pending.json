@@ -21,7 +21,8 @@
   "19": "data/buildings.ts",
   "20": "settings.ts",
   "21": "textures.ts",
-  "22": "showPreview",
-  "23": "world.ts",
-  "24": "refresh"
+  "22": "end",
+  "23": "showPreview",
+  "24": "pixi.js",
+  "25": "applySettings"
 }

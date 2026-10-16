@@ -1,7 +1,7 @@
 import { BufferImageSource, Geometry, Mesh, Shader } from 'pixi.js';
-import type { GameMap } from '../sim/map';
+import { type GameMap, levelAt, terrainAt } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
-import { TILE_H, TILE_W } from './iso';
+import { LEVEL_H, MAX_LEVEL, TILE_H, TILE_W } from './iso';
 
 /** Largest offshore rock, in tiles across its foam collar; the rock texture stores size / ROCK_MAX. */
 const ROCK_MAX = 1.2;
@@ -35,6 +35,7 @@ uniform vec3 uSun;
 uniform vec3 uMoon;
 uniform sampler2D uRocks;
 uniform sampler2D uRiver;
+uniform sampler2D uLevel;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 // Baked, tileable noise (see bakeNoise): r = 4-octave fbm, g = single octave, b = second fbm.
@@ -47,10 +48,30 @@ vec4 smp(sampler2D t, vec2 p) {
   f = f * f * (3.0 - 2.0 * f);
   return texture(t, (i + f + 0.5) / uSize);
 }
-// Screen-space world pixels back to continuous tile coordinates.
-vec2 tileCoord() {
-  return vec2(vPos.x / ${TILE_W.toFixed(1)} + vPos.y / ${TILE_H.toFixed(1)}, vPos.y / ${TILE_H.toFixed(1)} - vPos.x / ${TILE_W.toFixed(1)});
+// Screen-space world pixels back to continuous tile coordinates (at sea level).
+vec2 toTile(vec2 v) {
+  return vec2(v.x / ${TILE_W.toFixed(1)} + v.y / ${TILE_H.toFixed(1)}, v.y / ${TILE_H.toFixed(1)} - v.x / ${TILE_W.toFixed(1)});
 }
+vec2 tileCoord() { return toTile(vPos); }
+// Terrace level at tile point p (uLevel r = level / MAX_LEVEL), its edge warped so terraces wander.
+float levelAt(vec2 p) { return smp(uLevel, p + (nz(p * 0.5).gb - 0.5) * 0.5).r * ${MAX_LEVEL.toFixed(1)}; }
+/*
+ * What the eye meets at world pixel v on raised ground: (tile point, level, k). k = 0 is the top
+ * of a terrace; k in (0, 1] is a cliff face, k of the way down from its top edge to the level below.
+ * Searched from the highest terrace down: a higher one hides what lies behind it.
+ */
+vec4 surface(vec2 v) {
+  for (int l = ${MAX_LEVEL}; l >= 1; l--) {
+    float fl = float(l);
+    for (int k = 0; k <= 8; k++) {
+      vec2 p = toTile(v + vec2(0.0, (fl - float(k) / 8.0) * ${LEVEL_H.toFixed(1)}));
+      if (levelAt(p) > fl - 0.5) return vec4(p, fl, float(k) / 8.0);
+    }
+  }
+  return vec4(toTile(v), 0.0, 0.0);
+}
+// A river on raised ground within a few tiles of p? Elsewhere the land hides the sea layer anyway.
+bool nearTerrace(vec2 p) { return texture(uLevel, (floor(p) + 0.5) / uSize).b > 0.0; }
 // Animated sea height: several octaves of drifting noise.
 float wave(vec2 q) { return fbm(q * 0.9 + vec2(uTime * 0.08, -uTime * 0.05)) + 0.4 * noise(q * 2.7 - vec2(uTime * 0.1, 0.0)); }
 vec2 warpN(vec2 q) { return vec2(noise(q * 0.7 + 3.0), noise(q * 0.7 + 9.0)) * 2.0 - 1.0; }
@@ -65,6 +86,27 @@ vec2 coastWarp(vec2 p) { return p + (nz(p * 0.45).rb - 0.5) * 0.7; }
 const waterFragment = /* glsl */ `${common}
 void main() {
   vec2 p = tileCoord();
+  float t = uTime;
+  // On raised ground, rivers lie on their terrace; where one goes over a cliff, it falls.
+  float lift = 0.0;
+  if (nearTerrace(p)) {
+    vec4 sf = surface(vPos);
+    if (sf.z > 0.5) {
+      if (sf.w > 0.0) {
+        // Waterfall (the land shader leaves the cliff open only where a river crosses its edge):
+        // streaks pouring down, a smooth glassy lip at the top, white water at the foot.
+        float a = noise(vec2(vPos.x * 0.35, vPos.y * 0.05 - t * 2.6));
+        float b = noise(vec2(vPos.x * 0.9 + 5.0, vPos.y * 0.09 - t * 3.8));
+        vec3 c = mix(vec3(0.45, 0.7, 0.75), vec3(0.95, 0.98, 0.98), smoothstep(0.35, 0.75, a) * 0.8 + smoothstep(0.6, 0.9, b) * 0.4);
+        c = mix(c, vec3(0.32, 0.58, 0.6), smoothstep(0.15, 0.0, sf.w) * 0.6);
+        c = mix(c, vec3(0.97, 0.99, 0.99), smoothstep(0.7, 1.0, sf.w) * (0.7 + 0.3 * noise(vPos * 0.3 + t * 2.0)));
+        finalColor = vec4(pow(c, vec3(0.95)) * vec3(1.04, 1.0, 0.94) * uAmbient, 1.0);
+        return;
+      }
+      p = sf.xy;
+      lift = sf.z;
+    }
+  }
   // Past the map edge the sea fades to deep water over a few tiles: sampling beyond the edge
   // would repeat the edge tiles as long straight bands, and a hard edge shows as a diamond.
   vec2 pc = clamp(p, vec2(0.0), uSize);
@@ -74,7 +116,6 @@ void main() {
   // Hidden under baked land: stop before the expensive part.
   if (land > 0.56) { finalColor = vec4(0.3, 0.45, 0.3, 1.0); return; }
   float depthRaw = mix(smp(uDist, pc).r, 1.0, fade);
-  float t = uTime;
   float depth = smoothstep(0.0, 0.75, depthRaw);
   vec3 col = mix(vec3(0.24, 0.63, 0.66), vec3(0.09, 0.42, 0.58), smoothstep(0.0, 0.25, depth));
   col = mix(col, vec3(0.05, 0.25, 0.42), smoothstep(0.3, 1.0, depth));
@@ -128,13 +169,19 @@ void main() {
   vec4 rv = smp(uRiver, pc);
   float river = smoothstep(0.2, 0.6, rv.r);
   if (river > 0.0) {
-    vec2 f = rv.gb * 2.0 - 1.0;
-    f = length(f) > 0.05 ? normalize(f) : vec2(0.0, 1.0);
-    vec2 q = vec2(dot(p, vec2(-f.y, f.x)), dot(p, f));
-    float s1 = noise(vec2(q.x * 3.0, q.y * 0.7 - t * 1.2));
-    float s2 = noise(vec2(q.x * 7.0 + 3.0, q.y * 1.5 - t * 2.2));
+    // Flow map: two layers of noise carried downstream, each restarting while the other is
+    // at full strength, so the pattern flows along bends and banks without stretching.
+    vec2 f = (rv.gb * 2.0 - 1.0) * 1.4;
+    float ph0 = fract(t * 0.3);
+    float ph1 = fract(t * 0.3 + 0.5);
+    float w = abs(ph0 - 0.5) * 2.0;
+    float s1 = mix(noise(p * 2.4 - f * ph0 * 2.4), noise(p * 2.4 - f * ph1 * 2.4 + 0.37), w);
+    float s2 = mix(noise(p * 6.0 - f * ph0 * 6.0 + 3.0), noise(p * 6.0 - f * ph1 * 6.0 + 7.3), w);
     vec3 rc = mix(vec3(0.15, 0.4, 0.43), vec3(0.27, 0.56, 0.54), s1);
-    rc += vec3(0.55, 0.6, 0.6) * smoothstep(0.72, 0.92, s2) * 0.3;
+    rc += vec3(0.55, 0.6, 0.6) * smoothstep(0.62, 0.85, s2) * 0.35;
+    // White water where it lands at the foot of a cliff.
+    float foot = smoothstep(0.12, 0.45, smp(uLevel, pc).r * ${MAX_LEVEL.toFixed(1)} - lift);
+    rc = mix(rc, vec3(0.93, 0.97, 0.97), foot * (0.6 + 0.4 * s2));
     col = mix(col, rc, river);
   }
   if (land > 0.01) {
@@ -173,7 +220,29 @@ float height(vec2 q) {
   return smp(uDist, q).g * 1.6 + fbm(q * 0.5) * 0.9 + smoothstep(0.3, 0.8, fbm(q * 0.1 + 11.0)) * 9.0 + dune;
 }
 void main() {
-  vec2 p = tileCoord();
+  vec4 sf = surface(vPos);
+  vec2 p = sf.xy;
+  if (sf.w > 0.0) {
+    // Cliff face of a terrace. Where a river runs over its edge it is left open: the live
+    // water shader draws the waterfall there.
+    if (smp(uRiver, p).r > 0.5) { finalColor = vec4(0.0); return; }
+    // Facing: the slope of the level field, lit from the upper left like everything else.
+    vec2 gl = vec2(levelAt(p + vec2(0.25, 0.0)) - levelAt(p - vec2(0.25, 0.0)), levelAt(p + vec2(0.0, 0.25)) - levelAt(p - vec2(0.0, 0.25)));
+    vec2 nrm = length(gl) > 0.001 ? -normalize(gl) : vec2(0.7);
+    float shade = 0.82 + 0.28 * (nrm.y - nrm.x) * 0.5;
+    float strata = noise(vec2(vPos.x * 0.04, vPos.y * 0.45));
+    float cracks = noise(vec2(vPos.x * 0.55, vPos.y * 0.07));
+    vec3 c = mix(vec3(0.5, 0.45, 0.38), vec3(0.68, 0.62, 0.52), strata);
+    c *= 0.82 + 0.3 * smoothstep(0.3, 0.7, cracks);
+    c *= mix(1.05, 0.68, sf.w);
+    // A lip of grass hanging over the top edge.
+    c = mix(c, vec3(0.3, 0.47, 0.2), smoothstep(0.14, 0.02, sf.w) * 0.85);
+    c *= shade;
+    finalColor = vec4(pow(c, vec3(0.95)) * vec3(1.04, 1.0, 0.94), 1.0);
+    return;
+  }
+  // Ground-plane point of this pixel on its terrace: fine detail stays fixed to the ground.
+  vec2 vg = vPos + vec2(0.0, sf.z * ${LEVEL_H.toFixed(1)});
   float land = smp(uMask, coastWarp(p)).r;
   if (land < 0.45) { finalColor = vec4(0.0); return; }
   vec2 warp = nz(p * 0.45).rb - 0.5;
@@ -181,7 +250,7 @@ void main() {
   // Inland borders (forest, rock) may wander further than the coast, which must match the tiles.
   vec2 pf = p + warp * 1.2 + warp2 * 0.5;
   // Ground-plane coords aligned to the screen: fine detail here does not zigzag along tile diagonals.
-  vec2 g = vec2(vPos.x, vPos.y * 2.0) / 32.0;
+  vec2 g = vec2(vg.x, vg.y * 2.0) / 32.0;
   vec4 m = smp(uMask, p + warp * 0.7);
 
   float n = fbm(p * 0.22);
@@ -241,6 +310,11 @@ void main() {
   float sandEdge = m.g + (noise(p * 3.5) - 0.5) * 0.12;
   col = mix(col, sandCol, smoothstep(0.14, 0.34, sandEdge));
   col = mix(col, vec3(0.68, 0.6, 0.42), (1.0 - smoothstep(0.5, 0.58, land)) * 0.8);
+
+  // Terraces read from above: a pale rim along the top of each cliff, shade along its foot.
+  float lv = levelAt(p);
+  col *= 1.0 + 0.12 * smoothstep(0.35, 0.0, lv - (sf.z - 0.5)) * step(0.5, sf.z);
+  col *= 1.0 - 0.3 * smoothstep(0.0, 0.4, levelAt(p - vec2(0.35)) - (sf.z + 0.5) + 0.4);
 
   // Relief: height from inland distance plus noise (rock raised), lit from the upper left.
   float h0 = height(p) + rockMask * ridge * 0.4;
@@ -447,21 +521,38 @@ export function createGround(map: GameMap) {
         }
     }
     const cover = blur(is('river'), W, H).map((v, i) => (tiles[i] === 'river' ? 1 : v));
+    // Downstream step of each river tile, then averaged over its surroundings: the flow turns
+    // smoothly through bends and keeps its direction out to the banks.
+    const fx = new Float32Array(W * H);
+    const fy = new Float32Array(W * H);
     tiles.forEach((t, i) => {
-      let fx = 0;
-      let fy = 0;
-      if (t === 'river')
-        for (const [dx, dy] of [
-          [1, 0],
-          [-1, 0],
-          [0, 1],
-          [0, -1],
-        ]) {
-          const j = i + dx + dy * W;
-          if (down[j] >= 0 && down[j] < down[i]) [fx, fy] = [dx, dy];
-        }
-      riverData.set([cover[i] * 255, (fx * 0.5 + 0.5) * 255, (fy * 0.5 + 0.5) * 255, 255], i * 4);
+      if (t !== 'river') return;
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const j = i + dx + dy * W;
+        if (down[j] >= 0 && down[j] < down[i]) [fx[i], fy[i]] = [dx, dy];
+      }
     });
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        let sx = 0;
+        let sy = 0;
+        for (let dy = -2; dy <= 2; dy++)
+          for (let dx = -2; dx <= 2; dx++) {
+            const u = x + dx;
+            const v = y + dy;
+            if (u < 0 || v < 0 || u >= W || v >= H) continue;
+            sx += fx[v * W + u];
+            sy += fy[v * W + u];
+          }
+        const len = Math.hypot(sx, sy) || 1;
+        const i = y * W + x;
+        riverData.set([cover[i] * 255, (sx / len) * 127.5 + 127.5, (sy / len) * 127.5 + 127.5, 255], i * 4);
+      }
   }
   const forestRaw = is('forest');
   // Alpha stays 255 in both: a zero alpha would wipe the other channels (premultiplied upload).
@@ -474,6 +565,29 @@ export function createGround(map: GameMap) {
   const opts = { width: W, height: H, format: 'rgba8unorm' as const, scaleMode: 'linear' as const };
   const maskSrc = new BufferImageSource({ resource: mask, ...opts, addressMode: 'clamp-to-edge' });
   const distSrc = new BufferImageSource({ resource: dist, ...opts, addressMode: 'clamp-to-edge' });
+  // Terraces: r level (blurred), g the highest level within three tiles, b raised ground and a
+  // river within three tiles: the only places the sea shader has to search the terraces.
+  const levels = map.levels ?? new Uint8Array(W * H);
+  // Blurred: unblurred, a diagonal edge is a staircase of tiny cliffs facing alternate ways.
+  const smoothLevels = blur(
+    Float32Array.from(levels, (v) => v / MAX_LEVEL),
+    W,
+    H,
+  );
+  const levelData = new Uint8Array(W * H * 4);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      let top = 0;
+      let river = false;
+      for (let dy = -3; dy <= 3; dy++)
+        for (let dx = -3; dx <= 3; dx++) {
+          top = Math.max(top, levelAt(map, x + dx, y + dy));
+          river ||= terrainAt(map, x + dx, y + dy) === 'river';
+        }
+      const search = top > 0 && river ? 255 : 0;
+      levelData.set([smoothLevels[y * W + x] * 255, (top / MAX_LEVEL) * 255, search, 255], (y * W + x) * 4);
+    }
+  const levelSrc = new BufferImageSource({ resource: levelData, ...opts, addressMode: 'clamp-to-edge' });
   const rockSrc = new BufferImageSource({ resource: rockData, ...opts, addressMode: 'clamp-to-edge' });
   const riverSrc = new BufferImageSource({ resource: riverData, ...opts, addressMode: 'clamp-to-edge' });
 
@@ -482,6 +596,7 @@ export function createGround(map: GameMap) {
     uDist: distSrc,
     uRocks: rockSrc,
     uRiver: riverSrc,
+    uLevel: levelSrc,
     uNoise: noise,
     [name]: {
       uSize: { value: new Float32Array([W, H]), type: 'vec2<f32>' },

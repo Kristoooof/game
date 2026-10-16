@@ -8,9 +8,14 @@ export interface GameMap {
   height: number;
   /** Row-major: tiles[y * width + x]. */
   tiles: Terrain[];
-  /** Where a river drops out of the highlands: the first tile below the fall and the flow direction. */
+  /** Terrace level per tile (0 sea level, up to MAX_LEVEL), row-major; absent means all flat. */
+  levels?: Uint8Array;
+  /** Where a river drops a terrace: the first tile below the fall and the flow direction. */
   waterfalls?: { x: number; y: number; dx: number; dy: number }[];
 }
+
+export const levelAt = (map: GameMap, x: number, y: number) =>
+  x >= 0 && y >= 0 && x < map.width && y < map.height ? (map.levels?.[y * map.width + x] ?? 0) : 0;
 
 export const terrainAt = (map: GameMap, x: number, y: number): Terrain | undefined =>
   x >= 0 && y >= 0 && x < map.width && y < map.height ? map.tiles[y * map.width + x] : undefined;
@@ -54,10 +59,12 @@ export function generateMap(seed: number, size = 256, islandCount = 8): GameMap 
   const dunes = valueNoise(rand, size, size, 10);
   const shore = valueNoise(rand, size, size, 7);
   const tiles: Terrain[] = [];
+  const elev = new Float32Array(size * size);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const e = Math.max(-1, ...islands.map((i) => 1 - Math.hypot(i.x - x, i.y - y) / i.r));
       const h = e + (shape(x, y) - 0.5) * 0.4;
+      elev[y * size + x] = h;
       // Beaches widen into dune fields in places; some stretches of coast are bare rock.
       const beach = 0.09 + Math.max(0, dunes(x, y) - 0.5) * 0.5;
       tiles.push(
@@ -76,8 +83,52 @@ export function generateMap(seed: number, size = 256, islandCount = 8): GameMap 
     }
   }
   const map: GameMap = { width: size, height: size, tiles, waterfalls: [] };
+  map.levels = terraces(map, elev);
   for (const isl of islands) if (rand() < 0.8) carveRiver(map, isl, shape, rand);
   return map;
+}
+
+/**
+ * Terraces from the elevation: level 1 inland, level 2 in the high middle. The coast stays at sea
+ * level, a terrace keeps a few tiles from the sea, lone raised or sunken tiles are evened out, and
+ * level 2 never borders level 0 (one cliff at a time).
+ */
+function terraces(map: GameMap, elev: Float32Array) {
+  const { width: W, height: H, tiles } = map;
+  const toSea = new Int32Array(W * H).fill(-1);
+  const queue: number[] = [];
+  tiles.forEach((t, i) => {
+    if (t !== 'water') return;
+    toSea[i] = 0;
+    queue.push(i);
+  });
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    for (const j of [i + 1, i - 1, i + W, i - W])
+      if (j >= 0 && j < W * H && toSea[j] < 0) {
+        toSea[j] = toSea[i] + 1;
+        queue.push(j);
+      }
+  }
+  const lv = new Uint8Array(W * H);
+  tiles.forEach((t, i) => {
+    if (t === 'water' || t === 'beach' || t === 'rocky') return;
+    lv[i] = elev[i] > 0.62 && toSea[i] >= 7 ? 2 : elev[i] > 0.36 && toSea[i] >= 4 ? 1 : 0;
+  });
+  for (let pass = 0; pass < 3; pass++)
+    for (let y = 1; y < H - 1; y++)
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x;
+        const n = [lv[i + 1], lv[i - 1], lv[i + W], lv[i - W]];
+        // A lone raised or sunken tile takes its lowest neighbour's level.
+        if (!n.includes(lv[i])) lv[i] = Math.min(...n);
+        if (
+          lv[i] === 2 &&
+          [i + 1, i - 1, i + W, i - W, i + W + 1, i + W - 1, i - W + 1, i - W - 1].some((j) => lv[j] === 0)
+        )
+          lv[i] = 1;
+      }
+  return lv;
 }
 
 /**
@@ -105,7 +156,9 @@ function carveRiver(
     }
   if (start < 0) return;
   const seen = new Set<number>();
-  let fell = false;
+  const levels = map.levels!;
+  // The river never climbs: its tiles are cut down to the level it has fallen to.
+  let level = levels[start];
   let narrow = 8;
   let prev = [0, 0];
   for (let cur = start, steps = 0; steps < 200; steps++) {
@@ -136,11 +189,15 @@ function carveRiver(
     // The second tile only on straight runs: on a diagonal the staircase is already wide enough.
     const wide = narrow <= 0 && dir[0] === prev[0] && dir[1] === prev[1];
     for (const k of wide ? [cur, cur + Math.abs(dir[1]) + Math.abs(dir[0]) * W] : [cur])
-      if (tiles[k] !== 'water') tiles[k] = 'river';
+      if (tiles[k] !== 'water') {
+        tiles[k] = 'river';
+        levels[k] = Math.min(levels[k], level);
+      }
     prev = dir;
     if (tiles[next] === 'water') return;
-    if (!fell && orig[cur] === 'mountain' && orig[next] !== 'mountain') {
-      fell = true;
+    // Dropping to a lower terrace: a waterfall over the cliff, and a narrow stream below it again.
+    if (levels[next] < level) {
+      level = levels[next];
       narrow = 6;
       map.waterfalls!.push({ x: next % W, y: Math.floor(next / W), dx: dir[0], dy: dir[1] });
     }

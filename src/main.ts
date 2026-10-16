@@ -14,9 +14,9 @@ import pelda from './data/maps/pelda.txt?raw';
 import { chimneyAt, drawBuilding, drawTerritory } from './render/buildings';
 import { createEffects } from './render/effects';
 import { attachCameraControls, screenToWorld, type Camera } from './render/camera';
-import { diamond, screenToTile, tileToScreen } from './render/iso';
+import { diamond, groundToScreen, screenToGround, setLevels, tileToScreen } from './render/iso';
 import { createTerrain, FAR_SCALE } from './render/terrain';
-import { type GameMap, type Terrain, generateMap, parseMap, terrainAt } from './sim/map';
+import { type GameMap, type Terrain, generateMap, levelAt, parseMap, terrainAt } from './sim/map';
 import { buildingAt, createWorld, demolish, place, placementError, roadPath } from './sim/world';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
 import { createConstruction } from './render/construction';
@@ -40,6 +40,8 @@ const params = new URLSearchParams(location.search);
 const mapName = params.get('map') ?? '';
 const seed = Number(params.get('seed')) || Math.floor(Math.random() * 1e6);
 const map: GameMap = MAPS[mapName] ? parseMap(MAPS[mapName]) : generateMap(seed);
+// Everything placed on the ground is raised to its tile's terrace.
+setLevels((x, y) => levelAt(map, x, y));
 const world = createWorld(map);
 
 const hud = document.getElementById('hud')!;
@@ -245,7 +247,7 @@ applyCamera();
 
 const tileAt = (sx: number, sy: number) => {
   const w = screenToWorld(cam, sx, sy);
-  const t = screenToTile(w.x, w.y);
+  const t = screenToGround(w.x, w.y);
   return terrainAt(map, t.x, t.y) ? t : undefined;
 };
 
@@ -321,7 +323,7 @@ const demolishAt = (t: { x: number; y: number } | undefined) => {
   // A cloud of dust over the footprint.
   const size = BUILDINGS[b.type].size;
   for (let k = 0; k < 18; k++) {
-    const p = tileToScreen(b.x + Math.random() * size, b.y + Math.random() * size);
+    const p = groundToScreen(b.x + Math.random() * size, b.y + Math.random() * size);
     effects.dust(p.x, p.y - Math.random() * 20);
   }
   refresh(footprint(b.x, b.y, BUILDINGS[b.type].size));
