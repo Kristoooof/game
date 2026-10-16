@@ -243,8 +243,9 @@ void main() {
   if (sf.w > 0.0) {
     // Cliff face of a terrace. Where a river runs over its edge it is left open: the live
     // water shader draws the waterfall there.
-    // Opened with a soft edge: a hard cut leaves the fall's sides jagged.
-    float open = smoothstep(0.35, 0.65, smp(uRiver, p).r);
+    // Opened only as wide as the river shows on top (where the land there is see-through),
+    // with a soft edge: a hard cut leaves the fall's sides jagged.
+    float open = 1.0 - smoothstep(0.42, 0.5, smp(uMask, coastWarp(p)).r);
     if (open > 0.99) { finalColor = vec4(0.0); return; }
     // Facing: the slope of the level field, lit from the upper left like everything else.
     vec2 gl = vec2(levelAt(p + vec2(0.25, 0.0)) - levelAt(p - vec2(0.25, 0.0)), levelAt(p + vec2(0.0, 0.25)) - levelAt(p - vec2(0.0, 0.25)));

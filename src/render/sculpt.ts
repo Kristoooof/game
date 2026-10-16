@@ -61,68 +61,6 @@ const SUN = (() => {
   return v.map((k) => k / l);
 })();
 
-export interface Field {
-  /** Footprint-centre ground point in art pixels, and art pixels per footprint unit across. */
-  cx: number;
-  cy: number;
-  scale: number;
-  /** Height in art pixels at footprint point (u, v) in [-1, 1]²; ≤ 0 outside the object. */
-  height: (u: number, v: number) => number;
-  /** Surface colour for a point: its height, the up-component of its normal, and the light on it. */
-  color: (p: { u: number; v: number; h: number; up: number; light: number; occl: number }) => RGB;
-  /** Grid cells across the footprint. */
-  grid?: number;
-}
-
-/**
- * A height field seen in the scene's isometric projection: drawn back to front as little
- * columns, each lit from its own normal, darkened in hollows.
- */
-export function litField(c: Ctx, S: number, f: Field) {
-  const W = c.canvas.width;
-  const H = c.canvas.height;
-  const out = new Uint8ClampedArray(W * H * 4);
-  const N = f.grid ?? 200;
-  const step = 2 / N;
-  const e = step * 1.5;
-  const k = f.scale;
-  for (let s = 0; s <= 2 * (N - 1); s++)
-    for (let i = Math.max(0, s - N + 1); i <= Math.min(s, N - 1); i++) {
-      const u = -1 + (i + 0.5) * step;
-      const v = -1 + (s - i + 0.5) * step;
-      const h = f.height(u, v);
-      if (h <= 0) continue;
-      // Normal from the slope (heights in art px, footprint units ≈ k art px across).
-      const dx = (f.height(u + e, v) - f.height(u - e, v)) / (2 * e * k);
-      const dy = (f.height(u, v + e) - f.height(u, v - e)) / (2 * e * k);
-      const n = [-dx, -dy, 1];
-      const l = Math.hypot(n[0], n[1], n[2]);
-      // Ground space (u, v, up) to screen light: the sun comes from -u (screen left) and above.
-      const light = clamp01((-n[0] * 0.72 - n[1] * 0.24 + n[2] * 0.62) / l);
-      // Hollows: lower than the average around them.
-      const r = 0.07;
-      const avg = (f.height(u + r, v) + f.height(u - r, v) + f.height(u, v + r) + f.height(u, v - r)) / 4;
-      const occl = clamp01(1 + (h - avg) * 0.08);
-      const rgb = f.color({ u, v, h, up: n[2] / l, light, occl });
-      const sx = Math.round((f.cx + (u - v) * k * 0.5) * S);
-      const sy = Math.round((f.cy + (u + v) * k * 0.25 - h) * S);
-      const alpha = clamp01(h / 2.5) * 255;
-      // A column down to where the cells in front begin, so steep faces leave no holes.
-      const front = Math.min(f.height(u + step, v), f.height(u, v + step), h);
-      const len = Math.max(3, Math.ceil((h - front + step * k * 0.25) * S) + 2);
-      for (let yy = sy; yy < sy + len; yy++)
-        for (let xx = sx - 1; xx <= sx; xx++) {
-          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
-          const o = (yy * W + xx) * 4;
-          out[o] = rgb[0];
-          out[o + 1] = rgb[1];
-          out[o + 2] = rgb[2];
-          out[o + 3] = Math.max(out[o + 3], alpha);
-        }
-    }
-  blit(c, out, W, H);
-}
-
 /**
  * A leafy crown: a cluster of spheres, each pixel lit from the sphere surface it shows, with
  * leaf-sized texture, light shining through the rim, and darker hollows deep in the crown.
@@ -179,57 +117,6 @@ export function litCrown(c: Ctx, S: number, balls: number[][], palette: string[]
       out[o + 1] = rgb[1];
       out[o + 2] = rgb[2];
       out[o + 3] = alpha * 255;
-    }
-  blit(c, out, W, H);
-}
-
-/**
- * A conifer's foliage: stacked drooping cones from the bottom tier up, each pixel lit from the
- * cone's surface, clumps of boughs as texture, shade under each tier's skirt.
- */
-export function litConifer(
-  c: Ctx,
-  S: number,
-  tiers: { ty: number; by: number; hw: number }[],
-  cx: number,
-  palette: string[],
-  seed: number,
-) {
-  const W = c.canvas.width;
-  const H = c.canvas.height;
-  const out = new Uint8ClampedArray(W * H * 4);
-  const [dark, mid, light] = palette.map(hexRGB);
-  for (let py = 0; py < H; py++)
-    for (let px = 0; px < W; px++) {
-      const x = px / S;
-      const y = py / S;
-      // The highest tier covering this pixel hides the ones below it.
-      for (let i = tiers.length - 1; i >= 0; i--) {
-        const { ty, by, hw } = tiers[i];
-        const t = (y - ty) / (by - ty);
-        const ragged = noise2(x * 1.6, y * 0.9, seed + i);
-        const bottom = by - 1.6 * noise2(x * 0.9, i * 7.3, seed);
-        if (t < 0 || y > bottom) continue;
-        const w = hw * Math.pow(t, 0.85) * (0.84 + 0.22 * ragged);
-        const dx = (x - cx) / Math.max(0.6, w);
-        if (Math.abs(dx) >= 1) continue;
-        const nx = dx * 0.8;
-        const ny = -0.25 + 0.45 * t;
-        const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
-        const sun = Math.max(0, nx * SUN[0] + ny * SUN[1] + nz * SUN[2]);
-        const clump = noise2(x * 1.4, y * 2.4, seed + 3);
-        // Shade just under the tier above, and towards the cone's edges.
-        const under = i < tiers.length - 1 ? smooth(0, 0.35, t) : 1;
-        let lum = (0.2 + 0.85 * sun) * (0.6 + 0.4 * under) * (0.68 + 0.5 * clump);
-        lum = clamp01(lum * (1 - Math.abs(dx) * 0.15));
-        const rgb = lum < 0.5 ? mix(dark, mid, lum * 2) : mix(mid, light, (lum - 0.5) * 2);
-        const o = (py * W + px) * 4;
-        out[o] = rgb[0];
-        out[o + 1] = rgb[1];
-        out[o + 2] = rgb[2];
-        out[o + 3] = 255 * smooth(1, 0.9, Math.abs(dx));
-        break;
-      }
     }
   blit(c, out, W, H);
 }

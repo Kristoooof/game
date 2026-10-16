@@ -228,15 +228,15 @@
     "semantic_hash": ""
   },
   "src/render/textures.ts": {
-    "mtime": 1792182088.2109387,
-    "seen": 1792182334.5732439,
-    "ast_hash": "fdef96892cb8de1bb51f1e00ebaf6611",
+    "mtime": 1792182989.2129803,
+    "seen": 1792183214.1687837,
+    "ast_hash": "d724f1401264849125696b2847d580b1",
     "semantic_hash": ""
   },
   "src/render/ground.ts": {
-    "mtime": 1792178871.7725646,
-    "seen": 1792179000.029862,
-    "ast_hash": "5c51cd65ceac66783adb8e4febea0bfb",
+    "mtime": 1792182772.6135764,
+    "seen": 1792183214.1687725,
+    "ast_hash": "a47ce46ce8feb807e4ed5fef54fdbade",
     "semantic_hash": ""
   },
   "src/render/effects.ts": {
@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "src/render/sculpt.ts": {
-    "mtime": 1792182042.1195652,
-    "seen": 1792182334.573234,
-    "ast_hash": "5b3b544780ffc94cc3b8cfcfa583c96b",
+    "mtime": 1792183008.3563507,
+    "seen": 1792183214.1687799,
+    "ast_hash": "abf43c4d3d958139895d052b3d7d4098",
     "semantic_hash": ""
   }
 }
