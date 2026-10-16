@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-16)
 
 ## Corpus Check
-- 45 files · ~40,761 words
+- 45 files · ~42,363 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 423 nodes · 884 edges · 27 communities (25 shown, 2 thin omitted)
+- 424 nodes · 888 edges · 27 communities (25 shown, 2 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 2 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `8b42fd88`
+- Built from commit: `9f39d032`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -35,12 +35,12 @@
 - .claude/CLAUDE.md
 - camera.ts
 - data/buildings.ts
-- showPreview
+- construction.ts
 - settings.ts
 - textures.ts
 - world.ts
 - atmosphere.ts
-- world.ts
+- applySettings
 - daylight.ts
 - refresh
 
@@ -48,24 +48,24 @@
 1. `drawBuilding()` - 27 edges
 2. `mulberry32()` - 24 edges
 3. `terrainAt()` - 21 edges
-4. `createTerrain()` - 20 edges
-5. `fill()` - 19 edges
-6. `P()` - 17 edges
+4. `fill()` - 20 edges
+5. `createTerrain()` - 20 edges
+6. `P()` - 18 edges
 7. `groundToScreen()` - 17 edges
 8. `walls()` - 15 edges
-9. `showPreview()` - 14 edges
-10. `house()` - 12 edges
+9. `house()` - 15 edges
+10. `showPreview()` - 14 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `bake()` --indirect_call--> `shade()`  [INFERRED]
   src/render/terrain.ts → src/render/buildings.ts
-- `landAreas()` --calls--> `labelIslands()`  [EXTRACTED]
-  src/sim/map.test.ts → src/sim/map.ts
 - `World` --references--> `Good`  [EXTRACTED]
   src/sim/world.ts → src/data/buildings.ts
 - `Building` --references--> `BuildingId`  [EXTRACTED]
   src/sim/world.ts → src/data/buildings.ts
 - `refresh()` --calls--> `chimneyAt()`  [EXTRACTED]
+  src/main.ts → src/render/buildings.ts
+- `refresh()` --calls--> `drawTerritory()`  [EXTRACTED]
   src/main.ts → src/render/buildings.ts
 
 ## Import Cycles
@@ -91,7 +91,7 @@ Nodes (20): caveman, Example output, How to invoke, See also, What it does, 1. A
 
 ### Community 4 - "main.ts"
 Cohesion: 0.04
-Nodes (43): app, applySettings(), atmosphere, cam, countFps, effects, fixedTime, fixedWeather (+35 more)
+Nodes (42): app, atmosphere, cam, cancel(), construction, countFps, effects, fixedTime (+34 more)
 
 ### Community 5 - "compilerOptions"
 Cohesion: 0.17
@@ -106,8 +106,8 @@ Cohesion: 0.18
 Nodes (9): caveman-review, Example output, How to invoke, See also, What it does, Auto-Clarity, Boundaries, Examples (+1 more)
 
 ### Community 8 - "terrain.ts"
-Cohesion: 0.14
-Nodes (32): pixi.js, drawRoads(), pierBox(), setGlow(), setSun(), createEffects(), Puff, puffTexture() (+24 more)
+Cohesion: 0.12
+Nodes (31): drawRoads(), pierBox(), setGlow(), setSun(), sunShadow(), createEffects(), Puff, puffTexture() (+23 more)
 
 ### Community 9 - "Ponytail Help"
 Cohesion: 0.25
@@ -138,36 +138,36 @@ Cohesion: 0.21
 Nodes (12): active(), attachCameraControls(), Camera, cancel(), end(), Handlers, MAX_SCALE, MIN_SCALE (+4 more)
 
 ### Community 18 - "data/buildings.ts"
-Cohesion: 0.18
-Nodes (14): BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, GOOD_NAMES, createConstruction() (+6 more)
+Cohesion: 0.21
+Nodes (13): BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, GOOD_NAMES, menu (+5 more)
 
-### Community 19 - "showPreview"
-Cohesion: 0.23
-Nodes (17): anchorFor(), cancel(), construction, demolishAt(), end(), footprint(), menu, move() (+9 more)
+### Community 19 - "construction.ts"
+Cohesion: 0.29
+Nodes (5): pixi.js, createConstruction(), HEIGHT, Site, createFxaa()
 
 ### Community 20 - "settings.ts"
 Cohesion: 0.19
 Nodes (13): Antialias, createFpsCounter(), createSettingsPanel(), DAY_CYCLE, DEFAULTS, displayWidth(), loadSettings(), LOOKS (+5 more)
 
 ### Community 21 - "textures.ts"
-Cohesion: 0.22
-Nodes (21): Art, AUTUMN, boulder, broadleaf(), bush(), conifer(), Ctx, DARK_GREEN (+13 more)
+Cohesion: 0.24
+Nodes (21): AUTUMN, boulder, broadleaf(), bush(), conifer(), Ctx, DARK_GREEN, driftwood() (+13 more)
 
 ### Community 22 - "world.ts"
-Cohesion: 0.11
-Nodes (21): bake(), Baked, Cart, cartArt(), SKIN, TUNICS, Vessel, Walker (+13 more)
+Cohesion: 0.08
+Nodes (49): vitest, anchorFor(), demolishAt(), end(), footprint(), move(), onHover(), onTap() (+41 more)
 
 ### Community 23 - "atmosphere.ts"
 Cohesion: 0.28
 Nodes (8): canvasTexture(), cloudTexture(), createAtmosphere(), NEXT, Sky, TARGETS, Weather, WIND
 
-### Community 24 - "world.ts"
-Cohesion: 0.32
-Nodes (13): createLife(), labelIslands(), terrainAt(), createWorld(), demolish(), footprint(), isRoad(), place() (+5 more)
+### Community 24 - "applySettings"
+Cohesion: 0.67
+Nodes (3): applySettings(), waterRes(), resolutionOf()
 
 ### Community 25 - "daylight.ts"
-Cohesion: 0.29
-Nodes (9): vitest, AMBIENT, daylight(), DayTime, lerp(), RGB, smooth(), SUN_STEPS (+1 more)
+Cohesion: 0.33
+Nodes (7): AMBIENT, daylight(), DayTime, lerp(), RGB, smooth(), SUN_STEPS
 
 ### Community 26 - "refresh"
 Cohesion: 0.67
@@ -175,19 +175,19 @@ Nodes (3): icon(), refresh(), showResources()
 
 ## Knowledge Gaps
 - **3 isolated node(s):** `eslint`, `prettier`, `typescript`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 197 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 198 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `pixi.js` connect `terrain.ts` to `package.json`, `main.ts`, `render/buildings.ts`, `data/buildings.ts`, `textures.ts`, `world.ts`, `atmosphere.ts`?**
+- **Why does `pixi.js` connect `construction.ts` to `package.json`, `main.ts`, `terrain.ts`, `render/buildings.ts`, `textures.ts`, `world.ts`, `atmosphere.ts`?**
   _High betweenness centrality (0.102) - this node is a cross-community bridge._
 - **What connects `eslint`, `prettier`, `typescript` to the rest of the system?**
   _3 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._
-- **Why does `mulberry32()` connect `terrain.ts` to `render/buildings.ts`, `textures.ts`, `world.ts`?**
+- **Why does `mulberry32()` connect `textures.ts` to `terrain.ts`, `render/buildings.ts`, `world.ts`?**
   _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Should `Caveman Help` be split into smaller, more focused modules?**
   _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._

@@ -106,8 +106,17 @@ const conifer = (seed: number, palette: string[], tiers: number) => {
   const r = mulberry32(seed);
   return paint(34, 60, 17, 55, (c) => {
     shadow(c, 22, 54, 14, 4.5);
+    // Trunk with bark lines and a little root flare.
     c.fillStyle = '#4e3520';
-    c.fillRect(15.6, 44, 2.8, 12);
+    c.beginPath();
+    c.moveTo(14.4, 56);
+    c.lineTo(15.8, 44);
+    c.lineTo(18.2, 44);
+    c.lineTo(19.6, 56);
+    c.closePath();
+    c.fill();
+    c.fillStyle = 'rgba(140,100,60,0.5)';
+    c.fillRect(15.9, 46, 0.6, 9);
     for (let i = 0; i < tiers; i++) {
       const by = 49 - i * (32 / tiers);
       const hw = 14 - i * (10 / tiers);
@@ -120,6 +129,13 @@ const conifer = (seed: number, palette: string[], tiers: number) => {
       g.addColorStop(0.45, palette[1]);
       g.addColorStop(1, palette[0]);
       poly(c, g, [[17, ty], ...edge.reverse()]);
+      // Darker shade along the underside of each tier, where the one below meets it.
+      c.fillStyle = 'rgba(0,20,8,0.22)';
+      c.beginPath();
+      edge.forEach(([px, py], j) => (j ? c.lineTo(px, py) : c.moveTo(px, py)));
+      [...edge].reverse().forEach(([px, py]) => c.lineTo(px, py - 2.2));
+      c.closePath();
+      c.fill();
       c.strokeStyle = 'rgba(0,20,0,0.25)';
       c.lineWidth = 0.6;
       c.beginPath();
@@ -155,47 +171,122 @@ const broadleaf = (seed: number, palette: string[], size = 1) => {
   const r = mulberry32(seed);
   return paint(44, 56, 22, 51, (c) => {
     shadow(c, 26, 50, 15, 5);
+    // Trunk flaring into roots at the foot, bark streaks, and two boughs forking into the crown.
     const trunk = c.createLinearGradient(19, 0, 25, 0);
     trunk.addColorStop(0, '#8a6440');
     trunk.addColorStop(1, '#4e3520');
     c.fillStyle = trunk;
     c.beginPath();
-    c.moveTo(19.5, 51);
-    c.lineTo(20.8, 30);
-    c.lineTo(23.2, 30);
-    c.lineTo(24.5, 51);
+    c.moveTo(17.5, 51.5);
+    c.quadraticCurveTo(20, 49, 20.6, 44);
+    c.lineTo(21, 30);
+    c.lineTo(23, 30);
+    c.lineTo(23.4, 44);
+    c.quadraticCurveTo(24, 49, 26.5, 51.5);
+    c.closePath();
     c.fill();
+    c.strokeStyle = 'rgba(40,26,14,0.55)';
+    c.lineWidth = 0.35;
+    for (let k = 0; k < 5; k++) {
+      const x = 21 + r() * 2;
+      c.beginPath();
+      c.moveTo(x, 50 - r() * 3);
+      c.lineTo(x + (r() - 0.5) * 0.6, 34 + r() * 6);
+      c.stroke();
+    }
+    c.strokeStyle = '#5e4028';
+    c.lineCap = 'round';
+    for (const [dx, h] of [
+      [-7, 22],
+      [6, 20],
+    ]) {
+      c.lineWidth = 1.6;
+      c.beginPath();
+      c.moveTo(22, 34);
+      c.quadraticCurveTo(22 + dx * 0.3, 28, 22 + dx, h);
+      c.stroke();
+    }
+    // Crown in three layers: dark balls at the back, mid, then lit ones in front; a few gaps
+    // let the boughs show through.
     const balls: number[][] = [];
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 26; i++) {
       const a = r() * Math.PI * 2;
-      const d = Math.sqrt(r()) * 11 * size;
-      balls.push([22 + Math.cos(a) * d, 22 + Math.sin(a) * d * 0.8, (4.5 + r() * 3.5) * size]);
+      const d = Math.sqrt(r()) * 11.5 * size;
+      balls.push([22 + Math.cos(a) * d, 21 + Math.sin(a) * d * 0.8, (3.8 + r() * 3.4) * size]);
     }
     balls.sort((a, b) => a[1] - b[1]);
-    for (const [x, y, rad] of balls) leafBall(c, x, y, rad, palette, r);
+    const back = [palette[0], palette[0], palette[1]];
+    balls.forEach(([x, y, rad], k) => {
+      if (k % 7 === 3) return; // a gap
+      leafBall(c, x, y, rad, k < balls.length / 3 ? back : palette, r);
+    });
   });
 };
-
 const bush = (seed: number, palette: string[]) => {
   const r = mulberry32(seed);
+  // Some bushes bear berries or blossom.
+  const fruit = ['#c0392b', '#f4f0e8', '#3a3a8a', ''][seed % 4];
   return paint(26, 20, 13, 16, (c) => {
     shadow(c, 15, 16, 10, 3.5);
-    for (let i = 0; i < 6; i++) leafBall(c, 7 + r() * 12, 8 + r() * 5, 3.2 + r() * 2.2, palette, r);
+    const base = c.createRadialGradient(13, 16, 1, 13, 16, 10);
+    base.addColorStop(0, 'rgba(20,40,15,0.5)');
+    base.addColorStop(1, 'rgba(20,40,15,0)');
+    c.fillStyle = base;
+    c.fillRect(2, 11, 22, 8);
+    const balls = Array.from({ length: 9 }, () => [6 + r() * 14, 7 + r() * 7, 2.6 + r() * 2.2]);
+    balls.sort((a, b) => a[1] - b[1]);
+    for (const [x, y, rad] of balls) leafBall(c, x, y, rad, palette, r);
+    if (fruit)
+      for (let k = 0; k < 9; k++) {
+        c.fillStyle = fruit;
+        c.beginPath();
+        c.arc(6 + r() * 14, 6 + r() * 8, 0.55, 0, Math.PI * 2);
+        c.fill();
+      }
   });
 };
 
 const boulder = paint(20, 14, 10, 11, (c) => {
   shadow(c, 11, 11, 9, 3);
+  // Faceted stone: a lit top-left face, a shaded right face, a crack, moss on top, pebbles at its foot.
   const g = c.createLinearGradient(3, 2, 16, 12);
-  g.addColorStop(0, '#c9c3b6');
-  g.addColorStop(1, '#6f685d');
+  g.addColorStop(0, '#d2ccbf');
+  g.addColorStop(1, '#7a7366');
   poly(c, g, [
     [3, 11],
-    [5, 5],
-    [10, 2.5],
-    [15, 5],
+    [4.5, 6],
+    [8, 3],
+    [12, 2.6],
+    [15.5, 5.2],
     [17, 11],
   ]);
+  poly(c, 'rgba(60,55,48,0.45)', [
+    [11, 11],
+    [12, 4],
+    [15.5, 5.2],
+    [17, 11],
+  ]);
+  c.strokeStyle = 'rgba(50,45,38,0.6)';
+  c.lineWidth = 0.4;
+  c.beginPath();
+  c.moveTo(8.5, 4.2);
+  c.lineTo(9.5, 7);
+  c.lineTo(8.8, 10);
+  c.stroke();
+  c.fillStyle = 'rgba(96,120,60,0.7)';
+  c.beginPath();
+  c.ellipse(9, 3.6, 3.2, 1, -0.1, 0, Math.PI * 2);
+  c.fill();
+  for (const [x, y] of [
+    [2, 11.6],
+    [18, 11.2],
+    [16.5, 12.3],
+  ]) {
+    c.fillStyle = '#9a9384';
+    c.beginPath();
+    c.ellipse(x, y, 0.9, 0.55, 0, 0, Math.PI * 2);
+    c.fill();
+  }
 });
 
 /**
@@ -249,6 +340,39 @@ const mountain = (seed: number, snowy: boolean) => {
       c.moveTo(x - 4, y - 2);
       c.lineTo(x + 3, y - 3.5);
       c.stroke();
+    }
+    // Within the silhouette: faint strata across the faces, grass and moss low down.
+    c.save();
+    c.beginPath();
+    [...west, ...east.slice(1)].forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+    c.closePath();
+    c.clip();
+    c.lineWidth = 0.5;
+    for (let i = 0; i < 7; i++) {
+      const y = base - 6 - i * h * 0.11 - r() * 3;
+      c.strokeStyle = i % 2 ? 'rgba(40,32,24,0.18)' : 'rgba(240,230,210,0.16)';
+      c.beginPath();
+      c.moveTo(0, y + r() * 2);
+      for (let x = 0; x <= 120; x += 12) c.lineTo(x, y + (r() - 0.5) * 2.5 + (x - px) * 0.05);
+      c.stroke();
+    }
+    for (let i = 0; i < 14; i++) {
+      const x = 14 + r() * 92;
+      const y = base - 2 - r() * h * 0.22;
+      c.fillStyle = r() < 0.5 ? 'rgba(98,122,62,0.55)' : 'rgba(120,140,70,0.45)';
+      c.beginPath();
+      c.ellipse(x, y, 2 + r() * 4, 0.8 + r() * 1.2, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.restore();
+    // Scree: loose stones spilled around the foot.
+    for (let i = 0; i < 22; i++) {
+      const x = 10 + r() * 100;
+      const y = base - 1 + r() * 3;
+      c.fillStyle = r() < 0.5 ? '#9a8f7c' : '#7a705f';
+      c.beginPath();
+      c.ellipse(x, y, 0.7 + r() * 1.2, 0.5 + r() * 0.6, 0, 0, Math.PI * 2);
+      c.fill();
     }
     if (snowy) {
       // Clip to the peak's silhouette so the snow can never hang over its outline.

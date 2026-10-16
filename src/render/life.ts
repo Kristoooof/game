@@ -31,6 +31,7 @@ const walkerArt = (r: Renderer) =>
       return [1, -1].map((phase) =>
         bake(r, (g) => {
           const dark = 0x2e2418;
+          g.ellipse(0, 0, 3.2, 1.1).fill({ color: 0x000000, alpha: 0.22 });
           if (woman) {
             g.poly([-2.6, -0.2, 2.6, -0.2, 1.6, -5, -1.6, -5]).fill(n % 2 ? 0x5a4a6a : 0x6a5038);
             g.moveTo(-1.6, -0.3).lineTo(1.6, -0.3).stroke({ width: 0.6, color: dark, alpha: 0.5 });
@@ -42,7 +43,7 @@ const walkerArt = (r: Renderer) =>
             g.stroke({ width: 1.3, color: 0x4a3a28, cap: 'round' });
           }
           // Body: tunic shaded on the side away from the sun, a belt, swinging arms.
-          g.roundRect(-2.2, -9.6, 4.4, 5.6, 1.4).fill(tunic);
+          g.roundRect(-2.2, -9.6, 4.4, 5.6, 1.4).fill(tunic).stroke({ width: 0.35, color: dark, alpha: 0.5 });
           g.rect(0.6, -9.2, 1.6, 5).fill({ color: 0x000000, alpha: 0.18 });
           g.rect(-2.2, -5.6, 4.4, 0.8).fill({ color: dark, alpha: 0.6 });
           g.moveTo(-2, -8.8)
@@ -52,7 +53,12 @@ const walkerArt = (r: Renderer) =>
           g.stroke({ width: 1.1, color: tunic, cap: 'round' });
           g.circle(-2.6 + 1.2 * phase, -5.1, 0.6).fill(skin);
           g.circle(2.6 + 1.2 * phase, -5.1, 0.6).fill(skin);
-          g.circle(0, -11.2, 1.9).fill(skin);
+          g.circle(0, -11.2, 1.9).fill(skin).stroke({ width: 0.3, color: dark, alpha: 0.4 });
+          // Some carry a basket on the hip.
+          if (woman && n % 3 === 0) {
+            g.ellipse(2.8, -5.6, 1.8, 1.2).fill(0xa0783e).stroke({ width: 0.3, color: 0x5a3e22 });
+            g.moveTo(1.4, -6.2).quadraticCurveTo(2.8, -8.4, 4.2, -6.2).stroke({ width: 0.35, color: 0x5a3e22 });
+          }
           if (woman) g.poly([-2.1, -11, 0, -13.6, 2.1, -11, 1.4, -10.2, -1.4, -10.2]).fill(n % 2 ? 0xe8e0c8 : 0xb84a3a);
           else if (n % 2) {
             g.ellipse(0, -12.4, 3.2, 0.9).fill(0xd8c080);
@@ -62,20 +68,56 @@ const walkerArt = (r: Renderer) =>
       );
     }),
   );
-/** Horse-drawn cart with a load of crates and a driver, facing right. */
-const cartArt = (r: Renderer) =>
+type Load = 'crates' | 'sacks' | 'logs' | 'barrels';
+/** Horse-drawn cart with a load and a driver, facing right. */
+const cartArt = (r: Renderer, load: Load) =>
   bake(r, (g) => {
     g.ellipse(-2, -0.5, 14, 2.6).fill({ color: 0x000000, alpha: 0.15 });
     // Cart bed, load and driver.
     g.roundRect(-13, -10, 15, 5.5, 1).fill(0x7a5230);
     g.rect(-13, -10, 15, 1.2).fill(0x9a7048);
-    g.rect(-12, -15.5, 5.5, 5.5).fill(0xa07a46).stroke({ width: 0.5, color: 0x5a3e22 });
-    g.rect(-6.2, -14.5, 5, 4.5).fill(0x8f6a3c).stroke({ width: 0.5, color: 0x5a3e22 });
-    g.moveTo(-12, -15.5)
-      .lineTo(-6.5, -10)
-      .moveTo(-6.2, -14.5)
-      .lineTo(-1.2, -10)
-      .stroke({ width: 0.4, color: 0x5a3e22 });
+    if (load === 'crates') {
+      g.rect(-12, -15.5, 5.5, 5.5).fill(0xa07a46).stroke({ width: 0.5, color: 0x5a3e22 });
+      g.rect(-6.2, -14.5, 5, 4.5).fill(0x8f6a3c).stroke({ width: 0.5, color: 0x5a3e22 });
+      g.moveTo(-12, -15.5)
+        .lineTo(-6.5, -10)
+        .moveTo(-6.2, -14.5)
+        .lineTo(-1.2, -10)
+        .stroke({ width: 0.4, color: 0x5a3e22 });
+    } else if (load === 'sacks')
+      for (const [x, y] of [
+        [-10.5, -11.6],
+        [-6.5, -11.8],
+        [-8.5, -14.6],
+      ]) {
+        g.ellipse(x, y, 2.6, 2).fill(0xd8c8a0).stroke({ width: 0.4, color: 0x8a7a5a });
+        g.rect(x - 0.6, y - 2.6, 1.2, 0.8).fill(0x8a7a5a);
+      }
+    else if (load === 'logs')
+      for (const [x, y] of [
+        [-11, -11.4],
+        [-7.6, -11.4],
+        [-4.2, -11.4],
+        [-9.3, -14],
+        [-5.9, -14],
+      ]) {
+        g.moveTo(x - 0.5, y)
+          .lineTo(x + 0.5, y)
+          .stroke({ width: 2.6, color: 0x7a5028, cap: 'round' });
+        g.circle(x + 1.2, y, 1.25)
+          .fill(0xdcb980)
+          .stroke({ width: 0.3, color: 0x7a4f25 });
+      }
+    else
+      for (const x of [-10.5, -6]) {
+        g.roundRect(x - 2.2, -16, 4.4, 6, 1.4).fill(0x7a5230);
+        g.moveTo(x - 2.2, -14)
+          .lineTo(x + 2.2, -14)
+          .moveTo(x - 2.2, -11.8)
+          .lineTo(x + 2.2, -11.8)
+          .stroke({ width: 0.4, color: 0x333333 });
+        g.ellipse(x, -16, 2.2, 0.8).fill(0x9a6e40);
+      }
     g.roundRect(-2.6, -15, 3.4, 5, 1).fill(0x3f5f8a);
     g.circle(-0.9, -16.6, 1.6).fill(0xe0b08a);
     g.ellipse(-0.9, -17.8, 2.6, 0.8).fill(0xd8c080);
@@ -263,7 +305,7 @@ export function createLife(
   const mirrors = new Container({ eventMode: 'none', alpha: 0.28 });
   const water = new Container({ children: [wakes, mirrors], eventMode: 'none' });
   const walkerFrames = walkerArt(renderer);
-  const cartTex = cartArt(renderer);
+  const cartArts = (['crates', 'sacks', 'logs', 'barrels'] as const).map((l) => cartArt(renderer, l));
 
   const center = (i: number) => groundToScreen((i % W) + 0.5, Math.floor(i / W) + 0.5);
   /** Tile x + y of a point a fraction t from tile i's centre to tile j's (matches the scene's zIndex). */
@@ -401,7 +443,7 @@ export function createLife(
             ? roadRoute(world, home, targets[Math.floor(Math.random() * targets.length)])
             : null;
         if (!route || route.length < 2) continue;
-        const s = spriteOf(cartTex);
+        const s = spriteOf(cartArts[b.id % cartArts.length]);
         front.addChild(s);
         carts.push({ s, route, pos: 0, dir: 1, wait: 1, home });
       }

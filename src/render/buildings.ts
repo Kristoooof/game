@@ -111,6 +111,13 @@ function walls(g: Graphics, b: Box, h0: number, h1: number, color: number, top =
     onRight(g, b, 0, 1, 0, 2.2, 0x6e695f);
     onLeft(g, b, 0, 1, 0, 0.7, 0x4a463f);
     onRight(g, b, 0, 1, 0, 0.7, 0x3c3934);
+    // Joints between the plinth stones.
+    const n = Math.round((b.x1 - b.x0 + b.y1 - b.y0) * 4);
+    for (let k = 1; k < n; k++) {
+      const t = k / n + (rnd() - 0.5) * 0.03;
+      onLeft(g, b, t - 0.004, t + 0.004, 0.7, 2.2, 0x5a564c);
+      onRight(g, b, t - 0.004, t + 0.004, 0.7, 2.2, 0x4a463e);
+    }
   }
 }
 
@@ -204,15 +211,28 @@ function windowLeft(g: Graphics, b: Box, t: number, w: number, h0: number, h1: n
   onLeft(g, b, t - 0.01, t + w + 0.01, h0 - 0.8, h1 + 0.8, 0xe8e2d2);
   lit(onLeft(g, b, t + 0.01, t + w - 0.01, h0, h1, 0x2c3a4a));
   onLeft(g, b, t + 0.015, t + w * 0.45, h1 - (h1 - h0) * 0.45, h1 - 0.4, 0x6f8fae);
+  // Glazing bars in a cross, and a sill casting a thin shadow.
+  onLeft(g, b, t + w * 0.5 - 0.004, t + w * 0.5 + 0.004, h0, h1, 0xe8e2d2);
+  onLeft(g, b, t + 0.01, t + w - 0.01, (h0 + h1) / 2 - 0.25, (h0 + h1) / 2 + 0.25, 0xe8e2d2);
+  onLeft(g, b, t - 0.03, t + w + 0.03, h0 - 1.6, h0 - 0.7, 0xd8d0bc);
+  onLeft(g, b, t - 0.02, t + w + 0.02, h0 - 2.2, h0 - 1.6, 0x5a5048);
 }
 function windowRight(g: Graphics, b: Box, t: number, w: number, h0: number, h1: number) {
   onRight(g, b, t - 0.01, t + w + 0.01, h0 - 0.8, h1 + 0.8, 0xc8c2b2);
   lit(onRight(g, b, t + 0.01, t + w - 0.01, h0, h1, 0x222e3a));
+  onRight(g, b, t + w * 0.5 - 0.004, t + w * 0.5 + 0.004, h0, h1, 0xc8c2b2);
+  onRight(g, b, t + 0.01, t + w - 0.01, (h0 + h1) / 2 - 0.25, (h0 + h1) / 2 + 0.25, 0xc8c2b2);
+  onRight(g, b, t - 0.03, t + w + 0.03, h0 - 1.6, h0 - 0.7, 0xb8b0a0);
 }
 function door(g: Graphics, b: Box, t: number, w: number, h: number, color: number) {
   onLeft(g, b, t - 0.015, t + w + 0.015, 0, h + 1, 0x6e6658);
   onLeft(g, b, t, t + w, 0, h, color);
   onLeft(g, b, t + w * 0.5 - 0.004, t + w * 0.5 + 0.004, 0, h, shade(color, 0.6));
+  // Iron hinges, a ring handle and a worn step.
+  for (const hh of [h * 0.25, h * 0.75]) onLeft(g, b, t, t + w * 0.35, hh - 0.35, hh + 0.35, 0x2a2622);
+  const [kx, ky] = P(b.x0 + (t + w * 0.8) * (b.x1 - b.x0), b.y1, h * 0.45);
+  g.circle(kx, ky, 0.55).stroke({ width: 0.4, color: 0x2a2622 });
+  onLeft(g, b, t - 0.03, t + w + 0.03, -0.6, 0.4, 0xa8a090);
   const [lx, ly] = P(b.x0 + (t + w + 0.06) * (b.x1 - b.x0), b.y1, h * 0.8);
   lantern(g, lx, ly, ly + h * 0.8);
 }
@@ -357,8 +377,40 @@ function house(g: Graphics, x: number, y: number, variant: number) {
     windowRight(g, b, 0.38, 0.24, row + 1, row + 5);
   }
   const at = (a: number, b: number, c: number, d: number): Box => ({ x0: x + a, y0: y + b, x1: x + c, y1: y + d });
-  walls(g, at(0.45, 0.45, 0.62, 0.62), wallH + 3, wallH + 14, 0x8a5a44);
+  const stack = at(0.45, 0.45, 0.62, 0.62);
+  walls(g, stack, wallH + 3, wallH + 14, 0x8a5a44);
+  // Brick courses on the chimney, every other joint staggered.
+  for (let k = 1; k < 5; k++) {
+    const h = wallH + 3 + k * 2.2;
+    onLeft(g, stack, 0, 1, h - 0.15, h + 0.15, 0x5e3a2a);
+    onRight(g, stack, 0, 1, h - 0.15, h + 0.15, 0x4e2e22);
+    onLeft(g, stack, k % 2 ? 0.48 : 0.2, (k % 2 ? 0.48 : 0.2) + 0.03, h, h + 2.2, 0x5e3a2a);
+  }
   walls(g, at(0.42, 0.42, 0.65, 0.65), wallH + 14, wallH + 15.5, 0x5e3e30);
+  // Something of the household beside the walls: a woodpile, a bench or a rain barrel.
+  const kind = variant % 3;
+  if (kind === 0) {
+    const pile = at(1.82, 0.45, 1.96, 1.2);
+    walls(g, pile, 0, 6, 0x7a5028);
+    for (let row = 0; row < 3; row++)
+      for (let k = 0; k < 4; k++) {
+        const [cx, cy] = P(pile.x1, pile.y0 + (0.1 + k * 0.2) * (pile.y1 - pile.y0), 1.1 + row * 1.9);
+        g.ellipse(cx, cy, 1.1, 0.8).fill(0xd8b880).stroke({ width: 0.3, color: 0x7a4f25 });
+      }
+  } else if (kind === 1) {
+    const bench = at(1.0, 1.82, 1.6, 1.93);
+    walls(g, bench, 2, 3, 0x8a6038);
+    for (const u of [1.05, 1.55]) walls(g, at(u, 1.84, u + 0.04, 1.9), 0, 2, 0x5a3e22);
+  } else {
+    const [bx, by] = P(x + 1.88, y + 1.55, 0);
+    g.roundRect(bx - 2.6, by - 7, 5.2, 7, 1.6).fill(0x6e4a2a);
+    g.ellipse(bx, by - 7, 2.6, 1.1).fill(0x3a4a5a);
+    g.moveTo(bx - 2.6, by - 2)
+      .lineTo(bx + 2.6, by - 2)
+      .moveTo(bx - 2.6, by - 5)
+      .lineTo(bx + 2.6, by - 5);
+    g.stroke({ width: 0.5, color: 0x333333 });
+  }
 }
 
 /** Wooden crate on tile point (x, y), `s` tiles wide, standing at height h0. */
@@ -762,6 +814,28 @@ export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.widt
   }
   for (const [ax, ay, bx, by] of ruts) g.moveTo(ax, ay).lineTo(bx, by);
   if (ruts.length) g.stroke({ width: 1.6, color: 0x6e5636, alpha: 0.45, cap: 'round' });
+  // Tufts of grass creeping onto the verges, and now and then a puddle in a rut.
+  for (const [ax, ay, bx, by] of segs) {
+    const len = Math.hypot(bx - ax, by - ay);
+    if (len < 1) continue;
+    const [nx, ny] = [-(by - ay) / len, (bx - ax) / len];
+    const r = mulberry32(Math.round(ax * 3 + ay * 17 + 5));
+    for (let k = 0; k < 3; k++) {
+      const t = r();
+      const side = (r() < 0.5 ? -1 : 1) * (10 + r() * 2);
+      const x = ax + (bx - ax) * t + nx * side;
+      const y = ay + (by - ay) * t + ny * side * 0.6;
+      for (let b = 0; b < 4; b++) g.moveTo(x + (b - 1.5) * 0.7, y).lineTo(x + (b - 1.5) * 1.2, y - 2 - r() * 1.5);
+      g.stroke({ width: 0.5, color: 0x5a7a34, alpha: 0.9 });
+    }
+    if (r() < 0.12) {
+      const t = 0.3 + r() * 0.4;
+      g.ellipse(ax + (bx - ax) * t + nx * 4.5, ay + (by - ay) * t + ny * 2.7, 3.2, 1.4).fill({
+        color: 0x6a8aa0,
+        alpha: 0.55,
+      });
+    }
+  }
 }
 
 /** Light grid over the land the player may build on. */

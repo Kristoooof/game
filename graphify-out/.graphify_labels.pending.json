@@ -18,12 +18,12 @@
   "16": ".claude/CLAUDE.md",
   "17": "camera.ts",
   "18": "data/buildings.ts",
-  "19": "showPreview",
+  "19": "construction.ts",
   "20": "settings.ts",
   "21": "textures.ts",
   "22": "world.ts",
   "23": "atmosphere.ts",
-  "24": "world.ts",
+  "24": "applySettings",
   "25": "daylight.ts",
   "26": "refresh"
 }
