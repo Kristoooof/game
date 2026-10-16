@@ -9,6 +9,7 @@ import { createTerrain, FAR_SCALE } from './render/terrain';
 import { type GameMap, type Terrain, generateMap, parseMap, terrainAt } from './sim/map';
 import { buildingAt, createWorld, demolish, place, placementError, roadPath } from './sim/world';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
+import { daylight } from './render/daylight';
 import { createFpsCounter, createSettingsPanel, loadSettings, resolutionOf } from './ui/settings';
 import { createFxaa } from './render/fxaa';
 
@@ -74,7 +75,11 @@ const ghost = new Graphics({ alpha: 0.6 });
 territory.visible = false;
 const effects = createEffects(map);
 // Reflections under the land: the baked land is opaque, so they only show on the sea.
-scene.addChild(terrain.reflections, terrain.ground, territory, terrain.objects, effects.layer);
+// The whole world takes the time of day as a tint; night lights and the UI overlays sit above it, untinted.
+const lit = new Container({
+  children: [terrain.reflections, terrain.ground, territory, terrain.objects, effects.layer],
+});
+scene.addChild(lit, terrain.lights);
 scene.addChild(hover, selection, preview, ghost);
 app.stage.addChild(scene);
 
@@ -133,6 +138,11 @@ applySettings();
 createSettingsPanel(document.getElementById('settings')!, settings, applySettings);
 // 'Auto' resolution depends on the window size.
 addEventListener('resize', applySettings);
+// Time of day: a full day takes DAY_SECONDS; `?ido=0.8` fixes it (0 midnight, 0.5 noon).
+const DAY_SECONDS = 480;
+const fixedTime = new URLSearchParams(location.search).get('ido');
+let dayTime = fixedTime !== null ? Number(fixedTime) : 0.32;
+const hex = (c: number[]) => (Math.round(c[0] * 255) << 16) | (Math.round(c[1] * 255) << 8) | Math.round(c[2] * 255);
 const countFps = createFpsCounter(document.getElementById('fps')!);
 const view = new Rectangle();
 app.ticker.add((t) => {
@@ -142,6 +152,19 @@ app.ticker.add((t) => {
   view.y = tl.y;
   view.width = app.screen.width / cam.scale;
   view.height = app.screen.height / cam.scale;
+  if (fixedTime === null && settings.dayCycle) dayTime = (dayTime + dt / DAY_SECONDS) % 1;
+  const day = daylight(fixedTime !== null || settings.dayCycle ? dayTime : 0.42);
+  lit.tint = hex(day.ambient);
+  terrain.lights.alpha = day.night;
+  terrain.setSun(day.step);
+  sunlight.tint = hex(day.sun);
+  sunlight.alpha = day.sunStrength;
+  // The moon's glitter column stays at a fixed place on screen, like the real one as you move.
+  terrain.light(
+    day.ambient,
+    day.sun.map((v) => v * day.sunStrength),
+    [view.x + view.width * 0.62, 50 / cam.scale, day.night],
+  );
   terrain.update(dt, view, cam.scale);
   // The target keeps CSS-pixel units; its own resolution does the downscaling.
   waterTransform.set(cam.scale, 0, 0, cam.scale, cam.x, cam.y);

@@ -8,12 +8,21 @@ export interface Settings {
   pixel: boolean;
   /** Pixel look for the sea alone, independent of the world. */
   waterPixel: boolean;
+  /** Days pass (dawn to night); off keeps it day. */
+  dayCycle: boolean;
   fps: boolean;
 }
 
 const KEY = 'szigetek.settings';
 // MSAA off by default: the baked world is already smooth, and MSAA is costly on big screens.
-const DEFAULTS: Settings = { width: 'auto', antialias: 'off', pixel: false, waterPixel: false, fps: false };
+const DEFAULTS: Settings = {
+  width: 'auto',
+  antialias: 'off',
+  pixel: false,
+  waterPixel: false,
+  dayCycle: true,
+  fps: false,
+};
 
 export function loadSettings(): Settings {
   try {
@@ -47,6 +56,10 @@ const widthOptions = (): [Settings['width'], string][] => [
 const LOOKS: [boolean, string][] = [
   [false, 'Sima'],
   [true, 'Pixeles'],
+];
+const DAY_CYCLE: [boolean, string][] = [
+  [true, 'Változó (nappal–éjszaka)'],
+  [false, 'Mindig nappal'],
 ];
 const ANTIALIAS: [Antialias, string][] = [
   ['off', 'Ki'],
@@ -95,6 +108,7 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
     select('Renderelési szélesség', widthOptions(), s.width, (width) => update({ width })),
     select('Megjelenés', LOOKS, s.pixel, (pixel) => update({ pixel })),
     select('Víz megjelenése', LOOKS, s.waterPixel, (waterPixel) => update({ waterPixel })),
+    select('Napszak', DAY_CYCLE, s.dayCycle, (dayCycle) => update({ dayCycle })),
     select('Élsimítás', ANTIALIAS, s.antialias, (antialias) => update({ antialias })),
     fps,
     note,

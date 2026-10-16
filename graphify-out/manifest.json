@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "src/main.ts": {
-    "mtime": 1792144909.9430757,
-    "seen": 1792145023.3523633,
-    "ast_hash": "9c2819201e413f500d806fb2f560d3f6",
+    "mtime": 1792145476.97008,
+    "seen": 1792145739.5174475,
+    "ast_hash": "5d6b9771095e84a934a9264220154797",
     "semantic_hash": ""
   },
   "src/render/iso.test.ts": {
@@ -144,9 +144,9 @@
     "semantic_hash": ""
   },
   "PLAN.md": {
-    "mtime": 1792145022.1930394,
-    "seen": 1792145023.352429,
-    "ast_hash": "bf8c48cc9361abe8f6d526c864d19409",
+    "mtime": 1792145738.4753647,
+    "seen": 1792145739.5175128,
+    "ast_hash": "42e5c7df49cb5226344207becca5fd40",
     "semantic_hash": ""
   },
   "index.html": {
@@ -168,9 +168,9 @@
     "semantic_hash": ""
   },
   "src/render/terrain.ts": {
-    "mtime": 1792144912.1300929,
-    "seen": 1792145023.3523839,
-    "ast_hash": "898bbf6527dace2b5309827caebb2c90",
+    "mtime": 1792145476.1731536,
+    "seen": 1792145739.5174704,
+    "ast_hash": "b662a2629d9539cf08c1d7b4590c032d",
     "semantic_hash": ""
   },
   "src/sim/map.test.ts": {
@@ -204,9 +204,9 @@
     "semantic_hash": ""
   },
   "src/render/buildings.ts": {
-    "mtime": 1792144909.9425015,
-    "seen": 1792145023.352366,
-    "ast_hash": "f5c734fa9831748b8198b1dd0140bd2e",
+    "mtime": 1792145431.614081,
+    "seen": 1792145739.5174506,
+    "ast_hash": "6d403d642956d9ed1f35e11c1be3089b",
     "semantic_hash": ""
   },
   "src/sim/world.test.ts": {
@@ -234,9 +234,9 @@
     "semantic_hash": ""
   },
   "src/render/ground.ts": {
-    "mtime": 1792144901.2966647,
-    "seen": 1792145023.352378,
-    "ast_hash": "543254b0669cfaa93b7b7058eb5fa776",
+    "mtime": 1792145454.10498,
+    "seen": 1792145739.5174646,
+    "ast_hash": "431915efccc142f29a29a7cd39014ba3",
     "semantic_hash": ""
   },
   "src/render/effects.ts": {
@@ -252,9 +252,21 @@
     "semantic_hash": ""
   },
   "src/ui/settings.ts": {
-    "mtime": 1792138676.0832255,
-    "seen": 1792138942.228921,
-    "ast_hash": "fb47ee16b22ebeb1531d8f29fe124230",
+    "mtime": 1792145477.5700798,
+    "seen": 1792145739.5174835,
+    "ast_hash": "f984504a2e783538e54712feac302896",
+    "semantic_hash": ""
+  },
+  "src/render/daylight.test.ts": {
+    "mtime": 1792145383.2420819,
+    "seen": 1792145739.517457,
+    "ast_hash": "afefe601899a29548b9deff917f01661",
+    "semantic_hash": ""
+  },
+  "src/render/daylight.ts": {
+    "mtime": 1792145659.1584804,
+    "seen": 1792145739.5174587,
+    "ast_hash": "0c43020a1c9872e66fcccab219927641",
     "semantic_hash": ""
   }
 }

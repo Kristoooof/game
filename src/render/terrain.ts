@@ -14,7 +14,8 @@ import { BUILDINGS } from '../data/buildings';
 import { terrainAt } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
 import type { World } from '../sim/world';
-import { drawBuilding, drawPier, drawRoads } from './buildings';
+import { drawBuilding, drawPier, drawRoads, setGlow, setSun } from './buildings';
+import { sunShadow } from './daylight';
 import { createGround } from './ground';
 import { tileToScreen } from './iso';
 import { type Art, makeArt, sprite } from './textures';
@@ -46,6 +47,8 @@ interface Chunk {
   objectSprite: Sprite;
   /** Mirror images of coastal things, drawn under the land so only the sea shows them. */
   reflectionSprite: Sprite;
+  /** Window and lantern light, added on top after dark. */
+  lightSprite: Sprite;
   /** Bake key ("tier/far") of the textures shown, or '' when nothing is baked. */
   baked: string;
   dirty: boolean;
@@ -68,6 +71,10 @@ export function createTerrain(world: World, renderer: Renderer) {
   const groundLayer = new Container();
   const objectLayer = new Container({ sortableChildren: true });
   const reflectionLayer = new Container();
+  const lightLayer = new Container({ alpha: 0 });
+  /** Sun step for shadows (see daylight.ts); part of the bake key. */
+  let sunStep = 3;
+  let shade = sunShadow(sunStep);
 
   // Mountain tiles deep inside a range get taller peaks.
   const rockDepth = new Uint8Array(W * H);
@@ -115,6 +122,14 @@ export function createTerrain(world: World, renderer: Renderer) {
           const sp = sprite(a, s.x, s.y, scale);
           sp.zIndex = x + y + u + v;
           into.addChild(sp);
+          // Cast shadow: the silhouette laid flat along the sun's direction.
+          const sh = sprite(a, s.x, s.y, scale);
+          const k = sh.scale.x;
+          sh.setFromMatrix(new Matrix(k, 0, -shade.dx * k, -shade.dy * k, s.x, s.y));
+          sh.tint = 0x0a1a10;
+          sh.alpha = 0.22 * shade.alpha;
+          sh.zIndex = sp.zIndex - 0.5;
+          into.addChild(sh);
           if (!far && nearWater(x, y)) {
             const m = sprite(a, s.x, s.y, scale);
             m.zIndex = sp.zIndex;
@@ -204,6 +219,7 @@ export function createTerrain(world: World, renderer: Renderer) {
         ),
         objectSprite: new Sprite({ visible: false, zIndex: cx + cy }),
         reflectionSprite: new Sprite({ visible: false, tint: 0x2a6a8a, alpha: 0.22 }),
+        lightSprite: new Sprite({ visible: false, blendMode: 'add' }),
         baked: '',
         dirty: false,
         lastSeen: -1e9,
@@ -211,6 +227,7 @@ export function createTerrain(world: World, renderer: Renderer) {
       groundLayer.addChild(c.groundMesh);
       objectLayer.addChild(c.objectSprite);
       reflectionLayer.addChild(c.reflectionSprite);
+      lightLayer.addChild(c.lightSprite);
       chunks.push(c);
     }
 
@@ -256,6 +273,8 @@ export function createTerrain(world: World, renderer: Renderer) {
 
     const o = new Container({ sortableChildren: true });
     const refl = new Container({ sortableChildren: true });
+    const lights = new Graphics();
+    setSun(shade);
     addNature(c, o, refl, far);
     for (const b of world.buildings.values()) {
       if (b.type === 'road' || b.x < c.x0 || b.x >= c.x1 || b.y < c.y0 || b.y >= c.y1) continue;
@@ -265,14 +284,18 @@ export function createTerrain(world: World, renderer: Renderer) {
         drawBuilding(bg, b.type, b.x, b.y, b.id);
         return bg;
       };
+      setGlow(lights);
       o.addChild(draw());
+      setGlow(null);
       const pier = b.type === 'harbor' || b.type === 'fisher' ? pierBox(b.x, b.y, size) : null;
       const drawP = () => {
         const pg = new Graphics({ zIndex: pier!.x0 + pier!.y0 + 0.5 });
         drawPier(pg, pier!.x0, pier!.y0, pier!.x1, pier!.y1);
         return pg;
       };
+      setGlow(lights);
       if (pier) o.addChild(drawP());
+      setGlow(null);
       if (far || !nearWater(b.x + size - 1, b.y + size - 1)) continue;
       // Mirrored about the front corner of the footprint, where the building meets the shore.
       mirror(draw(), tileToScreen(b.x + size, b.y + size).y, refl);
@@ -280,12 +303,15 @@ export function createTerrain(world: World, renderer: Renderer) {
     }
     const obj = renderTrimmed(o, tier);
     const mir = renderTrimmed(refl, tier);
+    const lit = renderTrimmed(new Container({ children: [lights] }), tier);
     o.destroy({ children: true });
     refl.destroy({ children: true });
+    lights.destroy();
 
     swap(c.groundMesh, groundTex);
     swap(c.objectSprite, obj.texture, obj.rect);
     swap(c.reflectionSprite, mir.texture, mir.rect);
+    swap(c.lightSprite, lit.texture, lit.rect);
     c.baked = key;
     c.dirty = false;
   }
@@ -299,6 +325,14 @@ export function createTerrain(world: World, renderer: Renderer) {
     ground: groundLayer,
     objects: objectLayer,
     reflections: reflectionLayer,
+    lights: lightLayer,
+    light: ground.light,
+    /** Sun step (see daylight.ts) for cast shadows; chunks rebake when it changes. */
+    setSun(step: number) {
+      if (step === sunStep) return;
+      sunStep = step;
+      shade = sunShadow(step);
+    },
     /** Rebake the chunks covering these tiles, including neighbours their objects overhang. */
     invalidate(tiles: [number, number][]) {
       for (const [x, y] of tiles)
@@ -323,11 +357,15 @@ export function createTerrain(world: World, renderer: Renderer) {
         // Never below native: zooming out keeps the land as sharp as zoomed in, like the sea.
         Math.max(1, 2 ** Math.ceil(Math.log2(scale * renderer.resolution))),
       );
-      const key = `${tier}/${far}/${pixel}`;
+      const key = `${tier}/${far}/${pixel}/${sunStep}`;
       const queue: Chunk[] = [];
       for (const c of chunks) {
         const visible = c.objects.intersects(view);
-        c.groundMesh.visible = c.objectSprite.visible = c.reflectionSprite.visible = visible && c.baked !== '';
+        c.groundMesh.visible =
+          c.objectSprite.visible =
+          c.reflectionSprite.visible =
+          c.lightSprite.visible =
+            visible && c.baked !== '';
         if (visible) {
           c.lastSeen = frame;
           if (c.dirty || c.baked !== key) queue.push(c);
@@ -335,6 +373,7 @@ export function createTerrain(world: World, renderer: Renderer) {
           swap(c.groundMesh, null);
           swap(c.objectSprite, null);
           swap(c.reflectionSprite, null);
+          swap(c.lightSprite, null);
           c.baked = '';
         }
       }

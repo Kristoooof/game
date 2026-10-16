@@ -22,6 +22,33 @@ const edge = (g: Graphics, pts: number[][], color: number, width = 0.8) =>
 /** Random seeded per building, so the same building always looks the same. */
 let rnd: () => number = Math.random;
 
+/** Night lights (lit window glass, lanterns) are also drawn here when set; shown additively after dark. */
+let glow: Graphics | null = null;
+export const setGlow = (g: Graphics | null) => (glow = g);
+/** Sun for cast shadows: screen offset per pixel of height, and opacity (see daylight.ts). */
+let sun = { dx: 0.4, dy: 0.17, alpha: 1 };
+export const setSun = (s: typeof sun) => (sun = s);
+
+/** Lights quad `pts` warmly at night; about one window in five stays dark (stable per position). */
+function lit(pts: number[][]) {
+  if (!glow) return;
+  const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length;
+  const cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  if (Math.abs(Math.floor(cx * 7 + cy * 13)) % 5 === 0) return;
+  glow.circle(cx, cy, 10).fill({ color: 0xff9a30, alpha: 0.1 });
+  glow.circle(cx, cy, 5.5).fill({ color: 0xffb040, alpha: 0.16 });
+  glow.poly(pts.flat()).fill(0xffc45a);
+}
+/** Small lantern at screen point (x, y): iron housing by day, a warm light with a pool on the ground by night. */
+function lantern(g: Graphics, x: number, y: number, ground: number) {
+  g.rect(x - 1, y - 1.6, 2, 3).fill(0x2a2420);
+  if (!glow) return;
+  glow.ellipse(x, ground, 9, 4).fill({ color: 0xffa040, alpha: 0.12 });
+  glow.circle(x, y, 8).fill({ color: 0xff9a30, alpha: 0.14 });
+  glow.circle(x, y, 3.5).fill({ color: 0xffc860, alpha: 0.35 });
+  glow.rect(x - 0.7, y - 1.1, 1.4, 2).fill(0xffe0a0);
+}
+
 /** Scatter dots over a quad (corners bottom-left, bottom-right, top-right, top-left): plaster, stone grain. */
 function speckle(g: Graphics, q: number[][], color: number, n: number, alpha: number) {
   for (let i = 0; i < n; i++) {
@@ -67,12 +94,16 @@ function walls(g: Graphics, b: Box, h0: number, h1: number, color: number, top =
 /** A rectangle drawn on the left face (y = y1) between fractions t0..t1 along x. */
 const onLeft = (g: Graphics, b: Box, t0: number, t1: number, h0: number, h1: number, color: number) => {
   const x = (t: number) => b.x0 + t * (b.x1 - b.x0);
-  fill(g, [P(x(t0), b.y1, h0), P(x(t1), b.y1, h0), P(x(t1), b.y1, h1), P(x(t0), b.y1, h1)], color);
+  const pts = [P(x(t0), b.y1, h0), P(x(t1), b.y1, h0), P(x(t1), b.y1, h1), P(x(t0), b.y1, h1)];
+  fill(g, pts, color);
+  return pts;
 };
 /** A rectangle drawn on the right face (x = x1) between fractions t0..t1 along y. */
 const onRight = (g: Graphics, b: Box, t0: number, t1: number, h0: number, h1: number, color: number) => {
   const y = (t: number) => b.y0 + t * (b.y1 - b.y0);
-  fill(g, [P(b.x1, y(t1), h0), P(b.x1, y(t0), h0), P(b.x1, y(t0), h1), P(b.x1, y(t1), h1)], color);
+  const pts = [P(b.x1, y(t1), h0), P(b.x1, y(t0), h0), P(b.x1, y(t0), h1), P(b.x1, y(t1), h1)];
+  fill(g, pts, color);
+  return pts;
 };
 
 /** Building with walls of height `wall` and a gable roof whose ridge runs along x. */
@@ -137,29 +168,47 @@ function windowLeft(g: Graphics, b: Box, t: number, w: number, h0: number, h1: n
   onLeft(g, b, t - sw, t, h0, h1, shutter);
   onLeft(g, b, t + w, t + w + sw, h0, h1, shade(shutter, 0.85));
   onLeft(g, b, t - 0.01, t + w + 0.01, h0 - 0.8, h1 + 0.8, 0xe8e2d2);
-  onLeft(g, b, t + 0.01, t + w - 0.01, h0, h1, 0x2c3a4a);
+  lit(onLeft(g, b, t + 0.01, t + w - 0.01, h0, h1, 0x2c3a4a));
   onLeft(g, b, t + 0.015, t + w * 0.45, h1 - (h1 - h0) * 0.45, h1 - 0.4, 0x6f8fae);
 }
 function windowRight(g: Graphics, b: Box, t: number, w: number, h0: number, h1: number) {
   onRight(g, b, t - 0.01, t + w + 0.01, h0 - 0.8, h1 + 0.8, 0xc8c2b2);
-  onRight(g, b, t + 0.01, t + w - 0.01, h0, h1, 0x222e3a);
+  lit(onRight(g, b, t + 0.01, t + w - 0.01, h0, h1, 0x222e3a));
 }
 function door(g: Graphics, b: Box, t: number, w: number, h: number, color: number) {
   onLeft(g, b, t - 0.015, t + w + 0.015, 0, h + 1, 0x6e6658);
   onLeft(g, b, t, t + w, 0, h, color);
   onLeft(g, b, t + w * 0.5 - 0.004, t + w * 0.5 + 0.004, 0, h, shade(color, 0.6));
+  const [lx, ly] = P(b.x0 + (t + w + 0.06) * (b.x1 - b.x0), b.y1, h * 0.8);
+  lantern(g, lx, ly, ly + h * 0.8);
 }
 
 const SHUTTERS = [0x3f6b4a, 0x4a5f8a, 0x8a3a2a, 0x6a5a2a];
 
 const ROOFS = [0xb5452b, 0xa0522d, 0x9b3b2b, 0x8e5a3a];
 
-/** Soft cast shadow of a footprint, falling towards the lower right (the sun is upper left). */
-function shadow(g: Graphics, x: number, y: number, size: number) {
-  const foot = [P(x, y, 0), P(x + size, y, 0), P(x + size, y + size, 0), P(x, y + size, 0)].flat();
-  const moved = (dx: number, dy: number) => foot.map((v, i) => (i % 2 ? v + dy : v + dx));
-  g.poly(moved(12, 5)).fill({ color: 0x0a1a10, alpha: 0.1 });
-  g.poly(moved(7, 3)).fill({ color: 0x0a1a10, alpha: 0.12 });
+/** Convex hull of points (monotone chain), for the area a footprint sweeps as its shadow. */
+function hull(pts: number[][]) {
+  pts = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o: number[], a: number[], b: number[]) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = (list: number[][]) => {
+    const h: number[][] = [];
+    for (const p of list) {
+      while (h.length >= 2 && cross(h[h.length - 2], h[h.length - 1], p) <= 0) h.pop();
+      h.push(p);
+    }
+    return h.slice(0, -1);
+  };
+  return [...half(pts), ...half([...pts].reverse())];
+}
+/** Soft cast shadow of a footprint `height` px tall: the footprint swept along the sun's direction. */
+function shadow(g: Graphics, x: number, y: number, size: number, height = 26) {
+  const foot = [P(x, y, 0), P(x + size, y, 0), P(x + size, y + size, 0), P(x, y + size, 0)];
+  const swept = (k: number) =>
+    hull([...foot, ...foot.map(([px, py]) => [px + sun.dx * height * k, py + sun.dy * height * k])]);
+  g.poly(swept(1).flat()).fill({ color: 0x0a1a10, alpha: 0.1 * sun.alpha });
+  g.poly(swept(0.6).flat()).fill({ color: 0x0a1a10, alpha: 0.12 * sun.alpha });
 }
 
 const WALL_COLORS = [0xece0c4, 0xd9b38c, 0xa9c4c9, 0xc9d6b0, 0xe6d5b8, 0xd8c0c8];
@@ -297,6 +346,12 @@ export function drawPier(g: Graphics, x0: number, y0: number, x1: number, y1: nu
     const b = P(bx, by, 3.4);
     g.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 0.5, color: 0x6e5236 });
   }
+  // Lantern post at the far end.
+  const [ex, ey] = at(len - 0.15, 0.85);
+  const base = P(ex, ey, 3.4);
+  const top = P(ex, ey, 14);
+  g.moveTo(base[0], base[1]).lineTo(top[0], top[1]).stroke({ width: 1, color: 0x3a2a1a });
+  lantern(g, top[0], top[1] + 1, base[1] + 4);
 }
 
 /** Draws building `type` with its top corner at tile (x, y). `variant` picks colours. */

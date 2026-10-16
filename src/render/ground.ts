@@ -31,6 +31,9 @@ uniform sampler2D uNoise;
 uniform vec2 uSize;
 uniform float uTime;
 uniform float uFar;
+uniform vec3 uAmbient;
+uniform vec3 uSun;
+uniform vec3 uMoon;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 // Baked, tileable noise (see bakeNoise): r = 4-octave fbm, g = single octave, b = second fbm.
@@ -88,7 +91,7 @@ void main() {
   vec3 n = normalize(vec3(-grad * 0.5, 1.0));
   vec3 sunH = normalize(vec3(-0.45, -0.55, 0.7) + vec3(0.0, 0.0, 1.0));
   float glint = pow(max(dot(n, sunH), 0.0), 600.0);
-  col += vec3(1.0, 0.95, 0.8) * glint * 0.45 * (1.0 - uFar * 0.8) * (1.0 - depth * 0.4);
+  col += uSun * glint * 0.45 * (1.0 - uFar * 0.8) * (1.0 - depth * 0.4);
   // Crest lines: ridged noise, thin and bright, only where the sea is open.
   float ridge = 1.0 - abs(noise(p * 1.3 + warpN(p)) * 2.0 - 1.0);
   col += vec3(0.6, 0.66, 0.68) * smoothstep(0.96, 0.995, ridge) * 0.07 * (1.0 - uFar) * (0.4 + depth * 0.6);
@@ -124,7 +127,15 @@ void main() {
     foam = max(foam, smoothstep(0.42, 0.49, land));
     col = mix(col, vec3(0.94, 0.97, 0.96), clamp(foam, 0.0, 1.0) * 0.85);
   }
-  finalColor = vec4(pow(col, vec3(0.95)) * vec3(1.04, 1.0, 0.94), 1.0);
+  col = pow(col, vec3(0.95)) * vec3(1.04, 1.0, 0.94) * uAmbient;
+  // Moonlight: a glittering column under the moon (uMoon: world x, half width, strength).
+  if (uMoon.z > 0.0) {
+    float mx = (vPos.x - uMoon.x) / uMoon.y;
+    float path = exp(-mx * mx) * (0.6 + 0.4 * noise(p * 0.5 + t * 0.05));
+    float mg = pow(max(dot(n, normalize(vec3(0.0, -0.3, 1.0))), 0.0), 50.0);
+    col += vec3(0.75, 0.82, 0.95) * path * (0.06 + mg * 0.8) * uMoon.z * (1.0 - smoothstep(0.1, 0.4, land));
+  }
+  finalColor = vec4(col, 1.0);
 }`;
 
 /*
@@ -363,6 +374,9 @@ export function createGround(map: GameMap) {
       uSize: { value: new Float32Array([W, H]), type: 'vec2<f32>' },
       uTime: { value: 0, type: 'f32' },
       uFar: { value: 0, type: 'f32' },
+      uAmbient: { value: new Float32Array([1, 1, 1]), type: 'vec3<f32>' },
+      uSun: { value: new Float32Array([1, 0.95, 0.8]), type: 'vec3<f32>' },
+      uMoon: { value: new Float32Array([0, 1, 0]), type: 'vec3<f32>' },
     },
   });
   const noise = bakeNoise();
@@ -392,6 +406,12 @@ export function createGround(map: GameMap) {
     update(dt: number, far: number) {
       wu.uTime += dt;
       wu.uFar = far;
+    },
+    /** Time-of-day light on the sea: colour multiplier, sun glint colour, moon column (world x, half width, strength). */
+    light(ambient: number[], sun: number[], moon: number[]) {
+      wu.uAmbient.set(ambient);
+      wu.uSun.set(sun);
+      wu.uMoon.set(moon);
     },
     /** A mesh covering tiles [x0, x1) × [y0, y1), to render that chunk's land once. */
     landMesh(x0: number, y0: number, x1: number, y1: number, far: number) {
