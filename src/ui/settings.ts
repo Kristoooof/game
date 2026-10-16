@@ -31,18 +31,18 @@ const save = (s: Settings) => {
   }
 };
 
-/** 'Automatic' renders at the display's own density, capped at 2×: sharp water and foam on any screen. */
-export const resolutionOf = (s: Settings) =>
-  s.width === 'auto' ? Math.min(devicePixelRatio, 2) : Math.min(4, Math.max(0.25, s.width / innerWidth));
+/** Physical pixel size of the display: the most the canvas can usefully render. */
+const displayWidth = () => Math.round(innerWidth * devicePixelRatio);
 
-const WIDTHS: [Settings['width'], string][] = [
-  ['auto', 'Automatikus'],
-  [960, '960 px'],
-  [1280, '1280 px'],
-  [1600, '1600 px'],
-  [1920, '1920 px'],
-  [2560, '2560 px'],
-  [3840, '3840 px'],
+/** Canvas scale for the setting: automatic is the display's density (max 2×), a width is never above the display. */
+export const resolutionOf = (s: Settings) =>
+  s.width === 'auto' ? Math.min(devicePixelRatio, 2) : Math.min(devicePixelRatio, Math.max(0.25, s.width / innerWidth));
+
+const WIDTH_OPTIONS = [960, 1280, 1600, 1920, 2560, 3200, 3840];
+const widthOptions = (): [Settings['width'], string][] => [
+  ['auto', 'Automatikus (kijelző)'],
+  ...WIDTH_OPTIONS.filter((w) => w < displayWidth()).map((w): [Settings['width'], string] => [w, `${w} px`]),
+  [displayWidth(), `${displayWidth()} px (kijelző)`],
 ];
 const LOOKS: [boolean, string][] = [
   [false, 'Sima'],
@@ -92,14 +92,14 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
   };
 
   panel.append(
-    select('Renderelési szélesség', WIDTHS, s.width, (width) => update({ width })),
+    select('Renderelési szélesség', widthOptions(), s.width, (width) => update({ width })),
     select('Megjelenés', LOOKS, s.pixel, (pixel) => update({ pixel })),
     select('Víz megjelenése', LOOKS, s.waterPixel, (waterPixel) => update({ waterPixel })),
     select('Élsimítás', ANTIALIAS, s.antialias, (antialias) => update({ antialias })),
     fps,
     note,
   );
-  note.textContent = 'Az MSAA ki- vagy bekapcsolása újratölti az oldalt.';
+  note.textContent = `Kijelző: ${displayWidth()} px széles. Kisebb érték pixeles lesz. Az MSAA váltása újratölti az oldalt.`;
   const gear = Object.assign(document.createElement('button'), {
     className: 'gear',
     title: 'Beállítások',

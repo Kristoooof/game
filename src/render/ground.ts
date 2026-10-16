@@ -43,6 +43,9 @@ vec4 smp(sampler2D t, vec2 p) {
 vec2 tileCoord() {
   return vec2(vPos.x / ${TILE_W.toFixed(1)} + vPos.y / ${TILE_H.toFixed(1)}, vPos.y / ${TILE_H.toFixed(1)} - vPos.x / ${TILE_W.toFixed(1)});
 }
+// Animated sea height: several octaves of drifting noise.
+float wave(vec2 q) { return fbm(q * 0.9 + vec2(uTime * 0.08, -uTime * 0.05)) + 0.4 * noise(q * 2.7 - vec2(uTime * 0.1, 0.0)); }
+vec2 warpN(vec2 q) { return vec2(noise(q * 0.7 + 3.0), noise(q * 0.7 + 9.0)) * 2.0 - 1.0; }
 // The one coastline warp both shaders use, so surf meets the land exactly.
 vec2 coastWarp(vec2 p) { return p + (nz(p * 0.45).rb - 0.5) * 0.7; }
 `;
@@ -74,22 +77,35 @@ void main() {
   // Reef: darker, greener patches in the shallows.
   float reef = smoothstep(0.62, 0.75, noise(p * 4.5 + 4.0)) * (1.0 - smoothstep(0.02, 0.16, depthRaw));
   col = mix(col, vec3(0.16, 0.42, 0.4), reef * 0.15);
-  // Broad sun band: a soft light sheen sliding across the sea, slower than the ripples.
-  float sheen = smoothstep(0.55, 1.0, sin(p.x * 0.35 - p.y * 0.6 + t * 0.25 + noise(p * 0.8) * 2.0));
-  col += vec3(1.0, 0.96, 0.85) * sheen * 0.05 * (1.0 - uFar * 0.7);
-  // Breaking swells: crests roll in towards the shore and whiten as they arrive.
-  float swell = sin(depthRaw * 19.0 - t * 2.4 + fbm(p * 0.5) * 3.0);
-  float breaker = smoothstep(0.75, 1.0, swell) * (1.0 - smoothstep(0.03, 0.26, depthRaw)) * (1.0 - fade);
+  // Height field: domain-warped noise, so crests bend, split and fade like real water.
+  // Sun glint comes from its slope: facets turned towards the sun (upper left) flash.
+  float h0 = wave(p);
+  vec2 grad = vec2(wave(p + vec2(0.15, 0.0)) - h0, wave(p + vec2(0.0, 0.15)) - h0) / 0.15;
+  vec3 n = normalize(vec3(-grad * 0.5, 1.0));
+  vec3 half = normalize(vec3(-0.45, -0.55, 0.7) + vec3(0.0, 0.0, 1.0));
+  float glint = pow(max(dot(n, half), 0.0), 90.0);
+  col += vec3(1.0, 0.95, 0.8) * glint * 0.6 * (1.0 - uFar * 0.8) * (1.0 - depth * 0.4);
+  // Crest lines: ridged noise, thin and bright, only where the sea is open.
+  float ridge = 1.0 - abs(noise(p * 1.3 + warpN(p)) * 2.0 - 1.0);
+  col += vec3(0.6, 0.66, 0.68) * smoothstep(0.9, 0.99, ridge) * 0.16 * (1.0 - uFar) * (0.4 + depth * 0.6);
+  // Breaking swells: crests roll in towards the shore, bent by the same height field, and whiten.
+  // Distance alone makes parallel bands, so the crest lines are bent by noise and only break in patches.
+  float bend = (noise(p * 1.1) - 0.5) * 0.3 + (fbm(p * 0.6) - 0.5) * 0.12;
+  float swell = sin((depthRaw + bend) * 19.0 - t * 2.4 + h0 * 6.0);
+  float patchy = smoothstep(0.45, 0.8, noise(p * 0.9 + vec2(t * 0.03, 0.0)));
+  float breaker = smoothstep(0.75, 1.0, swell) * patchy * (1.0 - smoothstep(0.03, 0.26, depthRaw)) * (1.0 - fade);
   col = mix(col, vec3(0.92, 0.96, 0.95), breaker * 0.5);
-  // Short, broken swell crests running diagonally, fading in and out in patches.
-  float w = sin(p.x * 1.3 + p.y * 0.5 + t * 1.1 + fbm(p * 0.3 + t * 0.04) * 7.0);
-  float patch = 0.7 + 0.3 * noise(p * 0.9 + vec2(t * 0.05, 0.0));
-  col += vec3(0.07, 0.09, 0.1) * smoothstep(0.9, 1.0, w) * patch * (0.3 + depth * 0.7);
-  float glint = noise(p * 5.0 + vec2(t * 0.9, t * 0.3));
-  col += vec3(0.25, 0.3, 0.32) * smoothstep(0.9, 0.97, glint) * depth * (1.0 - uFar * 0.8);
+  // Ripple rings around rocks in the shallows: one cell per rock, rings spread out and fade.
+  vec2 cell = floor(p * 1.6);
+  vec2 local = fract(p * 1.6) - 0.5 - (vec2(hash(cell), hash(cell + 7.0)) - 0.5) * 0.4;
+  float rock = step(0.8, hash(cell + 3.0)) * (1.0 - smoothstep(0.06, 0.2, depthRaw)) * (1.0 - fade);
+  float ring = fract(t * 0.35 + hash(cell)) ;
+  float rd = length(local) / 0.5;
+  float rings = smoothstep(0.1, 0.0, abs(rd - ring)) * (1.0 - ring) * rock;
+  col = mix(col, vec3(0.85, 0.92, 0.92), rings * 0.5);
   if (land > 0.01) {
     col = mix(col, vec3(0.5, 0.76, 0.7), smoothstep(0.2, 0.5, land) * 0.5);
-    float roll = sin(land * 40.0 - t * 2.2 + fbm(p * 0.8) * 4.0);
+    float roll = sin(land * 40.0 - t * 2.2 + fbm(p * 0.8) * 4.0 + noise(p * 0.7) * 6.0) * noise(p * 1.2 + t * 0.05);
     col += vec3(0.2) * smoothstep(0.88, 0.99, roll) * smoothstep(0.02, 0.3, land);
     float wave = 0.32 + 0.06 * sin(t * 1.4 + noise(p * 1.3) * 7.0);
     float foam = smoothstep(wave - 0.04, wave + 0.02, land) * (0.6 + 0.4 * noise(p * 9.0 + t));

@@ -277,7 +277,8 @@ export function createTerrain(world: World, renderer: Renderer) {
       // Power-of-two texture resolution per zoom level, so zooming does not rebake constantly.
       const tier = Math.min(
         pixel ? 1 : MAX_TIER,
-        Math.max(1 / 16, 2 ** Math.ceil(Math.log2(scale * renderer.resolution))),
+        // Never below native: zooming out keeps the land as sharp as zoomed in, like the sea.
+        Math.max(1, 2 ** Math.ceil(Math.log2(scale * renderer.resolution))),
       );
       const key = `${tier}/${far}/${pixel}`;
       const queue: Chunk[] = [];
@@ -287,7 +288,7 @@ export function createTerrain(world: World, renderer: Renderer) {
         if (visible) {
           c.lastSeen = frame;
           if (c.dirty || c.baked !== key) queue.push(c);
-        } else if (c.baked && frame - c.lastSeen > EVICT_FRAMES && tier > 0.125) {
+        } else if (c.baked && frame - c.lastSeen > EVICT_FRAMES) {
           swap(c.groundMesh, null);
           swap(c.objectSprite, null);
           c.baked = '';
