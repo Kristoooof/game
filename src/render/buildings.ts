@@ -277,6 +277,28 @@ function house(g: Graphics, x: number, y: number, variant: number) {
   walls(g, at(0.42, 0.42, 0.65, 0.65), wallH + 14, wallH + 15.5, 0x5e3e30);
 }
 
+/** Wooden pier over the tile box (x0, y0)–(x1, y1): a plank deck on posts standing in the sea. */
+export function drawPier(g: Graphics, x0: number, y0: number, x1: number, y1: number) {
+  rnd = mulberry32(Math.round(x0 * 131 + y0 * 31));
+  const along = x1 - x0 > y1 - y0;
+  const len = along ? x1 - x0 : y1 - y0;
+  const at = (t: number, s: number) => (along ? [x0 + t, y0 + s * (y1 - y0)] : [x0 + s * (x1 - x0), y0 + t]);
+  for (let t = 0.25; t < len; t += 0.65)
+    for (const s of [0.15, 0.85]) {
+      const [px, py] = at(t, s);
+      walls(g, { x0: px - 0.05, y0: py - 0.05, x1: px + 0.05, y1: py + 0.05 }, -4, 3, 0x4e3620);
+    }
+  walls(g, { x0, y0, x1, y1 }, 2.4, 3.4, 0x9a7650);
+  // Plank seams across the deck.
+  for (let t = 0.14; t < len; t += 0.14) {
+    const [ax, ay] = at(t, 0);
+    const [bx, by] = at(t, 1);
+    const a = P(ax, ay, 3.4);
+    const b = P(bx, by, 3.4);
+    g.moveTo(a[0], a[1]).lineTo(b[0], b[1]).stroke({ width: 0.5, color: 0x6e5236 });
+  }
+}
+
 /** Draws building `type` with its top corner at tile (x, y). `variant` picks colours. */
 export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number, variant = 0) {
   const size = BUILDINGS[type].size;

@@ -91,6 +91,7 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Víz: saját felbontás (sima víz mindig eszköz-pixel, független a világtól); átlátszó sekély víz homokfenékkel, kaustika; csillogás gyengítve
 - [x] Egyedi házak: 6 falszín, gerincés és nyeregtető, 1–2 szint, színes markiz, ajtó, kert kerítéssel, virágágyással és ösvénnyel
 - [x] Víz v2: partra futó törő hullámok, zátonyfoltok, széles napfény-sáv, parti tárgyak tükörképe a vízen; házak: a kerítés a tető alá került
+- [x] Víz v3: csíkmentes hullámok, parti sziklák hullámgyűrűvel és tajtékkal, fa móló a kikötőnél/halásznál, épületek tükörképe; tükörképek csak a vízen (a szárazföld alatt); mobilon teljes pontosságú shader
 - [ ] Grafika finomítása (épület sprite-ok, animációk, napszak?)
 - [ ] Hangok, zene
 - [x] Teljesítmény: statikus világ darabonként textúrába sütve (zoomhoz igazított felbontás, csak a változott darab sül újra, nem látott darabok felszabadulnak), élő csak a víz-shader; JS idő/képkocka 9,5 → 1,1 ms

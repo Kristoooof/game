@@ -73,7 +73,8 @@ const preview = new Graphics();
 const ghost = new Graphics({ alpha: 0.6 });
 territory.visible = false;
 const effects = createEffects(map);
-scene.addChild(terrain.ground, territory, terrain.objects, effects.layer);
+// Reflections under the land: the baked land is opaque, so they only show on the sea.
+scene.addChild(terrain.reflections, terrain.ground, territory, terrain.objects, effects.layer);
 scene.addChild(hover, selection, preview, ghost);
 app.stage.addChild(scene);
 

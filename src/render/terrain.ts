@@ -14,7 +14,7 @@ import { BUILDINGS } from '../data/buildings';
 import { terrainAt } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
 import type { World } from '../sim/world';
-import { drawBuilding, drawRoads } from './buildings';
+import { drawBuilding, drawPier, drawRoads } from './buildings';
 import { createGround } from './ground';
 import { tileToScreen } from './iso';
 import { type Art, makeArt, sprite } from './textures';
@@ -44,6 +44,8 @@ interface Chunk {
   /** Land drawn as the chunk's diamond, not its bounding box: no overdraw between chunks. */
   groundMesh: Mesh<MeshGeometry>;
   objectSprite: Sprite;
+  /** Mirror images of coastal things, drawn under the land so only the sea shows them. */
+  reflectionSprite: Sprite;
   /** Bake key ("tier/far") of the textures shown, or '' when nothing is baked. */
   baked: string;
   dirty: boolean;
@@ -65,6 +67,7 @@ export function createTerrain(world: World, renderer: Renderer) {
   const at = (x: number, y: number) => terrainAt(map, x, y) ?? 'water';
   const groundLayer = new Container();
   const objectLayer = new Container({ sortableChildren: true });
+  const reflectionLayer = new Container();
 
   // Mountain tiles deep inside a range get taller peaks.
   const rockDepth = new Uint8Array(W * H);
@@ -82,8 +85,26 @@ export function createTerrain(world: World, renderer: Renderer) {
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (at(x + dx, y + dy) === 'water') return true;
     return false;
   };
-  /** Trees, bushes, boulders and peaks standing on free tiles of a chunk. */
-  function addNature(c: Chunk, into: Container, far: boolean) {
+  /** A pier from the middle of a waterside footprint edge out over the sea, front sides first. */
+  const pierBox = (x: number, y: number, size: number) => {
+    const m = size / 2;
+    const L = 2.2;
+    const W2 = 0.25;
+    const mid = Math.floor(m);
+    if (at(x + size, y + mid) === 'water') return { x0: x + size, y0: y + m - W2, x1: x + size + L, y1: y + m + W2 };
+    if (at(x + mid, y + size) === 'water') return { x0: x + m - W2, y0: y + size, x1: x + m + W2, y1: y + size + L };
+    if (at(x - 1, y + mid) === 'water') return { x0: x - L, y0: y + m - W2, x1: x, y1: y + m + W2 };
+    if (at(x + mid, y - 1) === 'water') return { x0: x + m - W2, y0: y - L, x1: x + m + W2, y1: y };
+    return null;
+  };
+  /** Coastal things mirror into the sea: the same picture flipped about its base line `y`. */
+  const mirror = (d: Container, y: number, into: Container) => {
+    d.scale.y = -d.scale.y;
+    d.y = 2 * y - d.y;
+    into.addChild(d);
+  };
+  /** Trees, bushes, boulders, peaks and offshore rocks on free tiles of a chunk. */
+  function addNature(c: Chunk, into: Container, reflections: Container, far: boolean) {
     for (let y = c.y0; y < c.y1; y++)
       for (let x = c.x0; x < c.x1; x++) {
         if (world.occupied[y * W + x]) continue;
@@ -94,17 +115,15 @@ export function createTerrain(world: World, renderer: Renderer) {
           const sp = sprite(a, s.x, s.y, scale);
           sp.zIndex = x + y + u + v;
           into.addChild(sp);
-          // Coastal things mirror into the sea: the same sprite flipped about its base, bluish and faint.
           if (!far && nearWater(x, y)) {
-            const mirror = sprite(a, s.x, s.y, scale);
-            mirror.scale.y = -mirror.scale.y;
-            mirror.tint = 0x2a6a8a;
-            mirror.alpha = 0.2;
-            mirror.zIndex = sp.zIndex - 0.01;
-            into.addChild(mirror);
+            const m = sprite(a, s.x, s.y, scale);
+            m.zIndex = sp.zIndex;
+            mirror(m, s.y, reflections);
           }
         };
-        if (t === 'forest' && !far) {
+        const rock = t === 'water' && !far && ground.rockAt(x, y);
+        if (rock) put(art.boulder, rock[0], rock[1], rock[2]);
+        else if (t === 'forest' && !far) {
           const n = 2 + Math.floor(r() * 3);
           for (let i = 0; i < n; i++) {
             const u = 0.1 + r() * 0.8;
@@ -162,7 +181,8 @@ export function createTerrain(world: World, renderer: Renderer) {
       const y1 = Math.min(H, y0 + CHUNK);
       // Open sea: nothing to bake.
       let hasLand = false;
-      for (let y = y0; y < y1 && !hasLand; y++) for (let x = x0; x < x1; x++) if (at(x, y) !== 'water') hasLand = true;
+      for (let y = y0; y < y1 && !hasLand; y++)
+        for (let x = x0; x < x1; x++) if (at(x, y) !== 'water' || ground.rockAt(x, y)) hasLand = true;
       if (!hasLand) continue;
       const left = tileToScreen(x0, y1).x;
       const right = tileToScreen(x1, y0).x;
@@ -183,12 +203,14 @@ export function createTerrain(world: World, renderer: Renderer) {
           new Rectangle(left - 16, top - 16, right - left + 32, bottom - top + 32),
         ),
         objectSprite: new Sprite({ visible: false, zIndex: cx + cy }),
+        reflectionSprite: new Sprite({ visible: false, tint: 0x2a6a8a, alpha: 0.22 }),
         baked: '',
         dirty: false,
         lastSeen: -1e9,
       };
       groundLayer.addChild(c.groundMesh);
       objectLayer.addChild(c.objectSprite);
+      reflectionLayer.addChild(c.reflectionSprite);
       chunks.push(c);
     }
 
@@ -208,7 +230,20 @@ export function createTerrain(world: World, renderer: Renderer) {
     if (old instanceof RenderTexture && old !== texture) old.destroy(true);
   };
 
-  function bake(c: Chunk, tier: number, far: boolean) {
+  /** Render `o` into a texture trimmed to what is actually in it: less transparent overdraw. */
+  const renderTrimmed = (o: Container, tier: number) => {
+    if (!o.children.length) return { texture: null };
+    const b = o.getLocalBounds();
+    const rect = new Rectangle(
+      Math.floor(b.minX) - 2,
+      Math.floor(b.minY) - 2,
+      Math.ceil(b.width) + 4,
+      Math.ceil(b.height) + 4,
+    );
+    return { texture: render(o, rect, tier), rect };
+  };
+
+  function bake(c: Chunk, tier: number, far: boolean, key: string) {
     const g = new Container();
     // Bake a little past the diamond so its edge texels are fully covered: no seams.
     const land = ground.landMesh(c.x0 - 0.25, c.y0 - 0.25, c.x1 + 0.25, c.y1 + 0.25, far ? 1 : 0);
@@ -220,31 +255,38 @@ export function createTerrain(world: World, renderer: Renderer) {
     g.destroy({ children: true });
 
     const o = new Container({ sortableChildren: true });
-    addNature(c, o, far);
+    const refl = new Container({ sortableChildren: true });
+    addNature(c, o, refl, far);
     for (const b of world.buildings.values()) {
       if (b.type === 'road' || b.x < c.x0 || b.x >= c.x1 || b.y < c.y0 || b.y >= c.y1) continue;
-      const bg = new Graphics({ zIndex: b.x + b.y + BUILDINGS[b.type].size });
-      drawBuilding(bg, b.type, b.x, b.y, b.id);
-      o.addChild(bg);
+      const size = BUILDINGS[b.type].size;
+      const draw = () => {
+        const bg = new Graphics({ zIndex: b.x + b.y + size });
+        drawBuilding(bg, b.type, b.x, b.y, b.id);
+        return bg;
+      };
+      o.addChild(draw());
+      const pier = b.type === 'harbor' || b.type === 'fisher' ? pierBox(b.x, b.y, size) : null;
+      const drawP = () => {
+        const pg = new Graphics({ zIndex: pier!.x0 + pier!.y0 + 0.5 });
+        drawPier(pg, pier!.x0, pier!.y0, pier!.x1, pier!.y1);
+        return pg;
+      };
+      if (pier) o.addChild(drawP());
+      if (far || !nearWater(b.x + size - 1, b.y + size - 1)) continue;
+      // Mirrored about the front corner of the footprint, where the building meets the shore.
+      mirror(draw(), tileToScreen(b.x + size, b.y + size).y, refl);
+      if (pier) mirror(drawP(), tileToScreen(pier.x1, pier.y1).y, refl);
     }
-    // Trim the object texture to what is actually there: less transparent overdraw.
-    let objTex: RenderTexture | null = null;
-    let objRect: Rectangle | undefined;
-    if (o.children.length) {
-      const b = o.getLocalBounds();
-      objRect = new Rectangle(
-        Math.floor(b.minX) - 2,
-        Math.floor(b.minY) - 2,
-        Math.ceil(b.width) + 4,
-        Math.ceil(b.height) + 4,
-      );
-      objTex = render(o, objRect, tier);
-    }
+    const obj = renderTrimmed(o, tier);
+    const mir = renderTrimmed(refl, tier);
     o.destroy({ children: true });
+    refl.destroy({ children: true });
 
     swap(c.groundMesh, groundTex);
-    swap(c.objectSprite, objTex, objRect);
-    c.baked = `${tier}/${far}`;
+    swap(c.objectSprite, obj.texture, obj.rect);
+    swap(c.reflectionSprite, mir.texture, mir.rect);
+    c.baked = key;
     c.dirty = false;
   }
 
@@ -256,6 +298,7 @@ export function createTerrain(world: World, renderer: Renderer) {
     water: ground.water,
     ground: groundLayer,
     objects: objectLayer,
+    reflections: reflectionLayer,
     /** Rebake the chunks covering these tiles, including neighbours their objects overhang. */
     invalidate(tiles: [number, number][]) {
       for (const [x, y] of tiles)
@@ -284,13 +327,14 @@ export function createTerrain(world: World, renderer: Renderer) {
       const queue: Chunk[] = [];
       for (const c of chunks) {
         const visible = c.objects.intersects(view);
-        c.groundMesh.visible = c.objectSprite.visible = visible && c.baked !== '';
+        c.groundMesh.visible = c.objectSprite.visible = c.reflectionSprite.visible = visible && c.baked !== '';
         if (visible) {
           c.lastSeen = frame;
           if (c.dirty || c.baked !== key) queue.push(c);
         } else if (c.baked && frame - c.lastSeen > EVICT_FRAMES) {
           swap(c.groundMesh, null);
           swap(c.objectSprite, null);
+          swap(c.reflectionSprite, null);
           c.baked = '';
         }
       }
@@ -300,7 +344,7 @@ export function createTerrain(world: World, renderer: Renderer) {
       const dist = (c: Chunk) =>
         Math.hypot(c.ground.x + c.ground.width / 2 - cx, c.ground.y + c.ground.height / 2 - cy);
       queue.sort((a, b) => (a.baked ? 1 : 0) - (b.baked ? 1 : 0) || dist(a) - dist(b));
-      for (const c of queue.slice(0, BAKES_PER_FRAME)) bake(c, tier, far);
+      for (const c of queue.slice(0, BAKES_PER_FRAME)) bake(c, tier, far, key);
       stats.visible = chunks.filter((c) => c.lastSeen === frame).length;
       stats.pending = queue.length;
     },

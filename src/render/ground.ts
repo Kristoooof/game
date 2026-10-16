@@ -3,6 +3,10 @@ import type { GameMap } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
 import { TILE_H, TILE_W } from './iso';
 
+/** Share of eligible coastal water tiles with a rock, and how far it may sit off the tile centre. */
+const ROCK_CHANCE = 0.1;
+const ROCK_SPREAD = 0.2;
+
 const vertex = /* glsl */ `
 in vec2 aPosition;
 out vec2 vPos;
@@ -95,14 +99,22 @@ void main() {
   float patchy = smoothstep(0.45, 0.8, noise(p * 0.9 + vec2(t * 0.03, 0.0)));
   float breaker = smoothstep(0.75, 1.0, swell) * patchy * (1.0 - smoothstep(0.03, 0.26, depthRaw)) * (1.0 - fade);
   col = mix(col, vec3(0.92, 0.96, 0.95), breaker * 0.5);
-  // Ripple rings around rocks in the shallows: one cell per rock, rings spread out and fade.
-  vec2 cell = floor(p * 1.6);
-  vec2 local = fract(p * 1.6) - 0.5 - (vec2(hash(cell), hash(cell + 7.0)) - 0.5) * 0.4;
-  float rock = step(0.8, hash(cell + 3.0)) * (1.0 - smoothstep(0.06, 0.2, depthRaw)) * (1.0 - fade);
-  float ring = fract(t * 0.35 + hash(cell)) ;
-  float rd = length(local) / 0.5;
-  float rings = smoothstep(0.1, 0.0, abs(rd - ring)) * (1.0 - ring) * rock;
-  col = mix(col, vec3(0.85, 0.92, 0.92), rings * 0.5);
+  // Ripple rings and a foam collar around offshore rocks (rockAt places the same rocks on the CPU).
+  vec2 cell = floor(pc);
+  float rh = mod(cell.x * 37.0 + cell.y * 101.0 + cell.x * cell.y * 13.0, 97.0) / 97.0;
+  float rd0 = texture(uDist, (cell + 0.5) / uSize).r;
+  if (rh < ${ROCK_CHANCE} && rd0 > 0.02 && rd0 < 0.115 && fade < 1.0) {
+    vec2 off = vec2(mod(cell.x * 53.0 + cell.y * 29.0 + cell.x * cell.y * 7.0, 89.0) / 89.0,
+                    mod(cell.x * 17.0 + cell.y * 61.0 + cell.x * cell.y * 11.0, 83.0) / 83.0) - 0.5;
+    float d = length(pc - cell - 0.5 - off * ${ROCK_SPREAD});
+    float rings = 0.0;
+    for (int k = 0; k < 2; k++) {
+      float ph = fract(t * 0.3 + rh * 7.0 + float(k) * 0.5);
+      rings += smoothstep(0.035, 0.0, abs(d - 0.12 - ph * 0.26)) * (1.0 - ph);
+    }
+    rings += smoothstep(0.17, 0.1, d) * (0.6 + 0.4 * noise(p * 9.0 + t));
+    col = mix(col, vec3(0.88, 0.94, 0.94), clamp(rings, 0.0, 1.0) * 0.6 * (1.0 - uFar) * (1.0 - fade));
+  }
   if (land > 0.01) {
     col = mix(col, vec3(0.5, 0.76, 0.7), smoothstep(0.2, 0.5, land) * 0.5);
     float roll = sin(land * 40.0 - t * 2.2 + fbm(p * 0.8) * 4.0 + noise(p * 0.7) * 6.0) * noise(p * 1.2 + t * 0.05);
@@ -309,6 +321,19 @@ export function createGround(map: GameMap) {
   const mask = new Uint8Array(W * H * 4);
   const dist = new Uint8Array(W * H * 4);
   const toSea = distance(W, H, (i) => tiles[i] !== 'water');
+  /**
+   * Offshore rock on water tile (x, y), 1.4–2 tiles from land: [u, v, scale] within the tile, or null.
+   * Integer-exact hash so the sea shader finds the same rocks for their ripple rings.
+   */
+  const rockAt = (x: number, y: number): [number, number, number] | null => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return null;
+    const i = y * W + x;
+    if (tiles[i] !== 'water' || toSea[i] < 1.2 || toSea[i] > 2.01) return null;
+    if (((x * 37 + y * 101 + x * y * 13) % 97) / 97 >= ROCK_CHANCE) return null;
+    const u = ((x * 53 + y * 29 + x * y * 7) % 89) / 89 - 0.5;
+    const v = ((x * 17 + y * 61 + x * y * 11) % 83) / 83 - 0.5;
+    return [0.5 + u * ROCK_SPREAD, 0.5 + v * ROCK_SPREAD, 0.45 + ((x * y) % 7) * 0.06];
+  };
   const toShore = distance(W, H, (i) => tiles[i] === 'water' || tiles[i] === 'beach');
   const is = (k: string) => Float32Array.from(tiles, (t) => (t === k ? 1 : 0));
   const land = blur(
@@ -363,6 +388,7 @@ export function createGround(map: GameMap) {
 
   return {
     water,
+    rockAt,
     update(dt: number, far: number) {
       wu.uTime += dt;
       wu.uFar = far;
