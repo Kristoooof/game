@@ -4,12 +4,14 @@ export interface Settings {
   /** Render width in device pixels; the height follows the window's aspect ratio. 'auto' picks one. */
   width: number | 'auto';
   antialias: Antialias;
+  /** Pixel-art look: the baked world is drawn at 1 texel per world pixel and sampled nearest. */
+  pixel: boolean;
   fps: boolean;
 }
 
 const KEY = 'szigetek.settings';
 // MSAA off by default: the baked world is already smooth, and MSAA is costly on big screens.
-const DEFAULTS: Settings = { width: 'auto', antialias: 'off', fps: false };
+const DEFAULTS: Settings = { width: 'auto', antialias: 'off', pixel: false, fps: false };
 
 export function loadSettings(): Settings {
   try {
@@ -44,6 +46,10 @@ const WIDTHS: [Settings['width'], string][] = [
   [1920, '1920 px'],
   [2560, '2560 px'],
   [3840, '3840 px'],
+];
+const LOOKS: [boolean, string][] = [
+  [false, 'Sima'],
+  [true, 'Pixeles'],
 ];
 const ANTIALIAS: [Antialias, string][] = [
   ['off', 'Ki'],
@@ -90,6 +96,7 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
 
   panel.append(
     select('Renderelési szélesség', WIDTHS, s.width, (width) => update({ width })),
+    select('Megjelenés', LOOKS, s.pixel, (pixel) => update({ pixel })),
     select('Élsimítás', ANTIALIAS, s.antialias, (antialias) => update({ antialias })),
     fps,
     note,

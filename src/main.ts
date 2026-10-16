@@ -108,6 +108,7 @@ const fxaa = createFxaa();
 // A fixed filter area: measuring the huge sea mesh for bounds every frame is wasted work.
 app.stage.filterArea = app.screen;
 const applySettings = () => {
+  terrain.setPixel(settings.pixel);
   app.stage.filters = settings.antialias === 'fxaa' ? [fxaa] : [];
   const r = resolutionOf(settings);
   if (r !== app.renderer.resolution) app.renderer.resize(innerWidth, innerHeight, r);

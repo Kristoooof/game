@@ -17,5 +17,9 @@
   "15": "CLAUDE.md",
   "16": ".claude/CLAUDE.md",
   "17": "camera.ts",
-  "18": "world.ts"
+  "18": "world.ts",
+  "19": "showPreview",
+  "20": "settings.ts",
+  "21": "refresh",
+  "22": "costText"
 }

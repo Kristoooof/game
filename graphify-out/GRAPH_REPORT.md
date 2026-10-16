@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-16)
 
 ## Corpus Check
-- 40 files · ~22,286 words
+- 40 files · ~22,396 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 332 nodes · 611 edges · 19 communities (17 shown, 2 thin omitted)
+- 333 nodes · 612 edges · 23 communities (21 shown, 2 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `393baabe`
+- Built from commit: `1722a54e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -35,6 +35,10 @@
 - .claude/CLAUDE.md
 - camera.ts
 - world.ts
+- showPreview
+- settings.ts
+- refresh
+- costText
 
 ## God Nodes (most connected - your core abstractions)
 1. `drawBuilding()` - 18 edges
@@ -63,7 +67,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (19 total, 2 thin omitted)
+## Communities (23 total, 2 thin omitted)
 
 ### Community 0 - "package.json"
 Cohesion: 0.07
@@ -82,8 +86,8 @@ Cohesion: 0.09
 Nodes (20): caveman, Example output, How to invoke, See also, What it does, 1. Answer first, 2. Kill ceremony, 3. Short word (+12 more)
 
 ### Community 4 - "main.ts"
-Cohesion: 0.05
-Nodes (58): anchorFor(), app, applySettings(), cam, countFps, demolishAt(), effects, end() (+50 more)
+Cohesion: 0.06
+Nodes (30): app, cam, countFps, effects, fxaa, ghost, hover, ICONS (+22 more)
 
 ### Community 5 - "compilerOptions"
 Cohesion: 0.17
@@ -98,8 +102,8 @@ Cohesion: 0.18
 Nodes (9): caveman-review, Example output, How to invoke, See also, What it does, Auto-Clarity, Boundaries, Examples (+1 more)
 
 ### Community 8 - "terrain.ts"
-Cohesion: 0.10
-Nodes (39): pixi.js, drawRoads(), createEffects(), Puff, puffTexture(), createFxaa(), bakeNoise(), blur() (+31 more)
+Cohesion: 0.11
+Nodes (37): pixi.js, drawRoads(), createEffects(), Puff, puffTexture(), bakeNoise(), blur(), createGround() (+29 more)
 
 ### Community 9 - "Ponytail Help"
 Cohesion: 0.25
@@ -133,9 +137,25 @@ Nodes (12): active(), attachCameraControls(), Camera, cancel(), end(), Handlers,
 Cohesion: 0.12
 Nodes (29): vitest, BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, GOOD_NAMES (+21 more)
 
+### Community 19 - "showPreview"
+Cohesion: 0.27
+Nodes (14): anchorFor(), demolishAt(), end(), footprint(), menu, move(), onHover(), onTap() (+6 more)
+
+### Community 20 - "settings.ts"
+Cohesion: 0.18
+Nodes (11): applySettings(), Antialias, createFpsCounter(), createSettingsPanel(), DEFAULTS, loadSettings(), LOOKS, resolutionOf() (+3 more)
+
+### Community 21 - "refresh"
+Cohesion: 0.67
+Nodes (3): icon(), refresh(), showResources()
+
+### Community 22 - "costText"
+Cohesion: 0.67
+Nodes (3): button(), costText(), createBuildMenu()
+
 ## Knowledge Gaps
 - **3 isolated node(s):** `eslint`, `prettier`, `typescript`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 162 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 163 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -154,4 +174,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `caveman` be split into smaller, more focused modules?**
   _Cohesion score 0.09090909090909091 - nodes in this community are weakly interconnected._
 - **Should `main.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.051203277009728626 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.058823529411764705 - nodes in this community are weakly interconnected._

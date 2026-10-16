@@ -169,8 +169,11 @@ export function createTerrain(world: World, renderer: Renderer) {
       chunks.push(c);
     }
 
+  /** Pixel look: chunk textures are sampled nearest, so every texel stays a hard square. */
+  let pixel = false;
   const render = (container: Container, r: Rectangle, tier: number) => {
     const target = RenderTexture.create({ width: Math.ceil(r.width), height: Math.ceil(r.height), resolution: tier });
+    if (pixel) target.source.style.scaleMode = 'nearest';
     renderer.render({ container, target, clear: true, transform: new Matrix().translate(-r.x, -r.y) });
     return target;
   };
@@ -235,6 +238,10 @@ export function createTerrain(world: World, renderer: Renderer) {
       for (const [x, y] of tiles)
         for (const c of chunks) if (x >= c.x0 - 1 && x <= c.x1 && y >= c.y0 - 1 && y <= c.y1) c.dirty = true;
     },
+    /** Switch the look; chunks rebake on their next view because their key changes. */
+    setPixel(on: boolean) {
+      pixel = on;
+    },
     /** Tiles changed by building or demolishing: clear their forest and rebake around them. */
     changed(tiles: [number, number][]) {
       ground.clearForest(tiles);
@@ -245,8 +252,11 @@ export function createTerrain(world: World, renderer: Renderer) {
       const far = scale < FAR_SCALE;
       ground.update(dt, Math.min(1, Math.max(0, (FAR_SCALE + 0.08 - scale) / 0.08)));
       // Power-of-two texture resolution per zoom level, so zooming does not rebake constantly.
-      const tier = Math.min(MAX_TIER, Math.max(1 / 16, 2 ** Math.ceil(Math.log2(scale * renderer.resolution))));
-      const key = `${tier}/${far}`;
+      const tier = Math.min(
+        pixel ? 1 : MAX_TIER,
+        Math.max(1 / 16, 2 ** Math.ceil(Math.log2(scale * renderer.resolution))),
+      );
+      const key = `${tier}/${far}/${pixel}`;
       const queue: Chunk[] = [];
       for (const c of chunks) {
         const visible = c.objects.intersects(view);

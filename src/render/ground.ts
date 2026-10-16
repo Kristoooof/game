@@ -124,22 +124,22 @@ void main() {
   col = mix(col, mix(floorCol, canopy, uFar), smoothstep(0.3, 0.7, smp(uDist, pf).b));
 
   // Rock: ridged noise gives crevices and ledges; scree and moss where it meets the grass.
-  // Crisp, noise-broken edges: a soft blur reads as smudges, not terrain.
+  // Highland ground: pale stone with ochre and lichen, gravel, scrub where it meets the grass.
+  // Crisp, noise-broken edge: a soft blur reads as smudges.
   float rockEdge = smp(uMask, pf).b + (noise(p * 3.0) - 0.5) * 0.35;
   float rockMask = smoothstep(0.42, 0.5, rockEdge);
-  float rockRim = smoothstep(0.36, 0.44, rockEdge) - rockMask;
+  float rockFringe = smoothstep(0.3, 0.44, rockEdge) * (1.0 - rockMask);
   float ridge = 1.0 - abs(noise(p * vec2(2.2, 0.9)) * 2.0 - 1.0);
-  float strata = 0.5 + 0.5 * sin((p.x - p.y) * 6.0 + fbm(p * 1.2) * 8.0);
-  vec3 rock = mix(vec3(0.5, 0.47, 0.42), vec3(0.7, 0.66, 0.6), ridge * 0.7 + strata * 0.3);
-  rock = mix(rock, vec3(0.3, 0.27, 0.24), smoothstep(0.75, 0.95, 1.0 - ridge) * 0.6);
-  rock *= 0.88 + 0.24 * noise(g * 6.0);
-  // Stony grain and thin cracks where the ridged noise dips to its midline.
-  rock *= 0.8 + 0.4 * smoothstep(0.6, 0.9, noise(g * 14.0));
-  rock *= 1.0 - 0.3 * smoothstep(0.03, 0.0, abs(noise(p * 5.0) - 0.5));
-  vec3 scree = mix(vec3(0.5, 0.47, 0.4), vec3(0.42, 0.45, 0.32), noise(g * 3.0));
-  col = mix(col, scree, smoothstep(0.3, 0.5, rockEdge) * (1.0 - rockMask) * 0.8);
-  col = mix(col, vec3(0.5, 0.47, 0.43), rockRim * 0.5);
-  col = mix(col, rock, rockMask);
+  vec3 stone = mix(vec3(0.6, 0.58, 0.52), vec3(0.74, 0.71, 0.64), ridge);
+  stone = mix(stone, vec3(0.6, 0.5, 0.36), smoothstep(0.55, 0.8, fbm(p * 0.9 + 3.0)) * 0.35);
+  stone = mix(stone, vec3(0.62, 0.66, 0.4), smoothstep(0.62, 0.78, noise(g * 2.5 + 9.0)) * 0.45);
+  vec2 gb = g * 26.0, gi = floor(gb);
+  float pebble = (1.0 - smoothstep(0.1, 0.22, length(fract(gb) - 0.5 - 0.3 * vec2(hash(gi), hash(gi + 7.0))))) * step(0.55, hash(gi + 3.0));
+  stone = mix(stone, stone * 0.8 + vec3(0.14), pebble * 0.5);
+  stone *= 0.92 + 0.12 * noise(g * 7.0);
+  vec3 scrub = mix(vec3(0.42, 0.52, 0.24), vec3(0.5, 0.58, 0.3), noise(g * 5.0));
+  col = mix(col, scrub, rockFringe * 0.7);
+  col = mix(col, stone, rockMask);
 
   vec3 sandCol = vec3(0.9, 0.81, 0.58) * (0.94 + 0.12 * noise(g * 10.0));
   sandCol -= 0.03 * sin((p.x + p.y) * 9.0 + noise(p * 2.0) * 4.0);
