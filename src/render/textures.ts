@@ -1,5 +1,6 @@
 import { Sprite, Texture } from 'pixi.js';
 import { mulberry32 } from '../sim/rng';
+import { fbm2, hexRGB, litConifer, litCrown, litField, mix, noise2, smooth } from './sculpt';
 
 /** Textures are painted at 2× so they stay crisp when zoomed in. */
 const S = 4;
@@ -31,14 +32,6 @@ export function sprite(art: Art, x: number, y: number, scale = 1) {
   return s;
 }
 
-const poly = (c: Ctx, fill: string | CanvasGradient, pts: number[][]) => {
-  c.fillStyle = fill;
-  c.beginPath();
-  pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
-  c.closePath();
-  c.fill();
-};
-
 /** Soft contact shadow, cast towards the lower right (the sun is upper left, as in buildings.ts). */
 const shadow = (c: Ctx, x: number, y: number, rx: number, ry: number) => {
   const cx = x + rx * 0.3;
@@ -56,54 +49,8 @@ const shadow = (c: Ctx, x: number, y: number, rx: number, ry: number) => {
 };
 
 /** A ball of foliage: sunlit upper-left rim, a shaded crescent lower right, and leaf specks. */
-const leafBall = (c: Ctx, x: number, y: number, r: number, [dark, mid, light]: string[], rnd = Math.random) => {
-  const g = c.createRadialGradient(x - r * 0.4, y - r * 0.45, r * 0.1, x, y, r);
-  g.addColorStop(0, light);
-  g.addColorStop(0.55, mid);
-  g.addColorStop(1, dark);
-  c.fillStyle = g;
-  c.beginPath();
-  c.arc(x, y, r, 0, Math.PI * 2);
-  c.fill();
-  // Self-shadow: the lower right of the ball turned away from the sun.
-  const o = c.createRadialGradient(x + r * 0.45, y + r * 0.5, r * 0.2, x + r * 0.3, y + r * 0.35, r * 1.05);
-  o.addColorStop(0, 'rgba(5,20,8,0.35)');
-  o.addColorStop(1, 'rgba(5,20,8,0)');
-  c.fillStyle = o;
-  c.beginPath();
-  c.arc(x, y, r, 0, Math.PI * 2);
-  c.fill();
-  // Leaf clusters: many small lit leaves on the sun side, dark gaps on the shadow side.
-  for (let i = 0; i < Math.max(8, r * 5); i++) {
-    const a = rnd() * Math.PI * 2;
-    const d = Math.sqrt(rnd()) * r * 0.9;
-    const lit = Math.cos(a - 3.9) > -0.1;
-    c.fillStyle = lit ? light : dark;
-    c.globalAlpha = lit ? 0.7 : 0.5;
-    c.beginPath();
-    c.ellipse(
-      x + Math.cos(a) * d,
-      y + Math.sin(a) * d,
-      0.35 + rnd() * 0.45,
-      0.25 + rnd() * 0.3,
-      rnd() * 3,
-      0,
-      Math.PI * 2,
-    );
-    c.fill();
-  }
-  // A thin rim of sunlight along the upper-left edge.
-  c.globalAlpha = 0.45;
-  c.strokeStyle = light;
-  c.lineWidth = Math.max(0.4, r * 0.08);
-  c.beginPath();
-  c.arc(x, y, r * 0.92, Math.PI * 1.05, Math.PI * 1.6);
-  c.stroke();
-  c.globalAlpha = 1;
-};
 
 const conifer = (seed: number, palette: string[], tiers: number) => {
-  const r = mulberry32(seed);
   return paint(34, 60, 17, 55, (c) => {
     shadow(c, 22, 54, 14, 4.5);
     // Trunk with bark lines and a little root flare.
@@ -117,32 +64,11 @@ const conifer = (seed: number, palette: string[], tiers: number) => {
     c.fill();
     c.fillStyle = 'rgba(140,100,60,0.5)';
     c.fillRect(15.9, 46, 0.6, 9);
-    for (let i = 0; i < tiers; i++) {
+    const layers = Array.from({ length: tiers }, (_, i) => {
       const by = 49 - i * (32 / tiers);
-      const hw = 14 - i * (10 / tiers);
-      const ty = by - 17;
-      // Jagged lower edge, lit left half, shaded right half.
-      const edge: number[][] = [];
-      for (let k = 0; k <= 6; k++) edge.push([17 - hw + (k * hw * 2) / 6, by - (k % 2) * (2 + r() * 1.5)]);
-      const g = c.createLinearGradient(17 - hw, 0, 17 + hw, 0);
-      g.addColorStop(0, palette[2]);
-      g.addColorStop(0.45, palette[1]);
-      g.addColorStop(1, palette[0]);
-      poly(c, g, [[17, ty], ...edge.reverse()]);
-      // Darker shade along the underside of each tier, where the one below meets it.
-      c.fillStyle = 'rgba(0,20,8,0.22)';
-      c.beginPath();
-      edge.forEach(([px, py], j) => (j ? c.lineTo(px, py) : c.moveTo(px, py)));
-      [...edge].reverse().forEach(([px, py]) => c.lineTo(px, py - 2.2));
-      c.closePath();
-      c.fill();
-      c.strokeStyle = 'rgba(0,20,0,0.25)';
-      c.lineWidth = 0.6;
-      c.beginPath();
-      c.moveTo(17, ty + 1);
-      c.lineTo(17 + hw * 0.15, by - 1);
-      c.stroke();
-    }
+      return { by, ty: by - 17, hw: 14 - i * (10 / tiers) };
+    });
+    litConifer(c, S, layers, 17, palette, seed);
   });
 };
 
@@ -193,12 +119,11 @@ const broadleaf = (seed: number, palette: string[], size = 1) => {
       const d = Math.sqrt(r()) * 11.5 * size;
       balls.push([22 + Math.cos(a) * d, 21 + Math.sin(a) * d * 0.8, (3.8 + r() * 3.4) * size]);
     }
-    balls.sort((a, b) => a[1] - b[1]);
-    const back = [palette[0], palette[0], palette[1]];
-    balls.forEach(([x, y, rad], k) => {
-      if (k % 7 === 3) return; // a gap
-      leafBall(c, x, y, rad, k < balls.length / 3 ? back : palette, r);
-    });
+    // Depth for each ball: the crown is round towards the viewer too; a few left out are gaps.
+    const crown = balls
+      .filter((_, k) => k % 7 !== 3)
+      .map(([x, y, rad]) => [x, y, rad, (1 - Math.hypot(x - 22, y - 21) / 14) * 9]);
+    litCrown(c, S, crown, palette, seed);
   });
 };
 const bush = (seed: number, palette: string[]) => {
@@ -212,9 +137,8 @@ const bush = (seed: number, palette: string[]) => {
     base.addColorStop(1, 'rgba(20,40,15,0)');
     c.fillStyle = base;
     c.fillRect(2, 11, 22, 8);
-    const balls = Array.from({ length: 9 }, () => [6 + r() * 14, 7 + r() * 7, 2.6 + r() * 2.2]);
-    balls.sort((a, b) => a[1] - b[1]);
-    for (const [x, y, rad] of balls) leafBall(c, x, y, rad, palette, r);
+    const balls = Array.from({ length: 9 }, () => [6 + r() * 14, 7 + r() * 7, 2.6 + r() * 2.2, r() * 3]);
+    litCrown(c, S, balls, palette, seed);
     if (fruit)
       for (let k = 0; k < 9; k++) {
         c.fillStyle = fruit;
@@ -227,45 +151,24 @@ const bush = (seed: number, palette: string[]) => {
 
 const boulder = paint(20, 14, 10, 11, (c) => {
   shadow(c, 11, 11, 9, 3);
-  // Faceted stone: a lit top-left face, a shaded right face, a crack, moss on top, pebbles at its foot.
-  const g = c.createLinearGradient(3, 2, 16, 12);
-  g.addColorStop(0, '#d2ccbf');
-  g.addColorStop(1, '#7a7366');
-  poly(c, g, [
-    [3, 11],
-    [4.5, 6],
-    [8, 3],
-    [12, 2.6],
-    [15.5, 5.2],
-    [17, 11],
-  ]);
-  poly(c, 'rgba(60,55,48,0.45)', [
-    [11, 11],
-    [12, 4],
-    [15.5, 5.2],
-    [17, 11],
-  ]);
-  c.strokeStyle = 'rgba(50,45,38,0.6)';
-  c.lineWidth = 0.4;
-  c.beginPath();
-  c.moveTo(8.5, 4.2);
-  c.lineTo(9.5, 7);
-  c.lineTo(8.8, 10);
-  c.stroke();
-  c.fillStyle = 'rgba(96,120,60,0.7)';
-  c.beginPath();
-  c.ellipse(9, 3.6, 3.2, 1, -0.1, 0, Math.PI * 2);
-  c.fill();
-  for (const [x, y] of [
-    [2, 11.6],
-    [18, 11.2],
-    [16.5, 12.3],
-  ]) {
-    c.fillStyle = '#9a9384';
-    c.beginPath();
-    c.ellipse(x, y, 0.9, 0.55, 0, 0, Math.PI * 2);
-    c.fill();
-  }
+  const stone = [hexRGB('#7a7366'), hexRGB('#cfc8b9')];
+  const moss = hexRGB('#6a8040');
+  litField(c, S, {
+    cx: 10,
+    cy: 11,
+    scale: 15,
+    grid: 70,
+    height: (u, v) => {
+      const d = Math.hypot(u * 1.05, v * 1.2);
+      return d >= 1 ? 0 : 8 * (1 - d * d) * (0.75 + 0.4 * fbm2(u * 2.2, v * 2.2, 31)) - 0.3;
+    },
+    color: ({ u, v, h, up, light, occl }) => {
+      let base = mix(stone[0], stone[1], fbm2(u * 6, v * 6, 32));
+      if (up > 0.85 && h > 4 && noise2(u * 4, v * 4, 33) > 0.5) base = mix(base, moss, 0.7);
+      const lit = (0.48 + 0.75 * light) * (0.75 + 0.25 * occl);
+      return [base[0] * lit, base[1] * lit, base[2] * lit];
+    },
+  });
 });
 
 /**
@@ -274,102 +177,47 @@ const boulder = paint(20, 14, 10, 11, (c) => {
  */
 const mountain = (seed: number, snowy: boolean) => {
   const r = mulberry32(seed);
-  const h = (snowy ? 52 : 34) + r() * 18;
-  const px = 48 + r() * 12;
+  const H = (snowy ? 56 : 30) + r() * 16;
+  // Main peak and a lower shoulder beside it, slightly off centre.
+  const [pu, pv] = [(r() - 0.5) * 0.3, (r() - 0.5) * 0.3];
+  const [su, sv] = [(r() < 0.5 ? -1 : 1) * (0.35 + r() * 0.2), (r() - 0.5) * 0.6];
+  const rockDark = hexRGB('#857a68');
+  const rockLight = hexRGB('#cdbfa4');
+  const grass = hexRGB('#6f8a44');
+  const snow = hexRGB('#f2f5fa');
   return paint(120, 100, 60, 84, (c) => {
     shadow(c, 66, 84, 50, 12);
-    const base = 86;
-    const peak = [px, base - h];
-    const jag = (x0: number, y0: number, x1: number, y1: number, n: number, amp: number) =>
-      Array.from({ length: n + 1 }, (_, k) => {
-        const t = k / n;
-        return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t + (k && k < n ? (r() - 0.5) * amp : 0)];
-      });
-    const grad = (top: string, bottom: string) => {
-      const g = c.createLinearGradient(0, peak[1], 0, base);
-      g.addColorStop(0, top);
-      g.addColorStop(1, bottom);
-      return g;
-    };
-    // Shoulder peak behind and to the side.
-    const sx = px + (r() < 0.5 ? -26 : 24);
-    const sp = [sx, base - h * 0.55];
-    poly(c, grad('#a99c86', '#7f7360'), [[sx - 30, base], sp, [sx + 4, base]]);
-    poly(c, grad('#6f6555', '#4f483d'), [sp, [sx + 30, base], [sx + 4, base]]);
-    // Main peak: west face in two facets, east face in two facets.
-    const mid = [px + 4 + r() * 4, base - h * 0.42];
-    const west = jag(8, base, peak[0], peak[1], 5, 7);
-    const east = jag(peak[0], peak[1], 112, base, 5, 7);
-    poly(c, grad('#c2b49b', '#8d7f69'), [...west, mid, [px - 6, base]]);
-    poly(c, grad('#ab9d84', '#7b6e5a'), [peak, mid, [px - 6, base], [px + 10, base]]);
-    poly(c, grad('#7b6f5d', '#544b3f'), [...east, [px + 10, base], mid]);
-    poly(c, grad('#685d4e', '#463f35'), [peak, mid, [px + 10, base]]);
-    // Cracks on the faces and pale ledges catching light.
-    c.lineWidth = 0.7;
-    for (let i = 0; i < 9; i++) {
-      const x = 20 + r() * 84;
-      const y = base - 4 - r() * h * 0.55;
-      c.strokeStyle = 'rgba(40,32,24,0.35)';
-      c.beginPath();
-      c.moveTo(x, y);
-      c.lineTo(x + (r() - 0.5) * 6, y + 6 + r() * 8);
-      c.stroke();
-      c.strokeStyle = 'rgba(235,225,205,0.35)';
-      c.beginPath();
-      c.moveTo(x - 4, y - 2);
-      c.lineTo(x + 3, y - 3.5);
-      c.stroke();
-    }
-    // Within the silhouette: grass and moss low down.
-    c.save();
-    c.beginPath();
-    [...west, ...east.slice(1)].forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
-    c.closePath();
-    c.clip();
-    for (let i = 0; i < 14; i++) {
-      const x = 14 + r() * 92;
-      const y = base - 2 - r() * h * 0.22;
-      c.fillStyle = r() < 0.5 ? 'rgba(98,122,62,0.55)' : 'rgba(120,140,70,0.45)';
-      c.beginPath();
-      c.ellipse(x, y, 2 + r() * 4, 0.8 + r() * 1.2, 0, 0, Math.PI * 2);
-      c.fill();
-    }
-    c.restore();
-    // Scree: loose stones spilled around the foot.
-    for (let i = 0; i < 22; i++) {
-      const x = 10 + r() * 100;
-      const y = base - 1 + r() * 3;
-      c.fillStyle = r() < 0.5 ? '#9a8f7c' : '#7a705f';
-      c.beginPath();
-      c.ellipse(x, y, 0.7 + r() * 1.2, 0.5 + r() * 0.6, 0, 0, Math.PI * 2);
-      c.fill();
-    }
-    if (snowy) {
-      // Clip to the peak's silhouette so the snow can never hang over its outline.
-      c.save();
-      c.beginPath();
-      [...west, ...east.slice(1)].forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
-      c.closePath();
-      c.clip();
-      // Snow cap with a ragged lower edge and gullies running down the lit face.
-      const sh = h * 0.3;
-      const edge = Array.from({ length: 7 }, (_, k) => [
-        peak[0] - sh * 0.95 + (k / 6) * sh * 2,
-        peak[1] + sh * (0.7 + (k % 2) * 0.4 + r() * 0.2),
-      ]);
-      poly(c, '#f4f6f9', [peak, ...edge.slice(0, 4), [peak[0] + 2, peak[1] + sh * 0.7]]);
-      poly(c, '#bcc6d3', [peak, [peak[0] + 2, peak[1] + sh * 0.7], ...edge.slice(3)]);
-      c.strokeStyle = 'rgba(244,246,249,0.85)';
-      c.lineWidth = 1.2;
-      for (let i = 0; i < 3; i++) {
-        const [x, y] = edge[i];
-        c.beginPath();
-        c.moveTo(x, y - 1);
-        c.lineTo(x - 2 - r() * 3, y + 5 + r() * 6);
-        c.stroke();
-      }
-      c.restore();
-    }
+    litField(c, S, {
+      cx: 60,
+      cy: 84,
+      scale: 54,
+      grid: 220,
+      height: (u, v) => {
+        const d = Math.hypot(u, v);
+        if (d >= 1) return 0;
+        const peak = Math.max(0, 1 - Math.hypot(u - pu, v - pv) * 1.2);
+        const shoulder = Math.max(0, 1 - Math.hypot(u - su, v - sv) * 1.8) * 0.6;
+        // Ridged noise: sharp crests and gullies running down the faces.
+        const ridge = 1 - Math.abs(fbm2(u * 3.2, v * 3.2, seed) * 2 - 1);
+        // Domed rather than conical: broad shoulders, the crest broken up by ridges.
+        const body = Math.max(peak ** 1.05 * (1.15 - 0.15 * peak), shoulder ** 1.1);
+        return H * body * (0.7 + 0.42 * ridge) * smooth(0, 0.3, 1 - d) - 0.5;
+      },
+      color: ({ u, v, h, up, light, occl }) => {
+        let base = mix(rockDark, rockLight, fbm2(u * 7, v * 7, seed + 4));
+        if (h < H * 0.16 && up > 0.72) base = mix(base, grass, smooth(0.72, 0.9, up) * 0.85);
+        const line = H * (0.58 + 0.14 * noise2(u * 5, v * 5, seed + 9));
+        const snowy_ = snowy && h > line && up > 0.25;
+        if (snowy_) base = snow;
+        const lit = (0.5 + 0.75 * light) * (0.75 + 0.25 * occl);
+        // Shadowed faces lean blue, lit ones warm.
+        return [
+          Math.min(255, base[0] * lit * (light > 0.4 ? 1.04 : 0.92)),
+          Math.min(255, base[1] * lit),
+          Math.min(255, base[2] * lit * (light > 0.4 ? 0.96 : 1.1)),
+        ];
+      },
+    });
   });
 };
 
@@ -477,61 +325,39 @@ const OLIVE = ['#4a5a1c', '#7a8a2a', '#c4c45a'];
 const AUTUMN = ['#6a4a1a', '#a8742a', '#e0b048'];
 
 /** Rock standing in the sea: lit and shaded faces, a dark wet band with weed at the waterline. */
+/** Rock standing in the sea: lit stone, a dark wet band with weed at the waterline, gull marks on tall ones. */
 const seaRock = (seed: number, tall: boolean) => {
   const r = mulberry32(seed);
-  const h = tall ? 32 + r() * 14 : 17 + r() * 10;
+  const H = tall ? 34 + r() * 12 : 15 + r() * 8;
+  const stone = [hexRGB('#4e4a42'), hexRGB('#a8a092')];
+  const wet = hexRGB('#2e3a2c');
+  const guano = hexRGB('#ece8dc');
   return paint(64, 60, 32, 50, (c) => {
-    const base = 50;
-    const n = 7;
-    const top = Array.from({ length: n + 1 }, (_, k) => {
-      const t = k / n;
-      const env = Math.sin(Math.PI * t) ** (tall ? 0.6 : 1.2);
-      return [10 + 44 * t + (k && k < n ? (r() - 0.5) * 3 : 0), base - h * env * (0.75 + r() * 0.35)];
+    litField(c, S, {
+      cx: 32,
+      cy: 50,
+      scale: 44,
+      grid: 140,
+      height: (u, v) => {
+        const d = Math.hypot(u, v * 1.1);
+        if (d >= 1) return 0;
+        const ridge = 1 - Math.abs(fbm2(u * 2.6, v * 2.6, seed) * 2 - 1);
+        const shape = tall ? (1 - d) ** 0.7 : (1 - d * d) * 0.9;
+        return H * shape * (0.7 + 0.45 * ridge) - 0.5;
+      },
+      color: ({ u, v, h, up, light, occl }) => {
+        let base = mix(stone[0], stone[1], fbm2(u * 6, v * 6, seed + 1));
+        base = mix(base, wet, smooth(4, 1, h));
+        if (tall && h > H * 0.75 && up > 0.6 && noise2(u * 9, v * 9, seed + 2) > 0.55) base = guano;
+        const lit = (0.48 + 0.75 * light) * (0.75 + 0.25 * occl);
+        return [base[0] * lit, base[1] * lit, base[2] * lit];
+      },
     });
-    const peak = top.reduce((m, p, i) => (p[1] < top[m][1] ? i : m), 0);
-    const px = top[peak][0];
-    const grad = (a: string, b: string) => {
-      const g = c.createLinearGradient(0, base - h, 0, base);
-      g.addColorStop(0, a);
-      g.addColorStop(1, b);
-      return g;
-    };
-    poly(c, grad('#bdb6a8', '#7d766a'), [[10, base], ...top.slice(0, peak + 1), [px + 2, base]]);
-    poly(c, grad('#6e685d', '#3f3b35'), [[px + 2, base], ...top.slice(peak), [54, base]]);
-    // Everything below is clipped to the rock's outline.
-    c.save();
-    c.beginPath();
-    [[10, base], ...top, [54, base]].forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
-    c.closePath();
-    c.clip();
-    c.lineWidth = 0.7;
-    for (let i = 0; i < 6; i++) {
-      const x = 14 + r() * 36;
-      const y = base - 3 - r() * h * 0.7;
-      c.strokeStyle = 'rgba(35,30,25,0.4)';
-      c.beginPath();
-      c.moveTo(x, y);
-      c.lineTo(x + (r() - 0.5) * 5, y + 4 + r() * 6);
-      c.stroke();
-    }
-    c.fillStyle = 'rgba(38,50,36,0.8)';
-    c.fillRect(0, base - 5, 64, 5);
-    for (let i = 0; i < 14; i++) {
-      c.fillStyle = r() < 0.5 ? 'rgba(60,82,46,0.8)' : 'rgba(28,36,28,0.8)';
-      c.fillRect(10 + r() * 44, base - 6 - r() * 3, 1.5, 1.5);
-    }
-    // Pale specks on top of tall stacks, where the gulls sit.
-    if (tall)
-      for (let i = 0; i < 10; i++) {
-        c.fillStyle = 'rgba(238,236,228,0.85)';
-        c.fillRect(px - 8 + r() * 14, top[peak][1] + r() * 8, 1.2, 1.2);
-      }
-    c.restore();
     // Foam lip where the sea meets the rock.
     c.strokeStyle = 'rgba(236,246,246,0.75)';
     c.lineWidth = 1.2;
     c.beginPath();
-    c.ellipse(32, base - 0.5, 23, 3.2, 0, 0, Math.PI);
+    c.ellipse(32, 49.5, 23, 3.2, 0, 0, Math.PI);
     c.stroke();
   });
 };

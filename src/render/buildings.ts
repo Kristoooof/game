@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+import { Graphics, Matrix, Texture } from 'pixi.js';
 import { BUILDINGS, type BuildingId } from '../data/buildings';
 import { type GameMap, terrainAt } from '../sim/map';
 import type { World } from '../sim/world';
@@ -23,6 +23,103 @@ const P = (x: number, y: number, h: number) => {
 const fill = (g: Graphics, pts: number[][], color: number) => g.poly(pts.flat()).fill(color);
 const edge = (g: Graphics, pts: number[][], color: number, width = 0.8) =>
   g.poly(pts.flat()).stroke({ width, color, alpha: 0.6 });
+
+/** Value noise that wraps every `period` lattice cells: for seamless repeating textures. */
+function pnoise(x: number, y: number, period: number, seed: number) {
+  const h = (i: number, j: number) => {
+    i = ((i % period) + period) % period;
+    j = ((j % period) + period) % period;
+    let n = (i * 374761393 + j * 668265263 + seed * 1442695041) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+  };
+  const i = Math.floor(x);
+  const j = Math.floor(y);
+  const fx = x - i;
+  const fy = y - j;
+  const sx = fx * fx * (3 - 2 * fx);
+  const sy = fy * fy * (3 - 2 * fy);
+  const a = h(i, j) + (h(i + 1, j) - h(i, j)) * sx;
+  const b = h(i, j + 1) + (h(i + 1, j + 1) - h(i, j + 1)) * sx;
+  return a + (b - a) * sy;
+}
+/** A repeating overlay texture: per texel a shade (−1 dark … +1 light) laid over the surface's own colour. */
+function overlayTexture(w: number, h: number, shadeAt: (x: number, y: number) => number) {
+  const canvas = Object.assign(document.createElement('canvas'), { width: w, height: h });
+  const c = canvas.getContext('2d')!;
+  const img = c.createImageData(w, h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const v = Math.max(-1, Math.min(1, shadeAt(x, y)));
+      const o = (y * w + x) * 4;
+      const lightness = v > 0 ? 255 : 0;
+      img.data.set([lightness, lightness, lightness, Math.abs(v) * 255], o);
+    }
+  c.putImageData(img, 0, 0);
+  const t = Texture.from(canvas);
+  t.source.style.addressMode = 'repeat';
+  t.source.style.update();
+  return t;
+}
+let surfaces: { plaster: Texture; tiles: Texture; thatch: Texture } | null = null;
+/** Plaster, roof tiles and thatch, made on first use (needs a DOM canvas). */
+const surface = () =>
+  (surfaces ??= {
+    // Plaster: soft blotches of damp and wear, and a fine grain.
+    plaster: overlayTexture(64, 64, (x, y) => {
+      const v = pnoise(x / 8, y / 8, 8, 1) * 0.65 + pnoise(x / 4, y / 4, 16, 2) * 0.35 - 0.5;
+      const grain = pnoise(x, y, 64, 3) - 0.5;
+      return v * 0.32 + grain * 0.12;
+    }),
+    // Clay tiles in staggered rows: each tile darker under the row above, a lit lower lip, a
+    // shadowed gap at each side, and every tile a slightly different shade.
+    tiles: overlayTexture(32, 24, (x, y) => {
+      const row = Math.floor(y / 12);
+      const ry = (y % 12) / 12;
+      const tx = ((x + row * 4) % 8) / 8;
+      const tile = Math.floor((x + row * 4) / 8) + row * 7;
+      const lip = 0.84 + 0.08 * Math.sin(Math.PI * tx);
+      let v = -0.35 * (1 - ry) ** 2 + (pnoise(tile * 1.7, row * 3.1, 64, 4) - 0.5) * 0.25;
+      if (ry > lip - 0.1 && ry < lip) v += 0.22;
+      if (ry >= lip) v -= 0.45;
+      if (tx < 0.08 || tx > 0.94) v -= 0.3;
+      return v + (pnoise(x / 2, y / 2, 16, 5) - 0.5) * 0.1;
+    }),
+    // Thatch: straw running down the slope, in layered courses.
+    thatch: overlayTexture(32, 32, (x, y) => {
+      const straw = pnoise(x * 0.9, y / 6, 29, 6) - 0.5;
+      const course = (y % 16) / 16;
+      return straw * 0.5 - (course > 0.85 ? 0.3 : 0) + (course < 0.15 ? 0.1 : 0);
+    }),
+  });
+/**
+ * Lay a surface texture over a face: `shape` is the outline, `origin` its top-left corner,
+ * `along` and `down` the face's directions; `texel` world pixels per texture pixel.
+ */
+function overlay(
+  g: Graphics,
+  shape: number[][],
+  origin: number[],
+  along: number[],
+  down: number[],
+  tex: Texture,
+  texel: number,
+) {
+  const la = Math.hypot(along[0], along[1]) || 1;
+  const ld = Math.hypot(down[0], down[1]) || 1;
+  const m = new Matrix(
+    (along[0] / la) * texel,
+    (along[1] / la) * texel,
+    (down[0] / ld) * texel,
+    (down[1] / ld) * texel,
+    origin[0],
+    origin[1],
+  );
+  g.poly(shape.flat()).fill({ texture: tex, matrix: m, textureSpace: 'global' });
+}
+/** A quad face (bottom-left, bottom-right, top-right, top-left) with a texture laid square on it. */
+const overlayQuad = (g: Graphics, q: number[][], tex: Texture, texel: number) =>
+  overlay(g, q, q[3], [q[1][0] - q[0][0], q[1][1] - q[0][1]], [q[0][0] - q[3][0], q[0][1] - q[3][1]], tex, texel);
 
 /** Random seeded per building, so the same building always looks the same. */
 let rnd: () => number = Math.random;
@@ -79,6 +176,8 @@ function walls(g: Graphics, b: Box, h0: number, h1: number, color: number, top =
   const right = [P(x1, y1, h0), P(x1, y0, h0), P(x1, y0, h1), P(x1, y1, h1)];
   fill(g, left, shade(color, 0.92));
   fill(g, right, shade(color, 0.72));
+  overlayQuad(g, left, surface().plaster, 0.3);
+  overlayQuad(g, right, surface().plaster, 0.3);
   if (top) fill(g, [P(x0, y0, h1), P(x1, y0, h1), P(x1, y1, h1), P(x0, y1, h1)], color);
   // Weathering: rain-splash grime along the foot of the wall, the top a touch lighter.
   if (h1 - h0 > 6) {
@@ -137,7 +236,7 @@ const onRight = (g: Graphics, b: Box, t0: number, t1: number, h0: number, h1: nu
 };
 
 /** Building with walls of height `wall` and a gable roof whose ridge runs along x. */
-function gabled(g: Graphics, b: Box, wall: number, roof: number, wallColor: number, roofColor: number) {
+function gabled(g: Graphics, b: Box, wall: number, roof: number, wallColor: number, roofColor: number, thatch = false) {
   const { x0, y0, x1, y1 } = b;
   const yc = (y0 + y1) / 2;
   const o = 0.08;
@@ -151,43 +250,10 @@ function gabled(g: Graphics, b: Box, wall: number, roof: number, wallColor: numb
   const south = [P(x0 - o, y1 + o, wall - 1), P(x1 + o, y1 + o, wall - 1), P(x1 + o, yc, top), P(x0 - o, yc, top)];
   fill(g, north, shade(roofColor, 0.75));
   fill(g, south, roofColor);
-  // Roof tiles: rows parallel to the eave, with staggered joints between rows.
-  const rows = 6;
-  const at = (k: number, u: number) =>
-    P(x0 - o + u * (x1 - x0 + 2 * o), y1 + o - k * (y1 + o - yc), wall - 1 + k * (top - wall + 1));
-  for (let r = 1; r < rows; r++) {
-    const a = at(r / rows, 0);
-    const c = at(r / rows, 1);
-    g.moveTo(a[0], a[1]).lineTo(c[0], c[1]);
-  }
-  g.stroke({ width: 0.8, color: shade(roofColor, 0.55), alpha: 0.8 });
-  const cols = Math.round((x1 - x0) * 7);
-  for (let r = 0; r < rows; r++)
-    for (let c = 1; c < cols; c++) {
-      const u = (c + (r % 2) * 0.5) / cols;
-      const a = at(r / rows, u);
-      const e = at((r + 1) / rows, u);
-      g.moveTo(a[0], a[1]).lineTo(e[0], e[1]);
-    }
-  g.stroke({ width: 0.5, color: shade(roofColor, 0.6), alpha: 0.55 });
-  // Odd tiles a shade lighter or darker, a few greened with moss: an old roof, not a flat sheet.
-  for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++) {
-      const v = rnd();
-      if (v > 0.35) continue;
-      const u0 = (c + (r % 2) * 0.5) / cols;
-      const u1 = Math.min(1, u0 + 1 / cols);
-      const q = [at(r / rows, u0), at(r / rows, u1), at((r + 1) / rows, u1), at((r + 1) / rows, u0)];
-      const color = v < 0.06 ? 0x5a6a3a : shade(roofColor, v < 0.2 ? 0.85 : 1.15);
-      g.poly(q.flat()).fill({ color, alpha: v < 0.06 ? 0.45 : 0.35 });
-    }
-  // Light catching the lower edge of each row.
-  for (let r = 0; r < rows; r++) {
-    const a = at(r / rows + 0.02, 0);
-    const c = at(r / rows + 0.02, 1);
-    g.moveTo(a[0], a[1]).lineTo(c[0], c[1]);
-  }
-  g.stroke({ width: 0.6, color: shade(roofColor, 1.35), alpha: 0.5 });
+  // Roof covering laid along each slope, eave to ridge.
+  const cover = thatch ? surface().thatch : surface().tiles;
+  overlayQuad(g, south, cover, 0.42);
+  overlayQuad(g, north, cover, 0.42);
   const r0 = P(x0 - o, yc, top);
   const r1 = P(x1 + o, yc, top);
   g.moveTo(r0[0], r0[1])
@@ -287,13 +353,28 @@ function hipped(g: Graphics, b: Box, wall: number, roof: number, wallColor: numb
   fill(g, [sw, se, B, A], roofColor);
   fill(g, [nw, sw, A], shade(roofColor, 0.6));
   fill(g, [ne, se, B], shade(roofColor, 0.85));
-  for (let r = 1; r < 5; r++) {
-    const k = r / 5;
-    const a = [sw[0] + (A[0] - sw[0]) * k, sw[1] + (A[1] - sw[1]) * k];
-    const c = [se[0] + (B[0] - se[0]) * k, se[1] + (B[1] - se[1]) * k];
-    g.moveTo(a[0], a[1]).lineTo(c[0], c[1]);
-  }
-  g.stroke({ width: 0.6, color: shade(roofColor, 0.6), alpha: 0.7 });
+  // Tiles on all four slopes, rows running along each eave.
+  const tiles = surface().tiles;
+  overlay(g, [sw, se, B, A], A, [se[0] - sw[0], se[1] - sw[1]], [sw[0] - A[0], sw[1] - A[1]], tiles, 0.42);
+  overlay(g, [nw, ne, B, A], A, [ne[0] - nw[0], ne[1] - nw[1]], [nw[0] - A[0], nw[1] - A[1]], tiles, 0.42);
+  overlay(
+    g,
+    [nw, sw, A],
+    A,
+    [sw[0] - nw[0], sw[1] - nw[1]],
+    [(nw[0] + sw[0]) / 2 - A[0], (nw[1] + sw[1]) / 2 - A[1]],
+    tiles,
+    0.42,
+  );
+  overlay(
+    g,
+    [ne, se, B],
+    B,
+    [se[0] - ne[0], se[1] - ne[1]],
+    [(ne[0] + se[0]) / 2 - B[0], (ne[1] + se[1]) / 2 - B[1]],
+    tiles,
+    0.42,
+  );
   edge(g, [sw, se, B, A], shade(roofColor, 0.45), 1);
 }
 
@@ -632,7 +713,7 @@ export function drawBuilding(
     case 'fisher': {
       // Weathered plank hut with a thatched roof.
       const b = box(0.15, 0.15, 1.0, 1.0);
-      gabled(g, b, 9, 10, 0x8fa3a6, 0x9a8650);
+      gabled(g, b, 9, 10, 0x8fa3a6, 0x9a8650, true);
       for (let t = 0.1; t < 1; t += 0.12) {
         onLeft(g, b, t, t + 0.01, 0, 9, 0x6a7c80);
         onRight(g, b, t, t + 0.01, 0, 9, 0x56676a);
