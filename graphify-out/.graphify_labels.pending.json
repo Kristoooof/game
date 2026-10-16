@@ -22,7 +22,5 @@
   "20": "settings.ts",
   "21": "textures.ts",
   "22": "showPreview",
-  "23": "demolishAt",
-  "24": "effects.ts",
-  "25": "applySettings"
+  "23": "world.ts"
 }

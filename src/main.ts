@@ -1,4 +1,14 @@
-import { Application, Container, Graphics, Matrix, Rectangle, RenderTexture, Sprite, Texture } from 'pixi.js';
+import {
+  Application,
+  Container,
+  Graphics,
+  Matrix,
+  Rectangle,
+  RenderTexture,
+  Sprite,
+  Texture,
+  type WebGLRenderer,
+} from 'pixi.js';
 import { BUILDINGS, GOOD_NAMES, type Good } from './data/buildings';
 import pelda from './data/maps/pelda.txt?raw';
 import { chimneyAt, drawBuilding, drawTerritory } from './render/buildings';
@@ -65,6 +75,23 @@ await app.init({
   autoDensity: true,
 });
 document.body.prepend(app.canvas);
+
+// Which GPU the browser draws with. A software one (hardware acceleration off or blocked)
+// is tens of times slower, so say so plainly instead of leaving the player with 5 FPS.
+const gl = (app.renderer as WebGLRenderer).gl;
+const gpuInfo = gl.getExtension('WEBGL_debug_renderer_info');
+const gpu = String(gl.getParameter(gpuInfo ? gpuInfo.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+if (/swiftshader|llvmpipe|softpipe|software|basic render/i.test(gpu)) {
+  const warn = Object.assign(document.createElement('div'), {
+    className: 'warn',
+    textContent:
+      `A böngésző nem a videokártyával rajzol (${gpu}), ezért nagyon lassú. ` +
+      'Chrome/Edge: Beállítások → Rendszer → „Grafikus gyorsítás használata, ha rendelkezésre áll” bekapcsolása, ' +
+      'majd a böngésző újraindítása. (Koppints a bezáráshoz.)',
+  });
+  warn.addEventListener('click', () => warn.remove());
+  document.body.append(warn);
+}
 
 const scene = new Container();
 const terrain = createTerrain(world, app.renderer);
@@ -163,9 +190,12 @@ app.ticker.add((t) => {
   const day = daylight(fixedTime !== null || settings.dayCycle ? dayTime : 0.42);
   lit.tint = hex(day.ambient);
   terrain.lights.alpha = day.night;
+  // Invisible layers are skipped, not drawn at zero opacity: full-screen blending is the main cost.
+  terrain.lights.visible = day.night > 0.01;
   terrain.setSun(day.step);
   sunlight.tint = hex(day.sun);
   sunlight.alpha = day.sunStrength;
+  sunlight.visible = day.sunStrength > 0.01;
   // The moon's glitter column stays at a fixed place on screen, like the real one as you move.
   terrain.light(
     day.ambient,
@@ -181,7 +211,7 @@ app.ticker.add((t) => {
   const { width, height } = app.canvas;
   countFps(
     settings.fps,
-    `${width}×${height} px · ${settings.antialias.toUpperCase()} · ${terrain.stats.visible} darab, ${terrain.stats.pending} sütésre vár`,
+    `${width}×${height} px · ${settings.antialias.toUpperCase()} · ${terrain.stats.visible} darab, ${terrain.stats.pending} sütésre vár\nGPU: ${gpu}`,
   );
 });
 

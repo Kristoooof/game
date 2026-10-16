@@ -9,10 +9,12 @@ const shade = (color: number, k: number) =>
   (Math.min(255, Math.round(((color >> 8) & 255) * k)) << 8) |
   Math.min(255, Math.round((color & 255) * k));
 
-/** Screen point of tile coords (x, y) at height h above raised land. */
+/** Mirror mode: heights go down instead of up, the building's reflection in still water. */
+let flip = false;
+/** Screen point of tile coords (x, y) at height h above raised land (below it in mirror mode). */
 const P = (x: number, y: number, h: number) => {
   const s = tileToScreen(x, y);
-  return [s.x, s.y - h];
+  return [s.x, flip ? s.y + h : s.y - h];
 };
 
 const fill = (g: Graphics, pts: number[][], color: number) => g.poly(pts.flat()).fill(color);
@@ -245,7 +247,8 @@ function hipped(g: Graphics, b: Box, wall: number, roof: number, wallColor: numb
 
 /** Low fence around a yard, a hedge on the back, flower beds and a path to the door. */
 function garden(g: Graphics, x: number, y: number, flower: number) {
-  const yard = { x0: x - 0.3, y0: y - 0.3, x1: x + 2.3, y1: y + 2.3 };
+  // Inside the 2×2 plot: a yard reaching into the next plot would be painted over by its building.
+  const yard = { x0: x + 0.03, y0: y + 0.03, x1: x + 1.97, y1: y + 1.97 };
   const fence = 0x8a6a48;
   const post = (u: number, v: number) => {
     const bottom = P(u, v, 0);
@@ -268,25 +271,25 @@ function garden(g: Graphics, x: number, y: number, flower: number) {
   // Hedge along the back fence.
   for (let i = 0; i < 9; i++) {
     const t = i / 8;
-    const p = P(yard.x0 + (yard.x1 - yard.x0) * t, yard.y0 + 0.2, 0);
+    const p = P(yard.x0 + (yard.x1 - yard.x0) * t, yard.y0 + 0.1, 0);
     g.ellipse(p[0], p[1] - 2, 4.2, 3).fill({ color: 0x3f7a34 });
     g.ellipse(p[0] - 1, p[1] - 3, 2.2, 1.6).fill({ color: 0x6aa84f, alpha: 0.9 });
   }
   // Flower beds beside the path, a few coloured blooms each.
   for (const [u, v] of [
-    [x + 0.05, y + 2.2],
-    [x + 1.9, y + 2.2],
+    [x + 0.05, y + 1.78],
+    [x + 1.5, y + 1.78],
   ] as const) {
-    const bed = [P(u, v, 0), P(u + 0.4, v, 0), P(u + 0.4, v + 0.25, 0), P(u, v + 0.25, 0)].flat();
+    const bed = [P(u, v, 0), P(u + 0.4, v, 0), P(u + 0.4, v + 0.17, 0), P(u, v + 0.17, 0)].flat();
     g.poly(bed).fill({ color: 0x5a4030, alpha: 0.85 });
     for (let k = 0; k < 6; k++) {
-      const q = P(u + 0.05 + rnd() * 0.3, v + 0.05 + rnd() * 0.15, 1);
+      const q = P(u + 0.05 + rnd() * 0.3, v + 0.03 + rnd() * 0.11, 1);
       g.circle(q[0], q[1], 1.1).fill({ color: [flower, 0xffffff, 0xf7d34a][k % 3] });
     }
   }
   // Stepping path from the front of the house to the gate.
-  const from = P(x + 0.5, y + 1.9, 0);
-  const to = P(x + 0.5, y + 2.75, 0);
+  const from = P(x + 0.5, y + 1.75, 0);
+  const to = P(x + 0.5, y + 1.97, 0);
   g.moveTo(from[0], from[1]).lineTo(to[0], to[1]).stroke({ width: 3, color: 0xd6c39a, alpha: 0.9, cap: 'round' });
 }
 
@@ -294,7 +297,7 @@ function garden(g: Graphics, x: number, y: number, flower: number) {
 function house(g: Graphics, x: number, y: number, variant: number) {
   const pick = (n: number) => Math.floor(rnd() * n);
   // The garden first: the fence behind the house must sit under the roof.
-  garden(g, x, y, [0xd04a5a, 0xe07aa8, 0x7a5ad0][variant % 3]);
+  if (!flip) garden(g, x, y, [0xd04a5a, 0xe07aa8, 0x7a5ad0][variant % 3]);
   const wallColor = WALL_COLORS[pick(WALL_COLORS.length)];
   const roof = ROOFS[pick(ROOFS.length)];
   const floors = rnd() < 0.4 ? 2 : 1;
@@ -381,7 +384,8 @@ function crane(g: Graphics, x: number, y: number) {
 }
 
 /** Wooden pier over the tile box (x0, y0)–(x1, y1): a plank deck on posts standing in the sea. */
-export function drawPier(g: Graphics, x0: number, y0: number, x1: number, y1: number) {
+export function drawPier(g: Graphics, x0: number, y0: number, x1: number, y1: number, mirrored = false) {
+  flip = mirrored;
   rnd = mulberry32(Math.round(x0 * 131 + y0 * 31));
   const along = x1 - x0 > y1 - y0;
   const len = along ? x1 - x0 : y1 - y0;
@@ -406,13 +410,15 @@ export function drawPier(g: Graphics, x0: number, y0: number, x1: number, y1: nu
   const top = P(ex, ey, 14);
   g.moveTo(base[0], base[1]).lineTo(top[0], top[1]).stroke({ width: 1, color: 0x3a2a1a });
   lantern(g, top[0], top[1] + 1, base[1] + 4);
+  flip = false;
 }
 
 /** Draws building `type` with its top corner at tile (x, y). `variant` picks colours. */
-export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number, variant = 0) {
+export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number, variant = 0, mirrored = false) {
   const size = BUILDINGS[type].size;
   rnd = mulberry32(variant * 7919 + x * 131 + y * 31 + type.length);
-  shadow(g, x, y, size);
+  flip = mirrored;
+  if (!flip) shadow(g, x, y, size);
   const box = (a: number, b: number, c: number, d: number): Box => ({ x0: x + a, y0: y + b, x1: x + c, y1: y + d });
   switch (type) {
     case 'house':
@@ -612,6 +618,7 @@ export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number
     case 'road':
       break;
   }
+  flip = false;
 }
 
 /** World point where smoke leaves a building's chimney, if it has one. */

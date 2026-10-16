@@ -282,27 +282,27 @@ export function createTerrain(world: World, renderer: Renderer) {
     for (const b of world.buildings.values()) {
       if (b.type === 'road' || hidden.has(b.id) || b.x < c.x0 || b.x >= c.x1 || b.y < c.y0 || b.y >= c.y1) continue;
       const size = BUILDINGS[b.type].size;
-      const draw = () => {
+      const draw = (mirrored = false) => {
         const bg = new Graphics({ zIndex: b.x + b.y + size });
-        drawBuilding(bg, b.type, b.x, b.y, b.id);
+        drawBuilding(bg, b.type, b.x, b.y, b.id, mirrored);
         return bg;
       };
       setGlow(lights);
       o.addChild(draw());
       setGlow(null);
       const pier = b.type === 'harbor' || b.type === 'fisher' ? pierBox(b.x, b.y, size) : null;
-      const drawP = () => {
+      const drawP = (mirrored = false) => {
         const pg = new Graphics({ zIndex: pier!.x0 + pier!.y0 + 0.5 });
-        drawPier(pg, pier!.x0, pier!.y0, pier!.x1, pier!.y1);
+        drawPier(pg, pier!.x0, pier!.y0, pier!.x1, pier!.y1, mirrored);
         return pg;
       };
       setGlow(lights);
       if (pier) o.addChild(drawP());
       setGlow(null);
       if (far || !nearWater(b.x + size - 1, b.y + size - 1)) continue;
-      // Mirrored about the front corner of the footprint, where the building meets the shore.
-      mirror(draw(), tileToScreen(b.x + size, b.y + size).y, refl);
-      if (pier) mirror(drawP(), tileToScreen(pier.x1, pier.y1).y, refl);
+      // Drawn in mirror mode: every point hangs below its own ground point, as in still water.
+      refl.addChild(draw(true));
+      if (pier) refl.addChild(drawP(true));
     }
     const obj = renderTrimmed(o, tier);
     const mir = renderTrimmed(refl, tier);

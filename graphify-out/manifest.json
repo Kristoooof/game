@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "src/main.ts": {
-    "mtime": 1792153060.4970434,
-    "seen": 1792153431.7337677,
-    "ast_hash": "e3e151acff7c33bc7596169b15e49870",
+    "mtime": 1792165993.4508195,
+    "seen": 1792166285.0922832,
+    "ast_hash": "2b404bce975a73605a88eddf0d6b5a2e",
     "semantic_hash": ""
   },
   "src/render/iso.test.ts": {
@@ -150,9 +150,9 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1792102763.5518894,
-    "seen": 1792102870.543447,
-    "ast_hash": "fa8d3d42cab9ab14eda6ca2e52e289e7",
+    "mtime": 1792165994.2348194,
+    "seen": 1792166285.0924072,
+    "ast_hash": "a4eb082de75dde16906e66ff576b50bf",
     "semantic_hash": ""
   },
   "src/render/camera.test.ts": {
@@ -168,9 +168,9 @@
     "semantic_hash": ""
   },
   "src/render/terrain.ts": {
-    "mtime": 1792153380.1745894,
-    "seen": 1792153431.7337933,
-    "ast_hash": "6b07bc2b0f19a528b565b00605dc34be",
+    "mtime": 1792166177.3135943,
+    "seen": 1792166285.0923243,
+    "ast_hash": "7813e266b0283528dc394d87d9db4b3a",
     "semantic_hash": ""
   },
   "src/sim/map.test.ts": {
@@ -204,9 +204,9 @@
     "semantic_hash": ""
   },
   "src/render/buildings.ts": {
-    "mtime": 1792152988.3083673,
-    "seen": 1792153431.7337713,
-    "ast_hash": "e870900bee984bd1c6cd75d8ef42ab70",
+    "mtime": 1792166051.3991494,
+    "seen": 1792166285.0922878,
+    "ast_hash": "1246a73b60a5496abc0ed522ddf86372",
     "semantic_hash": ""
   },
   "src/sim/world.test.ts": {

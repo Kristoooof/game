@@ -40,6 +40,23 @@
         line-height: 1.3;
         pointer-events: none;
       }
+      .warn {
+        position: fixed;
+        top: 64px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: min(560px, calc(100vw - 32px));
+        padding: 10px 14px;
+        background: #7a2e1e;
+        color: #fff4e0;
+        border: 1px solid #e0a060;
+        border-radius: 8px;
+        font:
+          14px/1.4 Georgia,
+          serif;
+        z-index: 10;
+        cursor: pointer;
+      }
       #resources {
         top: 8px;
         display: flex;
