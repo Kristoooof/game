@@ -168,9 +168,9 @@
     "semantic_hash": ""
   },
   "src/render/terrain.ts": {
-    "mtime": 1792173853.217694,
-    "seen": 1792174209.6341403,
-    "ast_hash": "c2037563debdc5a7108ddf141b2675ce",
+    "mtime": 1792174769.017673,
+    "seen": 1792174773.0866504,
+    "ast_hash": "ba07f87eabd27c272a2084a68c6cef5c",
     "semantic_hash": ""
   },
   "src/sim/map.test.ts": {
@@ -234,9 +234,9 @@
     "semantic_hash": ""
   },
   "src/render/ground.ts": {
-    "mtime": 1792174124.3336878,
-    "seen": 1792174209.634134,
-    "ast_hash": "314bc4ac5dd7f3e352f8df3f36f59ebd",
+    "mtime": 1792174633.806694,
+    "seen": 1792174773.086644,
+    "ast_hash": "10fea0808b401c15d89d83deeadf3df2",
     "semantic_hash": ""
   },
   "src/render/effects.ts": {

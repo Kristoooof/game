@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-16)
 
 ## Corpus Check
-- 43 files · ~34,263 words
+- 43 files · ~34,448 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 392 nodes · 803 edges · 26 communities (23 shown, 3 thin omitted)
+- 392 nodes · 805 edges · 26 communities (23 shown, 3 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 2 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e2c9e7b1`
+- Built from commit: `9e76fc40`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -47,8 +47,8 @@
 1. `drawBuilding()` - 27 edges
 2. `mulberry32()` - 23 edges
 3. `fill()` - 18 edges
-4. `P()` - 17 edges
-5. `createTerrain()` - 17 edges
+4. `createTerrain()` - 18 edges
+5. `P()` - 17 edges
 6. `terrainAt()` - 16 edges
 7. `walls()` - 15 edges
 8. `groundToScreen()` - 15 edges

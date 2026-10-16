@@ -11,7 +11,7 @@ import {
   Texture,
 } from 'pixi.js';
 import { BUILDINGS } from '../data/buildings';
-import { terrainAt } from '../sim/map';
+import { levelAt, terrainAt } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
 import type { World } from '../sim/world';
 import { drawBuilding, drawPier, drawRoads, setGlow, setSun } from './buildings';
@@ -89,6 +89,13 @@ export function createTerrain(world: World, renderer: Renderer) {
           rockDepth[i] = pass;
       }
 
+  /** Every tile within `r` of (x, y) on the same terrace. */
+  const flatAround = (x: number, y: number, r: number) => {
+    const l = levelAt(map, x, y);
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) if (levelAt(map, x + dx, y + dy) !== l) return false;
+    return true;
+  };
   /** Within two tiles of the sea: its reflections are drawn. */
   const nearWater = (x: number, y: number) => {
     for (let dy = -2; dy <= 2; dy++)
@@ -160,9 +167,14 @@ export function createTerrain(world: World, renderer: Renderer) {
           const d = rockDepth[y * W + x];
           const p = r();
           const k = r();
-          if ((x + y) % 2 === 0 && p < 0.45 + d * 0.15) {
-            const kinds = d >= 2 ? art.peaks : art.hills;
-            put(kinds[Math.floor(k * kinds.length)], 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.7 + d * 0.22 + r() * 0.3);
+          // A peak is about two tiles wide: on one terrace all round, or it would hang over a
+          // cliff edge or stand against the foot of one.
+          if ((x + y) % 2 === 0 && p < 0.45 + d * 0.15 && flatAround(x, y, 1)) {
+            // Near a cliff only a small hill, kept within its own tile.
+            const roomy = flatAround(x, y, 2);
+            const kinds = d >= 2 && roomy ? art.peaks : art.hills;
+            const size = roomy ? 0.7 + d * 0.22 + r() * 0.3 : 0.55;
+            put(kinds[Math.floor(k * kinds.length)], 0.4 + r() * 0.2, 0.4 + r() * 0.2, size);
           } else if (p < 0.5 && !far) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.8);
         } else if (t === 'beach' && !far) {
           // Coast: palms just back from the water, driftwood and pebbles along the tideline.

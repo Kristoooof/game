@@ -63,9 +63,9 @@ float levelAt(vec2 p) { return smp(uLevel, p + (nz(p * 0.5).gb - 0.5) * 0.5).r *
 vec4 surface(vec2 v) {
   for (int l = ${MAX_LEVEL}; l >= 1; l--) {
     float fl = float(l);
-    for (int k = 0; k <= 8; k++) {
-      vec2 p = toTile(v + vec2(0.0, (fl - float(k) / 8.0) * ${LEVEL_H.toFixed(1)}));
-      if (levelAt(p) > fl - 0.5) return vec4(p, fl, float(k) / 8.0);
+    for (int k = 0; k <= SURFACE_STEPS; k++) {
+      vec2 p = toTile(v + vec2(0.0, (fl - float(k) / float(SURFACE_STEPS)) * ${LEVEL_H.toFixed(1)}));
+      if (levelAt(p) > fl - 0.5) return vec4(p, fl, float(k) / float(SURFACE_STEPS));
     }
   }
   return vec4(toTile(v), 0.0, 0.0);
@@ -83,7 +83,9 @@ vec2 coastWarp(vec2 p) { return p + (nz(p * 0.45).rb - 0.5) * 0.7; }
  * Live sea, drawn every frame under the baked land: depth colour, swell crests, glints,
  * waves rolling in and surf. Kept to ~10 texture reads; deep water skips the shore work.
  */
-const waterFragment = /* glsl */ `${common}
+// Live every frame: a coarser terrace search is enough under the baked land.
+const waterFragment = /* glsl */ `#define SURFACE_STEPS 8
+${common}
 void main() {
   vec2 p = tileCoord();
   float t = uTime;
@@ -210,7 +212,9 @@ void main() {
  * tufts and flowers, forest floor or canopy, ridged rock, beach and wet sand, lit by
  * relief. Sea pixels come out transparent so the live water shows through.
  */
-const landFragment = /* glsl */ `${common}
+// Baked once per chunk: a fine terrace search, for smooth cliff edges.
+const landFragment = /* glsl */ `#define SURFACE_STEPS 20
+${common}
 // Inland rise, small bumps, rolling hills, and dune ridges where the sand is wide.
 float height(vec2 q) {
   float sand = smp(uMask, q).g;
@@ -225,7 +229,9 @@ void main() {
   if (sf.w > 0.0) {
     // Cliff face of a terrace. Where a river runs over its edge it is left open: the live
     // water shader draws the waterfall there.
-    if (smp(uRiver, p).r > 0.5) { finalColor = vec4(0.0); return; }
+    // Opened with a soft edge: a hard cut leaves the fall's sides jagged.
+    float open = smoothstep(0.35, 0.65, smp(uRiver, p).r);
+    if (open > 0.99) { finalColor = vec4(0.0); return; }
     // Facing: the slope of the level field, lit from the upper left like everything else.
     vec2 gl = vec2(levelAt(p + vec2(0.25, 0.0)) - levelAt(p - vec2(0.25, 0.0)), levelAt(p + vec2(0.0, 0.25)) - levelAt(p - vec2(0.0, 0.25)));
     vec2 nrm = length(gl) > 0.001 ? -normalize(gl) : vec2(0.7);
@@ -238,7 +244,7 @@ void main() {
     // A lip of grass hanging over the top edge.
     c = mix(c, vec3(0.3, 0.47, 0.2), smoothstep(0.14, 0.02, sf.w) * 0.85);
     c *= shade;
-    finalColor = vec4(pow(c, vec3(0.95)) * vec3(1.04, 1.0, 0.94), 1.0);
+    finalColor = vec4(pow(c, vec3(0.95)) * vec3(1.04, 1.0, 0.94) * (1.0 - open), 1.0 - open);
     return;
   }
   // Ground-plane point of this pixel on its terrace: fine detail stays fixed to the ground.
