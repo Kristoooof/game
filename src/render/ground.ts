@@ -67,12 +67,16 @@ void main() {
   float depth = smoothstep(0.0, 0.75, depthRaw);
   vec3 col = mix(vec3(0.24, 0.63, 0.66), vec3(0.09, 0.42, 0.58), smoothstep(0.0, 0.25, depth));
   col = mix(col, vec3(0.05, 0.25, 0.42), smoothstep(0.3, 1.0, depth));
+  // Shallows are see-through: the sandy bottom shows through, rippled by caustics.
+  float caustic = noise(p * 4.0 + vec2(t * 0.5, -t * 0.35)) * noise(p * 5.5 - vec2(t * 0.4, t * 0.3));
+  vec3 bottom = mix(vec3(0.85, 0.78, 0.55), vec3(0.6, 0.55, 0.42), noise(p * 1.7)) * (0.85 + 0.25 * caustic);
+  col = mix(col, bottom, (1.0 - smoothstep(0.04, 0.3, depthRaw)) * 0.55);
   // Short, broken swell crests running diagonally, fading in and out in patches.
   float w = sin(p.x * 1.3 + p.y * 0.5 + t * 1.1 + fbm(p * 0.3 + t * 0.04) * 7.0);
   float patch = smoothstep(0.45, 0.7, noise(p * 0.35 + vec2(t * 0.05, 0.0)));
   col += vec3(0.07, 0.09, 0.1) * smoothstep(0.9, 1.0, w) * patch * (0.3 + depth * 0.7);
   float glint = noise(p * 5.0 + vec2(t * 0.9, t * 0.3));
-  col += vec3(0.6) * smoothstep(0.82, 0.9, glint) * depth * (1.0 - uFar * 0.8);
+  col += vec3(0.25, 0.3, 0.32) * smoothstep(0.9, 0.97, glint) * depth * (1.0 - uFar * 0.8);
   if (land > 0.01) {
     col = mix(col, vec3(0.5, 0.76, 0.7), smoothstep(0.2, 0.5, land) * 0.5);
     float roll = sin(land * 40.0 - t * 2.2 + fbm(p * 0.8) * 4.0);

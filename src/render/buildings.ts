@@ -162,6 +162,120 @@ function shadow(g: Graphics, x: number, y: number, size: number) {
   g.poly(moved(7, 3)).fill({ color: 0x0a1a10, alpha: 0.12 });
 }
 
+const WALL_COLORS = [0xece0c4, 0xd9b38c, 0xa9c4c9, 0xc9d6b0, 0xe6d5b8, 0xd8c0c8];
+const DOOR_COLORS = [0x6b4426, 0x2f5a78, 0x3d6b3a, 0x7a2e2e, 0x4a4a52];
+const AWNING_COLORS = [0xc8453a, 0x3f7fb0, 0xe0b040, 0x4f9a5a];
+
+/** Hip roof: four sloping faces meeting at a short ridge along x. */
+function hipped(g: Graphics, b: Box, wall: number, roof: number, wallColor: number, roofColor: number) {
+  const { x0, y0, x1, y1 } = b;
+  const o = 0.08;
+  const top = wall + roof;
+  const w = x1 - x0;
+  const yc = (y0 + y1) / 2;
+  walls(g, b, 0, wall, wallColor, false);
+  const A = P(x0 + w * 0.3, yc, top);
+  const B = P(x1 - w * 0.3, yc, top);
+  const nw = P(x0 - o, y0 - o, wall - 1);
+  const ne = P(x1 + o, y0 - o, wall - 1);
+  const se = P(x1 + o, y1 + o, wall - 1);
+  const sw = P(x0 - o, y1 + o, wall - 1);
+  fill(g, [nw, ne, B, A], shade(roofColor, 0.75));
+  fill(g, [sw, se, B, A], roofColor);
+  fill(g, [nw, sw, A], shade(roofColor, 0.6));
+  fill(g, [ne, se, B], shade(roofColor, 0.85));
+  for (let r = 1; r < 5; r++) {
+    const k = r / 5;
+    const a = [sw[0] + (A[0] - sw[0]) * k, sw[1] + (A[1] - sw[1]) * k];
+    const c = [se[0] + (B[0] - se[0]) * k, se[1] + (B[1] - se[1]) * k];
+    g.moveTo(a[0], a[1]).lineTo(c[0], c[1]);
+  }
+  g.stroke({ width: 0.6, color: shade(roofColor, 0.6), alpha: 0.7 });
+  edge(g, [sw, se, B, A], shade(roofColor, 0.45), 1);
+}
+
+/** Low fence around a yard, a hedge on the back, flower beds and a path to the door. */
+function garden(g: Graphics, x: number, y: number, flower: number) {
+  const yard = { x0: x - 0.3, y0: y - 0.3, x1: x + 2.3, y1: y + 2.3 };
+  const fence = 0x8a6a48;
+  const post = (u: number, v: number) => {
+    const bottom = P(u, v, 0);
+    const top = P(u, v, 5);
+    g.moveTo(bottom[0], bottom[1]).lineTo(top[0], top[1]);
+  };
+  const side = (ax: number, ay: number, bx: number, by: number) => {
+    const n = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / 0.35));
+    for (let i = 0; i <= n; i++) post(ax + ((bx - ax) * i) / n, ay + ((by - ay) * i) / n);
+    for (const h of [2.2, 4.2]) {
+      const a = P(ax, ay, h);
+      const c = P(bx, by, h);
+      g.moveTo(a[0], a[1]).lineTo(c[0], c[1]);
+    }
+  };
+  // Fence on the two sides away from the road and the neighbours; the front is open for the path.
+  side(yard.x0, yard.y0, yard.x1, yard.y0);
+  side(yard.x0, yard.y0, yard.x0, yard.y1);
+  g.stroke({ width: 0.8, color: fence, alpha: 0.95 });
+  // Hedge along the back fence.
+  for (let i = 0; i < 9; i++) {
+    const t = i / 8;
+    const p = P(yard.x0 + (yard.x1 - yard.x0) * t, yard.y0 + 0.2, 0);
+    g.ellipse(p[0], p[1] - 2, 4.2, 3).fill({ color: 0x3f7a34 });
+    g.ellipse(p[0] - 1, p[1] - 3, 2.2, 1.6).fill({ color: 0x6aa84f, alpha: 0.9 });
+  }
+  // Flower beds beside the path, a few coloured blooms each.
+  for (const [u, v] of [
+    [x + 0.05, y + 2.2],
+    [x + 1.9, y + 2.2],
+  ] as const) {
+    const bed = [P(u, v, 0), P(u + 0.4, v, 0), P(u + 0.4, v + 0.25, 0), P(u, v + 0.25, 0)].flat();
+    g.poly(bed).fill({ color: 0x5a4030, alpha: 0.85 });
+    for (let k = 0; k < 6; k++) {
+      const q = P(u + 0.05 + rnd() * 0.3, v + 0.05 + rnd() * 0.15, 1);
+      g.circle(q[0], q[1], 1.1).fill({ color: [flower, 0xffffff, 0xf7d34a][k % 3] });
+    }
+  }
+  // Stepping path from the front of the house to the gate.
+  const from = P(x + 0.5, y + 1.9, 0);
+  const to = P(x + 0.5, y + 2.75, 0);
+  g.moveTo(from[0], from[1]).lineTo(to[0], to[1]).stroke({ width: 3, color: 0xd6c39a, alpha: 0.9, cap: 'round' });
+}
+
+/** A house with one or two floors, a gable or hip roof, a painted wall and a coloured door and awning. */
+function house(g: Graphics, x: number, y: number, variant: number) {
+  const pick = (n: number) => Math.floor(rnd() * n);
+  const wallColor = WALL_COLORS[pick(WALL_COLORS.length)];
+  const roof = ROOFS[pick(ROOFS.length)];
+  const floors = rnd() < 0.4 ? 2 : 1;
+  const wallH = floors === 2 ? 22 : 13;
+  const b: Box = { x0: x + 0.2, y0: y + 0.25, x1: x + 1.8, y1: y + 1.75 };
+  if (rnd() < 0.5) gabled(g, b, wallH, 11, wallColor, roof);
+  else hipped(g, b, wallH, 11, wallColor, roof);
+  if (wallColor === WALL_COLORS[0]) timber(g, b, wallH);
+  const door_ = DOOR_COLORS[pick(DOOR_COLORS.length)];
+  door(g, b, 0.43, 0.14, 8, door_);
+  // Striped awning over the door.
+  const awning = AWNING_COLORS[pick(AWNING_COLORS.length)];
+  onLeft(g, b, 0.37, 0.63, 8.4, 10, awning);
+  onLeft(g, b, 0.37, 0.63, 8.4, 8.9, shade(awning, 1.12));
+  const sh = SHUTTERS[variant % SHUTTERS.length];
+  const rows = floors === 2 ? [5, 14] : [5];
+  for (const row of rows) {
+    for (const t of [0.14, 0.72]) {
+      windowLeft(g, b, t, 0.12, row, row + 4.5, sh);
+      if (row === 5) {
+        onLeft(g, b, t - 0.02, t + 0.14, 3.6, 5, 0x6b4426);
+        onLeft(g, b, t, t + 0.12, 4.6, 5.6, [0xd04a5a, 0xe8c040, 0xe07aa8][variant % 3]);
+      }
+    }
+    windowRight(g, b, 0.38, 0.24, row + 1, row + 5);
+  }
+  const at = (a: number, b: number, c: number, d: number): Box => ({ x0: x + a, y0: y + b, x1: x + c, y1: y + d });
+  walls(g, at(0.45, 0.45, 0.62, 0.62), wallH + 3, wallH + 14, 0x8a5a44);
+  walls(g, at(0.42, 0.42, 0.65, 0.65), wallH + 14, wallH + 15.5, 0x5e3e30);
+  garden(g, x, y, [0xd04a5a, 0xe07aa8, 0x7a5ad0][variant % 3]);
+}
+
 /** Draws building `type` with its top corner at tile (x, y). `variant` picks colours. */
 export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number, variant = 0) {
   const size = BUILDINGS[type].size;
@@ -169,24 +283,9 @@ export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number
   shadow(g, x, y, size);
   const box = (a: number, b: number, c: number, d: number): Box => ({ x0: x + a, y0: y + b, x1: x + c, y1: y + d });
   switch (type) {
-    case 'house': {
-      const b = box(0.2, 0.25, 1.8, 1.75);
-      gabled(g, b, 13, 11, 0xece0c4, ROOFS[variant % ROOFS.length]);
-      timber(g, b, 13);
-      door(g, b, 0.43, 0.14, 8, 0x6b4426);
-      const sh = SHUTTERS[variant % SHUTTERS.length];
-      for (const t of [0.14, 0.72]) {
-        windowLeft(g, b, t, 0.12, 5, 9.5, sh);
-        // Flower box under the window.
-        onLeft(g, b, t - 0.02, t + 0.14, 3.6, 5, 0x6b4426);
-        onLeft(g, b, t, t + 0.12, 4.6, 5.6, [0xd04a5a, 0xe8c040, 0xe07aa8][variant % 3]);
-      }
-      windowRight(g, b, 0.38, 0.24, 6, 10);
-      const ch = box(0.45, 0.45, 0.62, 0.62);
-      walls(g, ch, 16, 27, 0x8a5a44);
-      walls(g, box(0.42, 0.42, 0.65, 0.65), 27, 28.5, 0x5e3e30);
+    case 'house':
+      house(g, x, y, variant);
       break;
-    }
     case 'harbor': {
       const b = box(0.15, 0.2, 1.75, 1.6);
       gabled(g, b, 15, 12, 0xa87b4f, 0x6b3f22);

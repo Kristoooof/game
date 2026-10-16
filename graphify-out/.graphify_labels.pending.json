@@ -18,9 +18,10 @@
   "16": ".claude/CLAUDE.md",
   "17": "camera.ts",
   "18": "world.ts",
-  "19": "showPreview",
+  "19": "showResources",
   "20": "settings.ts",
   "21": "textures.ts",
   "22": "data/buildings.ts",
-  "23": "costText"
+  "23": "pixi.js",
+  "24": "applySettings"
 }

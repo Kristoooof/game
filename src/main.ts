@@ -73,19 +73,19 @@ const preview = new Graphics();
 const ghost = new Graphics({ alpha: 0.6 });
 territory.visible = false;
 const effects = createEffects(map);
-scene.addChild(terrain.water, terrain.ground, territory, terrain.objects, effects.layer);
+scene.addChild(terrain.ground, territory, terrain.objects, effects.layer);
 scene.addChild(hover, selection, preview, ghost);
 app.stage.addChild(scene);
 
-// Pixel-look sea: the water is drawn into a low-resolution texture (sampled nearest) and
-// shown under the scene, so each water pixel is a hard block of WATER_BLOCK CSS pixels.
+// The sea is drawn into its own texture, separate from the world's resolution, so it stays
+// sharp when the world is rendered smaller. Smooth: device pixels (up to 2×), linear.
+// Pixel look: a quarter of that, nearest, so each water pixel is a hard block.
 const WATER_BLOCK = 4;
-const waterScene = new Container();
+const waterScene = new Container({ children: [terrain.water] });
 const waterTexture = RenderTexture.create({ width: 1, height: 1 });
-const waterSprite = new Sprite({ texture: waterTexture, visible: false, eventMode: 'none' });
-waterSprite.texture.source.style.scaleMode = 'nearest';
+const waterSprite = new Sprite({ texture: waterTexture, eventMode: 'none' });
 app.stage.addChildAt(waterSprite, 0);
-const waterRes = () => app.renderer.resolution / WATER_BLOCK;
+const waterRes = () => Math.min(devicePixelRatio, 2) / (settings.waterPixel ? WATER_BLOCK : 1);
 const waterTransform = new Matrix();
 
 // Vignette inside the canvas: as a CSS overlay the browser would blend it over the whole
@@ -120,15 +120,10 @@ const fxaa = createFxaa();
 app.stage.filterArea = app.screen;
 const applySettings = () => {
   terrain.setPixel(settings.pixel);
-  if (settings.waterPixel) {
-    waterScene.addChild(terrain.water);
-    waterTexture.resize(app.screen.width, app.screen.height, waterRes());
-    waterSprite.width = app.screen.width;
-    waterSprite.height = app.screen.height;
-  } else if (terrain.water.parent !== scene) {
-    scene.addChildAt(terrain.water, 0);
-  }
-  waterSprite.visible = settings.waterPixel;
+  waterTexture.resize(app.screen.width, app.screen.height, waterRes());
+  waterSprite.texture.source.style.scaleMode = settings.waterPixel ? 'nearest' : 'linear';
+  waterSprite.width = app.screen.width;
+  waterSprite.height = app.screen.height;
   app.stage.filters = settings.antialias === 'fxaa' ? [fxaa] : [];
   const r = resolutionOf(settings);
   if (r !== app.renderer.resolution) app.renderer.resize(innerWidth, innerHeight, r);
@@ -147,11 +142,9 @@ app.ticker.add((t) => {
   view.width = app.screen.width / cam.scale;
   view.height = app.screen.height / cam.scale;
   terrain.update(dt, view, cam.scale);
-  if (settings.waterPixel) {
-    // The target keeps CSS-pixel units; its own resolution does the downscaling.
-    waterTransform.set(cam.scale, 0, 0, cam.scale, cam.x, cam.y);
-    app.renderer.render({ container: waterScene, target: waterTexture, transform: waterTransform, clear: true });
-  }
+  // The target keeps CSS-pixel units; its own resolution does the downscaling.
+  waterTransform.set(cam.scale, 0, 0, cam.scale, cam.x, cam.y);
+  app.renderer.render({ container: waterScene, target: waterTexture, transform: waterTransform, clear: true });
   effects.update(dt, view, cam.scale < FAR_SCALE);
   const { width, height } = app.canvas;
   countFps(

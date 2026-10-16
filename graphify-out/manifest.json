@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "src/main.ts": {
-    "mtime": 1792134692.5538588,
-    "seen": 1792135107.4497225,
-    "ast_hash": "abbbc31f97762a7580a3ae1bcf52ff9d",
+    "mtime": 1792136069.501671,
+    "seen": 1792136704.0301032,
+    "ast_hash": "e314e4173ea4f3b0dbe712856fd4c229",
     "semantic_hash": ""
   },
   "src/render/iso.test.ts": {
@@ -144,9 +144,9 @@
     "semantic_hash": ""
   },
   "PLAN.md": {
-    "mtime": 1792135106.0884583,
-    "seen": 1792135107.4498682,
-    "ast_hash": "e6d3c642e18ecbc97b27ae69db51da13",
+    "mtime": 1792136702.8565824,
+    "seen": 1792136704.030164,
+    "ast_hash": "69548839b1bf0c3f723f862dcef9dfd2",
     "semantic_hash": ""
   },
   "index.html": {
@@ -204,9 +204,9 @@
     "semantic_hash": ""
   },
   "src/render/buildings.ts": {
-    "mtime": 1792131853.8920503,
-    "seen": 1792132274.7378407,
-    "ast_hash": "7d56c86c3b25ed81571ac73384592792",
+    "mtime": 1792136281.5816946,
+    "seen": 1792136704.0301056,
+    "ast_hash": "01ff881c4dd8d057b1e0a9310043beef",
     "semantic_hash": ""
   },
   "src/sim/world.test.ts": {
@@ -234,9 +234,9 @@
     "semantic_hash": ""
   },
   "src/render/ground.ts": {
-    "mtime": 1792134868.0673125,
-    "seen": 1792135107.449739,
-    "ast_hash": "aa18c83f9af3b3ec77398de6b97e91f6",
+    "mtime": 1792136438.831852,
+    "seen": 1792136704.0301163,
+    "ast_hash": "f2f449841c3edaa2d1a6da5b2ec8b254",
     "semantic_hash": ""
   },
   "src/render/effects.ts": {
