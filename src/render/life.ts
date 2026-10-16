@@ -162,13 +162,12 @@ const CART_SPEED = 1.1;
 
 /**
  * Life on the map: people walking the roads, carts between warehouses and houses, fishing boats
- * off the fishers' huts and sailing ships at sea. `layer` goes over the world's objects, `water`
- * (wakes and reflections) between the sea and the land.
+ * off the fishers' huts and sailing ships at sea. They go in `front`, depth-sorted with the
+ * buildings and trees; wakes and reflections in `water`, between the sea and the land.
  */
-export function createLife(world: World, renderer: Renderer) {
+export function createLife(world: World, renderer: Renderer, front: Container) {
   const { map } = world;
   const W = map.width;
-  const layer = new Container({ eventMode: 'none' });
   const wakes = new Graphics({ eventMode: 'none' });
   const mirrors = new Container({ eventMode: 'none', alpha: 0.28 });
   const water = new Container({ children: [wakes, mirrors], eventMode: 'none' });
@@ -176,6 +175,12 @@ export function createLife(world: World, renderer: Renderer) {
   const cartTex = cartArt(renderer);
 
   const center = (i: number) => groundToScreen((i % W) + 0.5, Math.floor(i / W) + 0.5);
+  /** Tile x + y of a point a fraction t from tile i's centre to tile j's (matches the scene's zIndex). */
+  const depth = (i: number, j: number, t: number) => {
+    const a = (i % W) + Math.floor(i / W);
+    const b = (j % W) + Math.floor(j / W);
+    return a + (b - a) * t + 1;
+  };
   const isRoad = (i: number) => world.buildings.get(world.occupied[i])?.type === 'road';
   const roadNeighbours = (i: number) =>
     [i + 1, i - 1, i + W, i - W].filter((j) => j >= 0 && j < map.tiles.length && isRoad(j));
@@ -216,7 +221,7 @@ export function createLife(world: World, renderer: Renderer) {
     const g = new Graphics();
     const mirror = new Graphics({ tint: 0x2a6a8a });
     mirror.scale.y = -1;
-    layer.addChild(g);
+    front.addChild(g);
     mirrors.addChild(mirror);
     return {
       g,
@@ -259,7 +264,6 @@ export function createLife(world: World, renderer: Renderer) {
   };
 
   return {
-    layer,
     water,
     /** The world changed: people, carts and fishing boats follow its roads and buildings. */
     refresh() {
@@ -277,7 +281,7 @@ export function createLife(world: World, renderer: Renderer) {
         const from = roads[Math.floor(Math.random() * roads.length)];
         const frames = walkerFrames[Math.floor(Math.random() * walkerFrames.length)];
         const s = spriteOf(frames[0]);
-        layer.addChild(s);
+        front.addChild(s);
         walkers.push({ s, frames, from, to: roadNeighbours(from)[0] ?? from, t: Math.random(), step: Math.random() });
       }
       // Carts: one per warehouse or harbour, to houses it can reach by road.
@@ -293,7 +297,7 @@ export function createLife(world: World, renderer: Renderer) {
             : null;
         if (!route || route.length < 2) continue;
         const s = spriteOf(cartTex);
-        layer.addChild(s);
+        front.addChild(s);
         carts.push({ s, route, pos: 0, dir: 1, wait: 1, home });
       }
       // Fishing boats: one per fisher hut.
@@ -315,7 +319,7 @@ export function createLife(world: World, renderer: Renderer) {
       }
     },
     update(dt: number, view: Rectangle, far: boolean) {
-      layer.visible = water.visible = !far;
+      water.visible = !far;
       if (far) return;
       const inView = (x: number, y: number, m = 80) =>
         x > view.x - m && x < view.x + view.width + m && y > view.y - m && y < view.y + view.height + m;
@@ -338,6 +342,8 @@ export function createLife(world: World, renderer: Renderer) {
         const y = a.y + dy * w.t + (dx / len) * 2.5;
         w.s.visible = inView(x, y);
         if (!w.s.visible) continue;
+        // Depth among buildings and trees: tile x + y of where it stands.
+        w.s.zIndex = depth(w.from, w.to, w.t);
         w.step = (w.step + dt * 4) % 1;
         w.s.texture = w.frames[w.step < 0.5 ? 0 : 1].texture as Texture;
         w.s.position.set(x, y - Math.abs(Math.sin(w.step * Math.PI * 2)) * 0.6);
@@ -362,11 +368,26 @@ export function createLife(world: World, renderer: Renderer) {
         const x = a.x + (b.x - a.x) * t;
         const y = a.y + (b.y - a.y) * t;
         c.s.visible = inView(x, y);
+        c.s.zIndex = depth(c.route[i], c.route[i + 1], t);
         c.s.position.set(x, y);
         c.s.scale.x = (b.x - a.x) * c.dir < 0 ? -1 : 1;
       }
 
-      for (const v of [...ships, ...boats]) {
+      const all = [...ships, ...boats];
+      // Never overlap, even while one lies still: vessels too close are eased apart.
+      for (let i = 0; i < all.length; i++)
+        for (let j = i + 1; j < all.length; j++) {
+          const [a, b] = [all[i], all[j]];
+          const min = a.small && b.small ? 0.6 : a.small || b.small ? 1.2 : 2.2;
+          const ox = a.x - b.x;
+          const oy = a.y - b.y;
+          const d = Math.hypot(ox, oy) || 0.01;
+          if (d >= min) continue;
+          const k = ((min - d) / d) * Math.min(1, dt * 2) * 0.5;
+          if (sea(a.x + ox * k, a.y + oy * k, 1)) [a.x, a.y] = [a.x + ox * k, a.y + oy * k];
+          if (sea(b.x - ox * k, b.y - oy * k, 1)) [b.x, b.y] = [b.x - ox * k, b.y - oy * k];
+        }
+      for (const v of all) {
         const dx = v.tx - v.x;
         const dy = v.ty - v.y;
         const dist = Math.hypot(dx, dy);
@@ -376,11 +397,28 @@ export function createLife(world: World, renderer: Renderer) {
           v.wait = v.small ? 3 + Math.random() * 4 : 0;
           retarget(v);
         } else {
-          // Turn gradually towards the destination, then move along the heading.
-          let da = Math.atan2(dy, dx) - v.a;
+          // Steer for the destination, pushed off by every vessel close by (more the closer it
+          // is), and slow down when one lies ahead: they give way instead of sailing through.
+          let sx = dx / dist;
+          let sy = dy / dist;
+          let ahead = 0;
+          const room = v.small ? 1.2 : 3.5;
+          for (const u of all) {
+            if (u === v) continue;
+            const ox = v.x - u.x;
+            const oy = v.y - u.y;
+            const d = Math.hypot(ox, oy);
+            if (d >= room || d === 0) continue;
+            const push = ((room - d) / room) * 2.5;
+            sx += (ox / d) * push;
+            sy += (oy / d) * push;
+            // In front of us (within ~45° of the heading)?
+            if ((-ox * Math.cos(v.a) - oy * Math.sin(v.a)) / d > 0.7) ahead = Math.max(ahead, 1 - d / room);
+          }
+          let da = Math.atan2(sy, sx) - v.a;
           da = Math.atan2(Math.sin(da), Math.cos(da));
           v.a += Math.max(-dt * 0.8, Math.min(dt * 0.8, da));
-          const sp = v.speed * (1 - Math.min(0.7, Math.abs(da)));
+          const sp = v.speed * (1 - Math.min(0.7, Math.abs(da))) * (1 - ahead * 0.8);
           const nx = v.x + Math.cos(v.a) * sp * dt;
           const ny = v.y + Math.sin(v.a) * sp * dt;
           if (sea(nx, ny, v.small ? 1 : 2)) [v.x, v.y] = [nx, ny];
@@ -399,6 +437,7 @@ export function createLife(world: World, renderer: Renderer) {
         }
         const bob = Math.sin(performance.now() / 600 + v.tx) * 0.8;
         v.g.position.set(p.x, p.y + bob);
+        v.g.zIndex = v.x + v.y;
         v.mirror.position.set(p.x, p.y + bob);
         // Wake: foam left at the stern, spreading out to both sides.
         const moving = v.wait <= 0 && dist >= 0.5;

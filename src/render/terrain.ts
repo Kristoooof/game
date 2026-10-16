@@ -72,6 +72,12 @@ export function createTerrain(world: World, renderer: Renderer) {
   const objectLayer = new Container({ sortableChildren: true });
   const reflectionLayer = new Container();
   const lightLayer = new Container({ alpha: 0 });
+  /**
+   * Depth-sorted with people and carts (zIndex = tile x + y): live copies of the buildings and of
+   * the trees near roads, so whatever stands in front of a walker hides it.
+   */
+  const front = new Container({ sortableChildren: true });
+  let occluders: Container[] = [];
   /** Buildings still under construction: drawn live elsewhere, left out of the bake. */
   const hidden = new Set<number>();
   /** Sun step for shadows (see daylight.ts); part of the bake key. */
@@ -124,81 +130,89 @@ export function createTerrain(world: World, renderer: Renderer) {
     into.addChild(d);
   };
   /** Trees, bushes, boulders, peaks and offshore rocks on free tiles of a chunk. */
-  function addNature(c: Chunk, into: Container, reflections: Container, far: boolean) {
-    for (let y = c.y0; y < c.y1; y++)
-      for (let x = c.x0; x < c.x1; x++) {
-        if (world.occupied[y * W + x]) continue;
-        const t = at(x, y);
-        const r = mulberry32(x * 92821 + y * 68917 + 7);
-        /** `lean`: trees bend a little with the prevailing wind. */
-        const put = (a: Art, u: number, v: number, scale: number, lean = false) => {
-          const s = groundToScreen(x + u, y + v);
-          const sp = sprite(a, s.x, s.y, scale);
-          if (lean) sp.skew.x = -(0.05 + ((x * 7 + y * 13) % 5) * 0.012);
-          sp.zIndex = x + y + u + v;
-          into.addChild(sp);
-          // Cast shadow: the silhouette laid flat along the sun's direction.
-          const sh = sprite(a, s.x, s.y, scale);
-          const k = sh.scale.x;
-          sh.setFromMatrix(new Matrix(k, 0, -shade.dx * k, -shade.dy * k, s.x, s.y));
-          sh.tint = 0x0a1a10;
-          sh.alpha = 0.22 * shade.alpha;
-          sh.zIndex = sp.zIndex - 0.5;
-          into.addChild(sh);
-          if (!far && nearWater(x, y)) {
-            const m = sprite(a, s.x, s.y, scale);
-            m.zIndex = sp.zIndex;
-            mirror(m, s.y, reflections);
-          }
-        };
-        const rock = t === 'water' && !far && ground.rockAt(x, y);
-        // Small rocks are always low ones; big ones may be tall stacks.
-        if (rock) put(art.seaRocks[rock[2] < 0.35 ? rock[3] % 3 : rock[3]], rock[0], rock[1], rock[2] * 1.4);
-        else if (t === 'forest' && !far) {
-          const n = 2 + Math.floor(r() * 3);
-          for (let i = 0; i < n; i++) {
-            const u = 0.1 + r() * 0.8;
-            const v = 0.1 + r() * 0.8;
-            const k = r();
-            if (k < 0.6) put(art.conifers[Math.floor(r() * 3)], u, v, 0.75 + r() * 0.45, true);
-            else if (k < 0.93) put(leaf(r()), u, v, 0.7 + r() * 0.4, true);
-            else put(art.bushes[Math.floor(r() * 2)], u, v, 0.8 + r() * 0.4);
-          }
-        } else if (t === 'mountain') {
-          // Sparse peaks on a checkerboard so they do not stack into rows; snow only deep inside a range.
-          const d = rockDepth[y * W + x];
-          const p = r();
-          const k = r();
-          // A peak is about two tiles wide: on one terrace all round, or it would hang over a
-          // cliff edge or stand against the foot of one.
-          if ((x + y) % 2 === 0 && p < 0.45 + d * 0.15 && flatAround(x, y, 1)) {
-            // Near a cliff only a small hill, kept within its own tile.
-            const roomy = flatAround(x, y, 2);
-            const kinds = d >= 2 && roomy ? art.peaks : art.hills;
-            const size = roomy ? 0.7 + d * 0.22 + r() * 0.3 : 0.55;
-            put(kinds[Math.floor(k * kinds.length)], 0.4 + r() * 0.2, 0.4 + r() * 0.2, size);
-          } else if (p < 0.5 && !far) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.8);
-        } else if (t === 'beach' && !far) {
-          // Coast: palms just back from the water, driftwood and pebbles along the tideline.
-          const coastal = [at(x + 1, y), at(x - 1, y), at(x, y + 1), at(x, y - 1)].includes('water');
-          const p = r();
-          if (coastal && p < 0.07)
-            put(art.palms[Math.floor(r() * 3)], 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.85 + r() * 0.3, true);
-          else if (coastal && p < 0.2)
-            put(art.driftwood[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.9 + r() * 0.4);
-          else if (p < 0.12) put(art.pebbles[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.5);
-        } else if (t === 'rocky' && !far) {
-          // Stony shore: boulders and loose stones.
-          const p = r();
-          if (p < 0.35) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.6 + r() * 0.9);
-          else if (p < 0.6) put(art.pebbles[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.9 + r() * 0.5);
-        } else if (t === 'grass' && !far) {
-          const p = r();
-          if (p < 0.035) put(leaf(r()), 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.75 + r() * 0.35, true);
-          else if (p < 0.09) put(art.bushes[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.7 + r() * 0.5);
-          else if (p < 0.105) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.6 + r() * 0.5);
+  /**
+   * Nature on `tiles`. Without `reflections` only the plain sprites, no shadows or mirror images:
+   * the live copies that hide people behind trees (see `refreshFront`).
+   */
+  function addNature(tiles: Iterable<[number, number]>, into: Container, reflections: Container | null, far: boolean) {
+    for (const [x, y] of tiles) {
+      if (world.occupied[y * W + x]) continue;
+      const t = at(x, y);
+      const r = mulberry32(x * 92821 + y * 68917 + 7);
+      /** `lean`: trees bend a little with the prevailing wind. */
+      const put = (a: Art, u: number, v: number, scale: number, lean = false) => {
+        const s = groundToScreen(x + u, y + v);
+        const sp = sprite(a, s.x, s.y, scale);
+        if (lean) sp.skew.x = -(0.05 + ((x * 7 + y * 13) % 5) * 0.012);
+        sp.zIndex = x + y + u + v;
+        into.addChild(sp);
+        if (!reflections) return;
+        // Cast shadow: the silhouette laid flat along the sun's direction.
+        const sh = sprite(a, s.x, s.y, scale);
+        const k = sh.scale.x;
+        sh.setFromMatrix(new Matrix(k, 0, -shade.dx * k, -shade.dy * k, s.x, s.y));
+        sh.tint = 0x0a1a10;
+        sh.alpha = 0.22 * shade.alpha;
+        sh.zIndex = sp.zIndex - 0.5;
+        into.addChild(sh);
+        if (!far && nearWater(x, y)) {
+          const m = sprite(a, s.x, s.y, scale);
+          m.zIndex = sp.zIndex;
+          mirror(m, s.y, reflections);
         }
+      };
+      const rock = t === 'water' && !far && ground.rockAt(x, y);
+      // Small rocks are always low ones; big ones may be tall stacks.
+      if (rock) put(art.seaRocks[rock[2] < 0.35 ? rock[3] % 3 : rock[3]], rock[0], rock[1], rock[2] * 1.4);
+      else if (t === 'forest' && !far) {
+        const n = 2 + Math.floor(r() * 3);
+        for (let i = 0; i < n; i++) {
+          const u = 0.1 + r() * 0.8;
+          const v = 0.1 + r() * 0.8;
+          const k = r();
+          if (k < 0.6) put(art.conifers[Math.floor(r() * 3)], u, v, 0.75 + r() * 0.45, true);
+          else if (k < 0.93) put(leaf(r()), u, v, 0.7 + r() * 0.4, true);
+          else put(art.bushes[Math.floor(r() * 2)], u, v, 0.8 + r() * 0.4);
+        }
+      } else if (t === 'mountain') {
+        // Sparse peaks on a checkerboard so they do not stack into rows; snow only deep inside a range.
+        const d = rockDepth[y * W + x];
+        const p = r();
+        const k = r();
+        // A peak is about two tiles wide: on one terrace all round, or it would hang over a
+        // cliff edge or stand against the foot of one.
+        if ((x + y) % 2 === 0 && p < 0.45 + d * 0.15 && flatAround(x, y, 1)) {
+          // Near a cliff only a small hill, kept within its own tile.
+          const roomy = flatAround(x, y, 2);
+          const kinds = d >= 2 && roomy ? art.peaks : art.hills;
+          const size = roomy ? 0.7 + d * 0.22 + r() * 0.3 : 0.55;
+          put(kinds[Math.floor(k * kinds.length)], 0.4 + r() * 0.2, 0.4 + r() * 0.2, size);
+        } else if (p < 0.5 && !far) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.8);
+      } else if (t === 'beach' && !far) {
+        // Coast: palms just back from the water, driftwood and pebbles along the tideline.
+        const coastal = [at(x + 1, y), at(x - 1, y), at(x, y + 1), at(x, y - 1)].includes('water');
+        const p = r();
+        if (coastal && p < 0.07)
+          put(art.palms[Math.floor(r() * 3)], 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.85 + r() * 0.3, true);
+        else if (coastal && p < 0.2)
+          put(art.driftwood[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.9 + r() * 0.4);
+        else if (p < 0.12) put(art.pebbles[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.5);
+      } else if (t === 'rocky' && !far) {
+        // Stony shore: boulders and loose stones.
+        const p = r();
+        if (p < 0.35) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.6 + r() * 0.9);
+        else if (p < 0.6) put(art.pebbles[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.9 + r() * 0.5);
+      } else if (t === 'grass' && !far) {
+        const p = r();
+        if (p < 0.035) put(leaf(r()), 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.75 + r() * 0.35, true);
+        else if (p < 0.09) put(art.bushes[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.7 + r() * 0.5);
+        else if (p < 0.105) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.6 + r() * 0.5);
       }
+    }
+  }
+
+  function* chunkTiles(c: Chunk): Generator<[number, number]> {
+    for (let y = c.y0; y < c.y1; y++) for (let x = c.x0; x < c.x1; x++) yield [x, y];
   }
 
   /** Diamond over tiles [x0, x1) × [y0, y1), its UVs mapping into a texture of bounds `r`. */
@@ -312,7 +326,7 @@ export function createTerrain(world: World, renderer: Renderer) {
     const refl = new Container({ sortableChildren: true });
     const lights = new Graphics();
     setSun(shade);
-    addNature(c, o, refl, far);
+    addNature(chunkTiles(c), o, refl, far);
     for (const b of world.buildings.values()) {
       if (b.type === 'road' || hidden.has(b.id) || b.x < c.x0 || b.x >= c.x1 || b.y < c.y0 || b.y >= c.y1) continue;
       const size = BUILDINGS[b.type].size;
@@ -362,6 +376,33 @@ export function createTerrain(world: World, renderer: Renderer) {
     ground: groundLayer,
     objects: objectLayer,
     reflections: reflectionLayer,
+    front,
+    /** Rebuild the live copies in `front` after the roads or buildings changed. */
+    refreshFront() {
+      for (const o of occluders) o.destroy();
+      const near = new Set<number>();
+      for (const b of world.buildings.values())
+        if (b.type === 'road')
+          for (let dy = -2; dy <= 2; dy++)
+            for (let dx = -2; dx <= 2; dx++)
+              if (terrainAt(map, b.x + dx, b.y + dy)) near.add((b.y + dy) * W + b.x + dx);
+      const tmp = new Container();
+      addNature(
+        [...near].map((i): [number, number] => [i % W, Math.floor(i / W)]),
+        tmp,
+        null,
+        false,
+      );
+      for (const b of world.buildings.values()) {
+        if (b.type === 'road' || hidden.has(b.id)) continue;
+        const g = new Graphics({ zIndex: b.x + b.y + BUILDINGS[b.type].size });
+        drawBuilding(g, b.type, b.x, b.y, b.id, false, false);
+        tmp.addChild(g);
+      }
+      occluders = [...tmp.children] as Container[];
+      if (occluders.length) front.addChild(...occluders);
+      tmp.destroy();
+    },
     lights: lightLayer,
     light: ground.light,
     /** Sun step (see daylight.ts) for cast shadows; chunks rebake when it changes. */

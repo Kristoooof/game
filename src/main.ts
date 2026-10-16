@@ -113,6 +113,7 @@ const effects = createEffects(map);
 // Buildings rise behind scaffolding; until then the terrain leaves them out of its baked chunks.
 const construction = createConstruction(effects.dust, (id) => {
   terrain.hide(id, false);
+  terrain.refreshFront();
   const b = world.buildings.get(id);
   if (b) terrain.invalidate(footprint(b.x, b.y, BUILDINGS[b.type].size));
 });
@@ -120,7 +121,7 @@ const construction = createConstruction(effects.dust, (id) => {
 const fixedWeather = new URLSearchParams(location.search).get('idojaras') as Weather | null;
 const atmosphere = createAtmosphere(fixedWeather ?? undefined);
 // People, carts and boats; their wakes and reflections lie on the water, under the land.
-const life = createLife(world, app.renderer);
+const life = createLife(world, app.renderer, terrain.front);
 const lit = new Container({
   children: [
     terrain.reflections,
@@ -128,7 +129,7 @@ const lit = new Container({
     terrain.ground,
     territory,
     terrain.objects,
-    life.layer,
+    terrain.front,
     construction.layer,
     atmosphere.world,
     effects.layer,
@@ -236,6 +237,7 @@ app.ticker.add((t) => {
   terrain.update(dt, view, cam.scale);
   construction.update(dt);
   life.update(dt, view, cam.scale < FAR_SCALE);
+  terrain.front.visible = cam.scale >= FAR_SCALE;
   // The target keeps CSS-pixel units; its own resolution does the downscaling.
   waterTransform.set(cam.scale, 0, 0, cam.scale, cam.x, cam.y);
   app.renderer.render({ container: waterScene, target: waterTexture, transform: waterTransform, clear: true });
@@ -250,6 +252,7 @@ app.ticker.add((t) => {
 /** Redraw after a world change in `tiles` (built on, cleared or demolished). */
 const refresh = (tiles: [number, number][] = []) => {
   terrain.changed(tiles);
+  terrain.refreshFront();
   life.refresh();
   effects.setChimneys([...world.buildings.values()].flatMap((b) => chimneyAt(b.type, b.x, b.y) ?? []));
   drawTerritory(territory, world);

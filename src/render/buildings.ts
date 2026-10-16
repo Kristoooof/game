@@ -417,12 +417,20 @@ export function drawPier(g: Graphics, x0: number, y0: number, x1: number, y1: nu
 }
 
 /** Draws building `type` with its top corner at tile (x, y). `variant` picks colours. */
-export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number, variant = 0, mirrored = false) {
+export function drawBuilding(
+  g: Graphics,
+  type: BuildingId,
+  x: number,
+  y: number,
+  variant = 0,
+  mirrored = false,
+  shadowed = true,
+) {
   const size = BUILDINGS[type].size;
   rnd = mulberry32(variant * 7919 + x * 131 + y * 31 + type.length);
   flip = mirrored;
   lift = liftAt(x, y);
-  if (!flip) shadow(g, x, y, size);
+  if (!flip && shadowed) shadow(g, x, y, size);
   const box = (a: number, b: number, c: number, d: number): Box => ({ x0: x + a, y0: y + b, x1: x + c, y1: y + d });
   switch (type) {
     case 'house':
