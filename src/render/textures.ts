@@ -249,6 +249,104 @@ const mountain = (seed: number, snowy: boolean) => {
   });
 };
 
+/** Palm: a leaning trunk with rings and a crown of arched fronds, lit from the upper left. */
+const palm = (seed: number) => {
+  const r = mulberry32(seed);
+  const lean = (r() - 0.5) * 6;
+  return paint(60, 70, 30, 66, (c) => {
+    shadow(c, 34, 66, 16, 4.5);
+    const top = [30 + lean * 2, 26];
+    c.strokeStyle = '#8a6a42';
+    c.lineWidth = 3.4;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(27, 66);
+    c.quadraticCurveTo(26 + lean, 44, top[0], top[1]);
+    c.stroke();
+    c.strokeStyle = 'rgba(60,40,20,0.45)';
+    c.lineWidth = 0.7;
+    for (let k = 0; k < 6; k++) {
+      const t = 0.2 + k * 0.12;
+      const y = 66 - t * 40;
+      c.beginPath();
+      c.moveTo(26 + lean * t * t + 1, y);
+      c.lineTo(28.5 + lean * t * t, y - 1.2);
+      c.stroke();
+    }
+    // Fronds: each a dark arch with a lighter rib on top.
+    for (let k = 0; k < 7; k++) {
+      const a = -Math.PI / 2 + (k - 3) * 0.5 + (r() - 0.5) * 0.2;
+      const len = 19 + r() * 6;
+      const tip = [top[0] + Math.cos(a) * len, top[1] + Math.sin(a) * len * 0.55 + 6];
+      const ctrl = [top[0] + Math.cos(a) * len * 0.5, top[1] + Math.sin(a) * len * 0.5 - 6];
+      c.lineCap = 'round';
+      c.strokeStyle = k % 2 ? '#2f6a2a' : '#3f7d34';
+      c.lineWidth = 5.5;
+      c.beginPath();
+      c.moveTo(top[0], top[1]);
+      c.quadraticCurveTo(ctrl[0], ctrl[1], tip[0], tip[1]);
+      c.stroke();
+      c.strokeStyle = '#7fb85a';
+      c.lineWidth = 1.6;
+      c.beginPath();
+      c.moveTo(top[0], top[1] - 0.8);
+      c.quadraticCurveTo(ctrl[0], ctrl[1] - 1, tip[0], tip[1] - 1);
+      c.stroke();
+    }
+    c.fillStyle = '#6a4a24';
+    c.beginPath();
+    c.arc(top[0] - 1.5, top[1] + 2.5, 1.8, 0, Math.PI * 2);
+    c.arc(top[0] + 1.5, top[1] + 3, 1.8, 0, Math.PI * 2);
+    c.fill();
+  });
+};
+
+/** Driftwood: a sun-bleached log with a pale cut end. */
+const driftwood = (seed: number) => {
+  const r = mulberry32(seed);
+  const tilt = (r() - 0.5) * 3;
+  return paint(26, 14, 13, 11, (c) => {
+    shadow(c, 13, 11, 11, 3);
+    const g = c.createLinearGradient(0, 4, 0, 11);
+    g.addColorStop(0, '#c8b08a');
+    g.addColorStop(1, '#7a6246');
+    c.fillStyle = g;
+    c.beginPath();
+    c.roundRect(3, 6, 19, 5, 2.5);
+    c.fill();
+    c.fillStyle = '#e8d8b8';
+    c.beginPath();
+    c.ellipse(21.5 + tilt * 0.2, 8.5, 1.8, 2.4, 0, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = 'rgba(70,50,30,0.5)';
+    c.lineWidth = 0.5;
+    c.beginPath();
+    c.moveTo(6, 8.5);
+    c.lineTo(17, 9);
+    c.stroke();
+  });
+};
+
+/** A few beach pebbles, lit on top. */
+const pebbles = (seed: number) => {
+  const r = mulberry32(seed);
+  return paint(18, 12, 9, 8, (c) => {
+    shadow(c, 9, 9.5, 7, 2);
+    for (let i = 0; i < 4; i++) {
+      const x = 4 + r() * 10;
+      const y = 6 + r() * 3;
+      const rad = 1.4 + r() * 1.2;
+      const g = c.createRadialGradient(x - rad * 0.4, y - rad * 0.4, 0, x, y, rad);
+      g.addColorStop(0, '#e6e0d2');
+      g.addColorStop(1, '#7d766a');
+      c.fillStyle = g;
+      c.beginPath();
+      c.ellipse(x, y, rad * 1.2, rad, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+  });
+};
+
 const DARK_GREEN = ['#1f4a24', '#2f6a33', '#5f9a4a'];
 const LEAF_GREEN = ['#2f5e1f', '#4f8a2e', '#9cc65a'];
 const OLIVE = ['#4a5a1c', '#7a8a2a', '#c4c45a'];
@@ -269,6 +367,9 @@ export function makeArt() {
       broadleaf(7, AUTUMN),
     ],
     bushes: [bush(8, LEAF_GREEN), bush(9, DARK_GREEN)],
+    palms: [palm(41), palm(42), palm(43)],
+    driftwood: [driftwood(51), driftwood(52)],
+    pebbles: [pebbles(61), pebbles(62)],
     boulder,
     peaks: [21, 22, 23].map((k) => mountain(k, true)),
     hills: [24, 25, 26, 27].map((k) => mountain(k, false)),

@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
+import { Application, Container, Graphics, Matrix, Rectangle, RenderTexture, Sprite, Texture } from 'pixi.js';
 import { BUILDINGS, GOOD_NAMES, type Good } from './data/buildings';
 import pelda from './data/maps/pelda.txt?raw';
 import { chimneyAt, drawBuilding, drawTerritory } from './render/buildings';
@@ -77,6 +77,17 @@ scene.addChild(terrain.water, terrain.ground, territory, terrain.objects, effect
 scene.addChild(hover, selection, preview, ghost);
 app.stage.addChild(scene);
 
+// Pixel-look sea: the water is drawn into a low-resolution texture (sampled nearest) and
+// shown under the scene, so each water pixel is a hard block of WATER_BLOCK CSS pixels.
+const WATER_BLOCK = 4;
+const waterScene = new Container();
+const waterTexture = RenderTexture.create({ width: 1, height: 1 });
+const waterSprite = new Sprite({ texture: waterTexture, visible: false, eventMode: 'none' });
+waterSprite.texture.source.style.scaleMode = 'nearest';
+app.stage.addChildAt(waterSprite, 0);
+const waterRes = () => app.renderer.resolution / WATER_BLOCK;
+const waterTransform = new Matrix();
+
 // Vignette inside the canvas: as a CSS overlay the browser would blend it over the whole
 // window at full screen resolution every frame, whatever the game's own resolution.
 const vignetteCanvas = Object.assign(document.createElement('canvas'), { width: 256, height: 256 });
@@ -109,6 +120,15 @@ const fxaa = createFxaa();
 app.stage.filterArea = app.screen;
 const applySettings = () => {
   terrain.setPixel(settings.pixel);
+  if (settings.waterPixel) {
+    waterScene.addChild(terrain.water);
+    waterTexture.resize(app.screen.width, app.screen.height, waterRes());
+    waterSprite.width = app.screen.width;
+    waterSprite.height = app.screen.height;
+  } else if (terrain.water.parent !== scene) {
+    scene.addChildAt(terrain.water, 0);
+  }
+  waterSprite.visible = settings.waterPixel;
   app.stage.filters = settings.antialias === 'fxaa' ? [fxaa] : [];
   const r = resolutionOf(settings);
   if (r !== app.renderer.resolution) app.renderer.resize(innerWidth, innerHeight, r);
@@ -127,6 +147,11 @@ app.ticker.add((t) => {
   view.width = app.screen.width / cam.scale;
   view.height = app.screen.height / cam.scale;
   terrain.update(dt, view, cam.scale);
+  if (settings.waterPixel) {
+    // The target keeps CSS-pixel units; its own resolution does the downscaling.
+    waterTransform.set(cam.scale, 0, 0, cam.scale, cam.x, cam.y);
+    app.renderer.render({ container: waterScene, target: waterTexture, transform: waterTransform, clear: true });
+  }
   effects.update(dt, view, cam.scale < FAR_SCALE);
   const { width, height } = app.canvas;
   countFps(

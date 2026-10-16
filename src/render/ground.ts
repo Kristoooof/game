@@ -54,10 +54,15 @@ vec2 coastWarp(vec2 p) { return p + (nz(p * 0.45).rb - 0.5) * 0.7; }
 const waterFragment = /* glsl */ `${common}
 void main() {
   vec2 p = tileCoord();
-  float land = smp(uMask, coastWarp(p)).r;
+  // Past the map edge the sea fades to deep water over a few tiles: sampling beyond the edge
+  // would repeat the edge tiles as long straight bands, and a hard edge shows as a diamond.
+  vec2 pc = clamp(p, vec2(0.0), uSize);
+  float beyond = length(p - pc);
+  float fade = smoothstep(0.0, 6.0, beyond);
+  float land = smp(uMask, coastWarp(pc)).r * (1.0 - smoothstep(0.0, 2.0, beyond));
   // Hidden under baked land: stop before the expensive part.
   if (land > 0.56) { finalColor = vec4(0.3, 0.45, 0.3, 1.0); return; }
-  float depthRaw = smp(uDist, p).r;
+  float depthRaw = mix(smp(uDist, pc).r, 1.0, fade);
   float t = uTime;
   float depth = smoothstep(0.0, 0.75, depthRaw);
   vec3 col = mix(vec3(0.24, 0.63, 0.66), vec3(0.09, 0.42, 0.58), smoothstep(0.0, 0.25, depth));
@@ -235,25 +240,36 @@ function blur(src: Float32Array, W: number, H: number) {
   return a;
 }
 
-/** Multi-source BFS distance (in tiles, 4-neighbour) from every tile where `src` is true. */
+/**
+ * Chamfer distance (two raster passes, weights 1 and √2): close to Euclidean. A plain
+ * 4-neighbour BFS measures Manhattan distance, whose kinks show up as straight bright
+ * or dark lines across the sea.
+ */
 function distance(W: number, H: number, src: (i: number) => boolean) {
-  const dist = new Float32Array(W * H).fill(Infinity);
-  const queue: number[] = [];
-  for (let i = 0; i < W * H; i++)
-    if (src(i)) {
-      dist[i] = 0;
-      queue.push(i);
+  const D = Math.SQRT2;
+  const dist = new Float32Array(W * H).fill(1e9);
+  for (let i = 0; i < W * H; i++) if (src(i)) dist[i] = 0;
+  const at = (x: number, y: number) => dist[y * W + x];
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      let d = dist[i];
+      if (x > 0) d = Math.min(d, at(x - 1, y) + 1);
+      if (y > 0) d = Math.min(d, at(x, y - 1) + 1);
+      if (x > 0 && y > 0) d = Math.min(d, at(x - 1, y - 1) + D);
+      if (x < W - 1 && y > 0) d = Math.min(d, at(x + 1, y - 1) + D);
+      dist[i] = d;
     }
-  for (let q = 0; q < queue.length; q++) {
-    const i = queue[q];
-    const x = i % W;
-    const y = (i - x) / W;
-    for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1])
-      if (j >= 0 && dist[j] === Infinity) {
-        dist[j] = dist[i] + 1;
-        queue.push(j);
-      }
-  }
+  for (let y = H - 1; y >= 0; y--)
+    for (let x = W - 1; x >= 0; x--) {
+      const i = y * W + x;
+      let d = dist[i];
+      if (x < W - 1) d = Math.min(d, at(x + 1, y) + 1);
+      if (y < H - 1) d = Math.min(d, at(x, y + 1) + 1);
+      if (x < W - 1 && y < H - 1) d = Math.min(d, at(x + 1, y + 1) + D);
+      if (x > 0 && y < H - 1) d = Math.min(d, at(x - 1, y + 1) + D);
+      dist[i] = d;
+    }
   return dist;
 }
 

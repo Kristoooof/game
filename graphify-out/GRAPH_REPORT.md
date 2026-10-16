@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-16)
 
 ## Corpus Check
-- 40 files · ~22,396 words
+- 40 files · ~23,422 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 333 nodes · 612 edges · 23 communities (21 shown, 2 thin omitted)
+- 341 nodes · 633 edges · 24 communities (21 shown, 3 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1722a54e`
+- Built from commit: `e4a7dd2a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -37,12 +37,13 @@
 - world.ts
 - showPreview
 - settings.ts
-- refresh
+- textures.ts
+- data/buildings.ts
 - costText
 
 ## God Nodes (most connected - your core abstractions)
-1. `drawBuilding()` - 18 edges
-2. `mulberry32()` - 17 edges
+1. `mulberry32()` - 20 edges
+2. `drawBuilding()` - 18 edges
 3. `showPreview()` - 14 edges
 4. `terrainAt()` - 13 edges
 5. `tileToScreen()` - 12 edges
@@ -50,9 +51,11 @@
 7. `fill()` - 11 edges
 8. `attachCameraControls()` - 11 edges
 9. `walls()` - 10 edges
-10. `compilerOptions` - 10 edges
+10. `makeArt()` - 10 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `World` --references--> `Good`  [EXTRACTED]
+  src/sim/world.ts → src/data/buildings.ts
 - `Building` --references--> `BuildingId`  [EXTRACTED]
   src/sim/world.ts → src/data/buildings.ts
 - `refresh()` --calls--> `chimneyAt()`  [EXTRACTED]
@@ -61,13 +64,11 @@
   src/main.ts → src/render/buildings.ts
 - `tileAt()` --calls--> `screenToWorld()`  [EXTRACTED]
   src/main.ts → src/render/camera.ts
-- `tileAt()` --calls--> `screenToTile()`  [EXTRACTED]
-  src/main.ts → src/render/iso.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (23 total, 2 thin omitted)
+## Communities (24 total, 3 thin omitted)
 
 ### Community 0 - "package.json"
 Cohesion: 0.07
@@ -86,8 +87,8 @@ Cohesion: 0.09
 Nodes (20): caveman, Example output, How to invoke, See also, What it does, 1. Answer first, 2. Kill ceremony, 3. Short word (+12 more)
 
 ### Community 4 - "main.ts"
-Cohesion: 0.06
-Nodes (30): app, cam, countFps, effects, fxaa, ghost, hover, ICONS (+22 more)
+Cohesion: 0.05
+Nodes (33): app, cam, countFps, effects, fxaa, ghost, hover, ICONS (+25 more)
 
 ### Community 5 - "compilerOptions"
 Cohesion: 0.17
@@ -102,8 +103,8 @@ Cohesion: 0.18
 Nodes (9): caveman-review, Example output, How to invoke, See also, What it does, Auto-Clarity, Boundaries, Examples (+1 more)
 
 ### Community 8 - "terrain.ts"
-Cohesion: 0.11
-Nodes (37): pixi.js, drawRoads(), createEffects(), Puff, puffTexture(), bakeNoise(), blur(), createGround() (+29 more)
+Cohesion: 0.14
+Nodes (22): pixi.js, drawRoads(), createEffects(), Puff, puffTexture(), createFxaa(), bakeNoise(), blur() (+14 more)
 
 ### Community 9 - "Ponytail Help"
 Cohesion: 0.25
@@ -134,44 +135,44 @@ Cohesion: 0.21
 Nodes (12): active(), attachCameraControls(), Camera, cancel(), end(), Handlers, MAX_SCALE, MIN_SCALE (+4 more)
 
 ### Community 18 - "world.ts"
-Cohesion: 0.12
-Nodes (29): vitest, BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, GOOD_NAMES (+21 more)
+Cohesion: 0.20
+Nodes (19): vitest, CHARS, GameMap, generateMap(), labelIslands(), lerp(), parseMap(), smooth() (+11 more)
 
 ### Community 19 - "showPreview"
-Cohesion: 0.27
-Nodes (14): anchorFor(), demolishAt(), end(), footprint(), menu, move(), onHover(), onTap() (+6 more)
+Cohesion: 0.23
+Nodes (16): anchorFor(), demolishAt(), end(), footprint(), icon(), move(), onHover(), onTap() (+8 more)
 
 ### Community 20 - "settings.ts"
-Cohesion: 0.18
-Nodes (11): applySettings(), Antialias, createFpsCounter(), createSettingsPanel(), DEFAULTS, loadSettings(), LOOKS, resolutionOf() (+3 more)
+Cohesion: 0.17
+Nodes (12): applySettings(), waterRes(), Antialias, createFpsCounter(), createSettingsPanel(), DEFAULTS, loadSettings(), LOOKS (+4 more)
 
-### Community 21 - "refresh"
-Cohesion: 0.67
-Nodes (3): icon(), refresh(), showResources()
+### Community 21 - "textures.ts"
+Cohesion: 0.24
+Nodes (20): AUTUMN, boulder, broadleaf(), bush(), conifer(), Ctx, DARK_GREEN, driftwood() (+12 more)
 
-### Community 22 - "costText"
-Cohesion: 0.67
-Nodes (3): button(), costText(), createBuildMenu()
+### Community 22 - "data/buildings.ts"
+Cohesion: 0.24
+Nodes (11): BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, GOOD_NAMES, Building (+3 more)
 
 ## Knowledge Gaps
 - **3 isolated node(s):** `eslint`, `prettier`, `typescript`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 163 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 167 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `pixi.js` connect `terrain.ts` to `package.json`, `render/buildings.ts`, `main.ts`?**
+- **Why does `pixi.js` connect `terrain.ts` to `package.json`, `render/buildings.ts`, `main.ts`, `textures.ts`?**
   _High betweenness centrality (0.103) - this node is a cross-community bridge._
 - **What connects `eslint`, `prettier`, `typescript` to the rest of the system?**
   _3 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._
+- **Why does `mulberry32()` connect `textures.ts` to `terrain.ts`, `render/buildings.ts`, `world.ts`?**
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Should `Caveman Help` be split into smaller, more focused modules?**
   _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._
 - **Should `Mérföldkövek` be split into smaller, more focused modules?**
   _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._
 - **Should `caveman` be split into smaller, more focused modules?**
   _Cohesion score 0.09090909090909091 - nodes in this community are weakly interconnected._
-- **Should `main.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.058823529411764705 - nodes in this community are weakly interconnected._

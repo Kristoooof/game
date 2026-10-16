@@ -109,6 +109,15 @@ export function createTerrain(world: World, renderer: Renderer) {
             const kinds = d >= 2 ? art.peaks : art.hills;
             put(kinds[Math.floor(k * kinds.length)], 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.7 + d * 0.22 + r() * 0.3);
           } else if (p < 0.5 && !far) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.8);
+        } else if (t === 'beach' && !far) {
+          // Coast: palms just back from the water, driftwood and pebbles along the tideline.
+          const coastal = [at(x + 1, y), at(x - 1, y), at(x, y + 1), at(x, y - 1)].includes('water');
+          const p = r();
+          if (coastal && p < 0.07)
+            put(art.palms[Math.floor(r() * 3)], 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.85 + r() * 0.3);
+          else if (coastal && p < 0.2)
+            put(art.driftwood[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.9 + r() * 0.4);
+          else if (p < 0.12) put(art.pebbles[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.5);
         } else if (t === 'grass' && !far) {
           const p = r();
           if (p < 0.035) put(leaf(r()), 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.75 + r() * 0.35);

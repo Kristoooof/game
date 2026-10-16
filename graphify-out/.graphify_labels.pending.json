@@ -20,6 +20,7 @@
   "18": "world.ts",
   "19": "showPreview",
   "20": "settings.ts",
-  "21": "refresh",
-  "22": "costText"
+  "21": "textures.ts",
+  "22": "data/buildings.ts",
+  "23": "costText"
 }

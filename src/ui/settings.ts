@@ -6,12 +6,14 @@ export interface Settings {
   antialias: Antialias;
   /** Pixel-art look: the baked world is drawn at 1 texel per world pixel and sampled nearest. */
   pixel: boolean;
+  /** Pixel look for the sea alone, independent of the world. */
+  waterPixel: boolean;
   fps: boolean;
 }
 
 const KEY = 'szigetek.settings';
 // MSAA off by default: the baked world is already smooth, and MSAA is costly on big screens.
-const DEFAULTS: Settings = { width: 'auto', antialias: 'off', pixel: false, fps: false };
+const DEFAULTS: Settings = { width: 'auto', antialias: 'off', pixel: false, waterPixel: false, fps: false };
 
 export function loadSettings(): Settings {
   try {
@@ -97,6 +99,7 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
   panel.append(
     select('Renderelési szélesség', WIDTHS, s.width, (width) => update({ width })),
     select('Megjelenés', LOOKS, s.pixel, (pixel) => update({ pixel })),
+    select('Víz megjelenése', LOOKS, s.waterPixel, (waterPixel) => update({ waterPixel })),
     select('Élsimítás', ANTIALIAS, s.antialias, (antialias) => update({ antialias })),
     fps,
     note,
