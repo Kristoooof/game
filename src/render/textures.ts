@@ -142,27 +142,6 @@ const conifer = (seed: number, palette: string[], tiers: number) => {
       c.moveTo(17, ty + 1);
       c.lineTo(17 + hw * 0.15, by - 1);
       c.stroke();
-      // Needles: short strokes over the tier, lit on the left, clipped to its outline so none
-      // stick out past the silhouette.
-      c.save();
-      c.beginPath();
-      [[17, ty], ...edge].forEach(([px, py], j) => (j ? c.lineTo(px, py) : c.moveTo(px, py)));
-      c.closePath();
-      c.clip();
-      for (let k = 0; k < 40; k++) {
-        const u = r();
-        const x0 = 17 - hw + u * hw * 2;
-        const y0 = by - 1 - (1 - Math.abs(u - 0.5) * 2) * 1.5;
-        c.strokeStyle = u < 0.5 ? `${palette[2]}` : 'rgba(5,25,10,0.5)';
-        c.globalAlpha = 0.6;
-        c.lineWidth = 0.35;
-        c.beginPath();
-        c.moveTo(x0, y0 - r() * (by - ty) * 0.5);
-        c.lineTo(x0 + (u - 0.5) * 2, y0 + 1.6);
-        c.stroke();
-      }
-      c.restore();
-      c.globalAlpha = 1;
     }
   });
 };
@@ -341,21 +320,12 @@ const mountain = (seed: number, snowy: boolean) => {
       c.lineTo(x + 3, y - 3.5);
       c.stroke();
     }
-    // Within the silhouette: faint strata across the faces, grass and moss low down.
+    // Within the silhouette: grass and moss low down.
     c.save();
     c.beginPath();
     [...west, ...east.slice(1)].forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
     c.closePath();
     c.clip();
-    c.lineWidth = 0.5;
-    for (let i = 0; i < 7; i++) {
-      const y = base - 6 - i * h * 0.11 - r() * 3;
-      c.strokeStyle = i % 2 ? 'rgba(40,32,24,0.18)' : 'rgba(240,230,210,0.16)';
-      c.beginPath();
-      c.moveTo(0, y + r() * 2);
-      for (let x = 0; x <= 120; x += 12) c.lineTo(x, y + (r() - 0.5) * 2.5 + (x - px) * 0.05);
-      c.stroke();
-    }
     for (let i = 0; i < 14; i++) {
       const x = 14 + r() * 92;
       const y = base - 2 - r() * h * 0.22;
