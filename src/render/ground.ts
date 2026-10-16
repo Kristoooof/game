@@ -82,12 +82,12 @@ void main() {
   float h0 = wave(p);
   vec2 grad = vec2(wave(p + vec2(0.15, 0.0)) - h0, wave(p + vec2(0.0, 0.15)) - h0) / 0.15;
   vec3 n = normalize(vec3(-grad * 0.5, 1.0));
-  vec3 half = normalize(vec3(-0.45, -0.55, 0.7) + vec3(0.0, 0.0, 1.0));
-  float glint = pow(max(dot(n, half), 0.0), 90.0);
-  col += vec3(1.0, 0.95, 0.8) * glint * 0.6 * (1.0 - uFar * 0.8) * (1.0 - depth * 0.4);
+  vec3 sunH = normalize(vec3(-0.45, -0.55, 0.7) + vec3(0.0, 0.0, 1.0));
+  float glint = pow(max(dot(n, sunH), 0.0), 600.0);
+  col += vec3(1.0, 0.95, 0.8) * glint * 0.45 * (1.0 - uFar * 0.8) * (1.0 - depth * 0.4);
   // Crest lines: ridged noise, thin and bright, only where the sea is open.
   float ridge = 1.0 - abs(noise(p * 1.3 + warpN(p)) * 2.0 - 1.0);
-  col += vec3(0.6, 0.66, 0.68) * smoothstep(0.9, 0.99, ridge) * 0.16 * (1.0 - uFar) * (0.4 + depth * 0.6);
+  col += vec3(0.6, 0.66, 0.68) * smoothstep(0.96, 0.995, ridge) * 0.07 * (1.0 - uFar) * (0.4 + depth * 0.6);
   // Breaking swells: crests roll in towards the shore, bent by the same height field, and whiten.
   // Distance alone makes parallel bands, so the crest lines are bent by noise and only break in patches.
   float bend = (noise(p * 1.1) - 0.5) * 0.3 + (fbm(p * 0.6) - 0.5) * 0.12;

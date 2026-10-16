@@ -234,9 +234,9 @@
     "semantic_hash": ""
   },
   "src/render/ground.ts": {
-    "mtime": 1792138896.7912204,
-    "seen": 1792138942.2288892,
-    "ast_hash": "3b707cfbfb1acc1bd4e15c3c11bc7b8e",
+    "mtime": 1792141452.6806011,
+    "seen": 1792141493.388629,
+    "ast_hash": "a9773219d18d5d52d273c503fd4ebf19",
     "semantic_hash": ""
   },
   "src/render/effects.ts": {
