@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-16)
 
 ## Corpus Check
-- 47 files · ~46,267 words
+- 47 files · ~47,284 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 451 nodes · 966 edges · 28 communities (26 shown, 2 thin omitted)
+- 451 nodes · 968 edges · 28 communities (26 shown, 2 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 5 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `fb32903e`
+- Built from commit: `b3732786`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -108,7 +108,7 @@ Nodes (9): caveman-review, Example output, How to invoke, See also, What it does
 
 ### Community 8 - "terrain.ts"
 Cohesion: 0.09
-Nodes (50): vitest, drawRoads(), pierBox(), setGlow(), setSun(), createEffects(), Puff, puffTexture() (+42 more)
+Nodes (52): pixi.js, vitest, drawRoads(), pierBox(), setGlow(), setSun(), createEffects(), Puff (+44 more)
 
 ### Community 9 - "Ponytail Help"
 Cohesion: 0.25
@@ -159,8 +159,8 @@ Cohesion: 0.26
 Nodes (15): anchorFor(), cancel(), construction, demolishAt(), end(), footprint(), move(), onHover() (+7 more)
 
 ### Community 23 - "atmosphere.ts"
-Cohesion: 0.20
-Nodes (10): pixi.js, canvasTexture(), cloudTexture(), createAtmosphere(), NEXT, Sky, TARGETS, Weather (+2 more)
+Cohesion: 0.28
+Nodes (8): canvasTexture(), cloudTexture(), createAtmosphere(), NEXT, Sky, TARGETS, Weather, WIND
 
 ### Community 24 - "say"
 Cohesion: 0.40
@@ -186,7 +186,7 @@ Nodes (3): applySettings(), waterRes(), resolutionOf()
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `pixi.js` connect `atmosphere.ts` to `package.json`, `main.ts`, `terrain.ts`, `render/buildings.ts`, `world.ts`, `textures.ts`?**
+- **Why does `pixi.js` connect `terrain.ts` to `package.json`, `main.ts`, `render/buildings.ts`, `world.ts`, `textures.ts`, `atmosphere.ts`?**
   _High betweenness centrality (0.105) - this node is a cross-community bridge._
 - **What connects `eslint`, `prettier`, `typescript` to the rest of the system?**
   _3 weakly-connected nodes found - possible documentation gaps or missing edges._

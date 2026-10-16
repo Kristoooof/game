@@ -82,6 +82,13 @@ float wave(vec2 q) { return fbm(q * 0.9 + vec2(uTime * 0.08, -uTime * 0.05)) + 0
 vec2 warpN(vec2 q) { return vec2(noise(q * 0.7 + 3.0), noise(q * 0.7 + 9.0)) * 2.0 - 1.0; }
 // The one coastline warp both shaders use, so surf meets the land exactly.
 vec2 coastWarp(vec2 p) { return p + (nz(p * 0.45).rb - 0.5) * 0.7; }
+// Land cover at p, the one both shaders cut the shore by: the tile mask a little blurred, so a
+// river's bends and the coast's corners come out rounded instead of in tile steps.
+float landAt(vec2 p) {
+  vec2 q = coastWarp(p);
+  return (smp(uMask, q).r * 2.0 + smp(uMask, q + vec2(0.4, 0.0)).r + smp(uMask, q - vec2(0.4, 0.0)).r
+    + smp(uMask, q + vec2(0.0, 0.4)).r + smp(uMask, q - vec2(0.0, 0.4)).r) / 6.0;
+}
 `;
 
 /*
@@ -102,11 +109,18 @@ void main() {
       if (sf.w > 0.0) {
         // Waterfall (the land shader leaves the cliff open only where a river crosses its edge):
         // streaks pouring down, a smooth glassy lip at the top, white water at the foot.
+        // Three sheets falling at different speeds: broad slow ropes behind, quick fine threads
+        // in front, and dark gaps where the curtain thins.
         float a = noise(vec2(vPos.x * 0.35, vPos.y * 0.05 - t * 2.6));
         float b = noise(vec2(vPos.x * 0.9 + 5.0, vPos.y * 0.09 - t * 3.8));
-        vec3 c = mix(vec3(0.45, 0.7, 0.75), vec3(0.95, 0.98, 0.98), smoothstep(0.35, 0.75, a) * 0.8 + smoothstep(0.6, 0.9, b) * 0.4);
+        float d = noise(vec2(vPos.x * 1.8 + 11.0, vPos.y * 0.12 - t * 5.2));
+        vec3 c = mix(vec3(0.36, 0.62, 0.68), vec3(0.95, 0.98, 0.98), smoothstep(0.35, 0.75, a) * 0.75 + smoothstep(0.6, 0.9, b) * 0.4);
+        c = mix(c, vec3(1.0), smoothstep(0.7, 0.92, d) * 0.5);
+        c *= 1.0 - 0.25 * smoothstep(0.35, 0.15, noise(vec2(vPos.x * 0.2 + 3.0, t * 0.4)));
         c = mix(c, vec3(0.32, 0.58, 0.6), smoothstep(0.15, 0.0, sf.w) * 0.6);
-        c = mix(c, vec3(0.97, 0.99, 0.99), smoothstep(0.7, 1.0, sf.w) * (0.7 + 0.3 * noise(vPos * 0.3 + t * 2.0)));
+        // Spray billowing up from the foot.
+        float spray = noise(vec2(vPos.x * 0.25, vPos.y * 0.25 + t * 1.5)) * noise(vPos * 0.6 - vec2(0.0, t * 2.0));
+        c = mix(c, vec3(0.97, 0.99, 0.99), smoothstep(0.55, 1.0, sf.w) * (0.6 + 0.4 * smoothstep(0.15, 0.4, spray)));
         finalColor = vec4(pow(c, vec3(0.95)) * vec3(1.04, 1.0, 0.94) * uAmbient, 1.0);
         return;
       }
@@ -119,7 +133,7 @@ void main() {
   vec2 pc = clamp(p, vec2(0.0), uSize);
   float beyond = length(p - pc);
   float fade = smoothstep(0.0, 6.0, beyond);
-  float land = smp(uMask, coastWarp(pc)).r * (1.0 - smoothstep(0.0, 2.0, beyond));
+  float land = landAt(pc) * (1.0 - smoothstep(0.0, 2.0, beyond));
   // Hidden under baked land: stop before the expensive part.
   if (land > 0.56) { finalColor = vec4(0.3, 0.45, 0.3, 1.0); return; }
   float depthRaw = mix(smp(uDist, pc).r, 1.0, fade);
@@ -193,11 +207,19 @@ void main() {
     float w = abs(ph0 - 0.5) * 2.0;
     float s1 = mix(noise(p * 2.4 - f * ph0 * 2.4), noise(p * 2.4 - f * ph1 * 2.4 + 0.37), w);
     float s2 = mix(noise(p * 6.0 - f * ph0 * 6.0 + 3.0), noise(p * 6.0 - f * ph1 * 6.0 + 7.3), w);
+    // Streaks drawn out along the current: noise squeezed across the flow and stretched along it.
+    vec2 fd = normalize(f + vec2(1e-4)), fs = vec2(-fd.y, fd.x);
+    vec2 q0 = p - f * ph0 * 2.0, q1 = p - f * ph1 * 2.0 + 0.53;
+    float streak = mix(noise(vec2(dot(q0, fd) * 1.2, dot(q0, fs) * 8.0)), noise(vec2(dot(q1, fd) * 1.2, dot(q1, fs) * 8.0)), w);
     vec3 rc = mix(vec3(0.15, 0.4, 0.43), vec3(0.27, 0.56, 0.54), s1);
-    rc += vec3(0.55, 0.6, 0.6) * smoothstep(0.62, 0.85, s2) * 0.35;
+    rc += vec3(0.55, 0.6, 0.6) * smoothstep(0.6, 0.85, streak) * 0.3 * length(f);
     // White water where it lands at the foot of a cliff.
-    float foot = smoothstep(0.12, 0.45, smp(uLevel, pc).r * ${MAX_LEVEL.toFixed(1)} - lift);
-    rc = mix(rc, vec3(0.93, 0.97, 0.97), foot * (0.6 + 0.4 * s2));
+    // White water where it lands at the foot of a cliff: a churning basin of foam with bubbles
+    // boiling up and drifting off downstream.
+    float foot = smoothstep(0.08, 0.5, smp(uLevel, pc).r * ${MAX_LEVEL.toFixed(1)} - lift);
+    float boil = noise(p * 7.0 - f * ph0 * 3.0 + vec2(0.0, t * 0.8)) * noise(p * 11.0 + vec2(t * 1.3, 0.0));
+    rc = mix(rc, vec3(0.93, 0.97, 0.97), foot * (0.55 + 0.45 * s2));
+    rc = mix(rc, vec3(0.97, 0.99, 0.99), smoothstep(0.25, 0.45, boil) * smoothstep(0.0, 0.3, foot) * 0.8);
     col = mix(col, rc, river);
   }
   if (land > 0.01) {
@@ -260,7 +282,7 @@ void main() {
     // water shader draws the waterfall there.
     // Opened only as wide as the river shows on top (where the land there is see-through),
     // with a soft edge: a hard cut leaves the fall's sides jagged.
-    float open = 1.0 - smoothstep(0.42, 0.5, smp(uMask, coastWarp(p)).r);
+    float open = 1.0 - smoothstep(0.42, 0.5, landAt(p));
     if (open > 0.99) { finalColor = vec4(0.0); return; }
     // Facing: the slope of the level field, lit from the upper left like everything else.
     vec2 gl = vec2(levelAt(p + vec2(0.25, 0.0)) - levelAt(p - vec2(0.25, 0.0)), levelAt(p + vec2(0.0, 0.25)) - levelAt(p - vec2(0.0, 0.25)));
@@ -290,7 +312,7 @@ void main() {
   }
   // Ground-plane point of this pixel on its terrace: fine detail stays fixed to the ground.
   vec2 vg = vPos + vec2(0.0, sf.z * ${LEVEL_H.toFixed(1)});
-  float land = smp(uMask, coastWarp(p)).r;
+  float land = landAt(p);
   if (land < 0.45) { finalColor = vec4(0.0); return; }
   vec2 warp = nz(p * 0.45).rb - 0.5;
   vec2 warp2 = vec2(noise(p * 1.7), noise(p * 1.7 + 13.0)) - 0.5;

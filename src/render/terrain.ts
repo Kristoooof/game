@@ -161,6 +161,9 @@ export function createTerrain(world: World, renderer: Renderer) {
       }
     return false;
   };
+  /** Water right in front (below on screen): only then does a tree's mirror image meet the shore. */
+  const waterInFront = (x: number, y: number) =>
+    [at(x + 1, y), at(x, y + 1), at(x + 1, y + 1)].some((t) => t === 'water' || t === 'river');
   /** Coastal things mirror into the sea: the same picture flipped about its base line `y`. */
   const mirror = (d: Container, y: number, into: Container) => {
     d.scale.y = -d.scale.y;
@@ -194,7 +197,7 @@ export function createTerrain(world: World, renderer: Renderer) {
         sh.alpha = 0.22 * shade.alpha;
         sh.zIndex = sp.zIndex - 0.5;
         into.addChild(sh);
-        if (!far && nearWater(x, y)) {
+        if (!far && waterInFront(x, y)) {
           const m = sprite(a, s.x, s.y, scale);
           m.zIndex = sp.zIndex;
           mirror(m, s.y, reflections);

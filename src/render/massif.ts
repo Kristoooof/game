@@ -105,12 +105,12 @@ export function createMassif(map: GameMap) {
         const s = tileToScreen(gx, gy);
         return { gx, gy, h, sx: s.x, sy: s.y - lift - h };
       });
-      if (vs.some((v) => v.h > 3)) {
+      // A tile that barely rises (a lone mountain tile) is left to the ground shader's scree.
+      if (vs.some((v) => v.h > 8)) {
         ctx = new GraphicsContext();
         const tri = (p: (typeof vs)[0], q: (typeof vs)[0], r: (typeof vs)[0]) => {
           const avg = (p.h + q.h + r.h) / 3;
-          // Barely raised: leave it to the ground shader's scree.
-          if (avg < 3) return;
+          if (Math.max(p.h, q.h, r.h) < 0.5) return;
           const a = [(q.gx - p.gx) * RUN, (q.gy - p.gy) * RUN, q.h - p.h];
           const b = [(r.gx - p.gx) * RUN, (r.gy - p.gy) * RUN, r.h - p.h];
           let n = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -129,7 +129,11 @@ export function createMassif(map: GameMap) {
           rgb = mix(SCREE, rgb, smooth(1, 20, avg));
           const c = hex(rgb);
           // Stroked in its own colour too, so no hairline gaps open between facets.
-          ctx!.poly([p.sx, p.sy, q.sx, q.sy, r.sx, r.sy]).fill(c).stroke({ width: 0.6, color: c });
+          // The lowest facets fade into the ground; the rest are stroked in their own colour too, so
+          // no hairline gaps open between them.
+          const fade = smooth(0.5, 6, avg);
+          ctx!.poly([p.sx, p.sy, q.sx, q.sy, r.sx, r.sy]).fill({ color: c, alpha: fade });
+          if (fade >= 1) ctx!.stroke({ width: 0.6, color: c });
           // A brush stroke down the slope, a shade darker (snow: a shade bluer): gullies and scree runs.
           if (avg > 8 && up < 0.9 && noise2(cx * 5.3, cy * 5.3, 84) > 0.45) {
             const low = [p, q, r].reduce((m, v) => (v.h < m.h ? v : m));

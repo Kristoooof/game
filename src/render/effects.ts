@@ -2,7 +2,7 @@ import { Container, Graphics, type Rectangle, Sprite, Texture } from 'pixi.js';
 import type { GameMap } from '../sim/map';
 import { terrainAt } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
-import { groundToScreen, tileToScreen } from './iso';
+import { groundToScreen, screenToGround, tileToScreen } from './iso';
 
 function puffTexture() {
   const c = document.createElement('canvas');
@@ -31,7 +31,7 @@ interface Puff {
 
 const MAX_PUFFS = 300;
 
-/** Chimney smoke and seagulls. Work is skipped for anything outside `view`. */
+/** Chimney smoke, seagulls, flocks of birds and leaping fish. Work is skipped for anything outside `view`. */
 export function createEffects(map: GameMap) {
   const layer = new Container();
   const puffTex = puffTexture();
@@ -81,6 +81,22 @@ export function createEffects(map: GameMap) {
     ...groundToScreen(f.x + 0.5 - f.dx * 0.4, f.y + 0.5 - f.dy * 0.4),
     next: 0,
   }));
+
+  // A flock now and then, crossing the view: small dark birds in a loose wedge, their shadows on the land.
+  type Bird = { body: Graphics; shadow: Graphics; dx: number; dy: number; phase: number };
+  let flock: { x: number; y: number; vx: number; vy: number; birds: Bird[] } | null = null;
+  let nextFlock = 8;
+  const bird = (color: number, alpha: number) =>
+    new Graphics()
+      .moveTo(-6, -2.2)
+      .quadraticCurveTo(-2.6, -5, 0, 0)
+      .quadraticCurveTo(2.6, -5, 6, -2.2)
+      .stroke({ width: 1.8, color, alpha, cap: 'round' });
+
+  // Fish leaping clear of the water: an arc, then rings where it went back in.
+  type Leap = { fish: Graphics; ring: Graphics; x: number; y: number; dir: number; age: number };
+  const leaps: Leap[] = [];
+  let nextLeap = 2;
 
   let time = 0;
   return {
@@ -153,6 +169,88 @@ export function createEffects(map: GameMap) {
         s.position.set(f.x + (Math.random() - 0.5) * 18, f.y + (Math.random() - 0.5) * 6);
         layer.addChild(s);
         puffs.push({ s, age: 0, life: 1.6, vx: (Math.random() - 0.5) * 10, vy: 9, size: 0.35, alpha: 0.35 });
+      }
+
+      nextFlock -= dt;
+      if (!flock && nextFlock <= 0) {
+        const fromLeft = Math.random() < 0.5;
+        const n = 5 + Math.floor(Math.random() * 5);
+        const birds = Array.from({ length: n }, (_, i) => {
+          const side = i % 2 ? 1 : -1;
+          const rank = Math.ceil(i / 2);
+          const b = { body: bird(0x2a2a32, 0.9), shadow: bird(0x000000, 0.15), phase: Math.random() * 6 };
+          layer.addChild(b.shadow, b.body);
+          return { ...b, dx: -rank * 13 + Math.random() * 4, dy: side * rank * 8 + Math.random() * 4 };
+        });
+        flock = {
+          x: fromLeft ? view.x - 60 : view.x + view.width + 60,
+          y: view.y + view.height * (0.15 + Math.random() * 0.5),
+          vx: (fromLeft ? 1 : -1) * (55 + Math.random() * 25),
+          vy: (Math.random() - 0.3) * 18,
+          birds,
+        };
+        if (!fromLeft) for (const b of birds) b.dx = -b.dx;
+      }
+      if (flock) {
+        const f = flock;
+        f.x += f.vx * dt;
+        f.y += f.vy * dt;
+        for (const b of f.birds) {
+          const flap = 0.5 + 0.5 * Math.sin(time * 11 + b.phase);
+          b.body.position.set(f.x + b.dx, f.y + b.dy);
+          b.body.scale.set(1, 0.4 + flap * 0.8);
+          b.shadow.position.set(f.x + b.dx + 40, f.y + b.dy + 140);
+          b.shadow.scale.set(1, 0.4 + flap * 0.6);
+        }
+        if (!inView(f.x, f.y, 400)) {
+          for (const b of f.birds) {
+            b.body.destroy();
+            b.shadow.destroy();
+          }
+          flock = null;
+          nextFlock = 20 + Math.random() * 25;
+        }
+      }
+
+      nextLeap -= dt;
+      if (nextLeap <= 0) {
+        nextLeap = 1.2 + Math.random() * 2.5;
+        const x = view.x + Math.random() * view.width;
+        const y = view.y + Math.random() * view.height;
+        const t = screenToGround(x, y);
+        const wet = (u: number, v: number) => ['water', 'river'].includes(terrainAt(map, u, v) ?? 'water');
+        const around = [wet(t.x + 1, t.y), wet(t.x, t.y + 1), wet(t.x - 1, t.y), wet(t.x, t.y - 1)].filter(Boolean);
+        if (wet(t.x, t.y) && around.length >= 3) {
+          const fish = new Graphics().ellipse(0, 0, 3.2, 1.2).fill(0x8a9aa8).circle(-3.4, 0, 0.9).fill(0x6a7a88);
+          const ring = new Graphics();
+          layer.addChild(ring, fish);
+          leaps.push({ fish, ring, x, y, dir: Math.random() < 0.5 ? -1 : 1, age: 0 });
+        }
+      }
+      for (let i = leaps.length - 1; i >= 0; i--) {
+        const l = leaps[i];
+        l.age += dt;
+        // 0.6 s in the air, then rings spreading for a second.
+        const k = Math.min(1, l.age / 0.6);
+        l.fish.visible = k < 1;
+        l.fish.position.set(l.x + l.dir * k * 14, l.y - Math.sin(k * Math.PI) * 12);
+        l.fish.rotation = l.dir * (k - 0.5) * 2;
+        l.fish.scale.x = l.dir;
+        const r = l.age - 0.55;
+        l.ring.clear();
+        for (const [x, d] of [
+          [l.x, l.age],
+          [l.x + l.dir * 14, r],
+        ])
+          if (d > 0 && d < 1.2)
+            l.ring
+              .ellipse(x, l.y, 2 + d * 10, 1 + d * 4)
+              .stroke({ width: 1, color: 0xe8f2f2, alpha: 0.7 * (1 - d / 1.2) });
+        if (l.age > 1.8) {
+          l.fish.destroy();
+          l.ring.destroy();
+          leaps.splice(i, 1);
+        }
       }
 
       for (const g of gulls) {
