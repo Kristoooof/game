@@ -21,6 +21,7 @@ import { buildingAt, createWorld, demolish, place, placementError, roadPath } fr
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
 import { createAtmosphere, type Weather } from './render/atmosphere';
 import { createConstruction } from './render/construction';
+import { createLife } from './render/life';
 import { daylight } from './render/daylight';
 import { createFpsCounter, createSettingsPanel, loadSettings, resolutionOf } from './ui/settings';
 import { createFxaa } from './render/fxaa';
@@ -118,12 +119,16 @@ const construction = createConstruction(effects.dust, (id) => {
 // Weather and air; `?idojaras=rain` (clear, cloudy, rain, fog) fixes it. Cloud shadows fall on the world.
 const fixedWeather = new URLSearchParams(location.search).get('idojaras') as Weather | null;
 const atmosphere = createAtmosphere(fixedWeather ?? undefined);
+// People, carts and boats; their wakes and reflections lie on the water, under the land.
+const life = createLife(world, app.renderer);
 const lit = new Container({
   children: [
     terrain.reflections,
+    life.water,
     terrain.ground,
     territory,
     terrain.objects,
+    life.layer,
     construction.layer,
     atmosphere.world,
     effects.layer,
@@ -230,6 +235,7 @@ app.ticker.add((t) => {
   );
   terrain.update(dt, view, cam.scale);
   construction.update(dt);
+  life.update(dt, view, cam.scale < FAR_SCALE);
   // The target keeps CSS-pixel units; its own resolution does the downscaling.
   waterTransform.set(cam.scale, 0, 0, cam.scale, cam.x, cam.y);
   app.renderer.render({ container: waterScene, target: waterTexture, transform: waterTransform, clear: true });
@@ -244,6 +250,7 @@ app.ticker.add((t) => {
 /** Redraw after a world change in `tiles` (built on, cleared or demolished). */
 const refresh = (tiles: [number, number][] = []) => {
   terrain.changed(tiles);
+  life.refresh();
   effects.setChimneys([...world.buildings.values()].flatMap((b) => chimneyAt(b.type, b.x, b.y) ?? []));
   drawTerritory(territory, world);
   showResources();

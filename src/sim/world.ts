@@ -132,3 +132,43 @@ export function roadPath(ax: number, ay: number, bx: number, by: number) {
   path.push([bx, by]);
   return path;
 }
+
+const isRoad = (w: World, i: number) => w.buildings.get(w.occupied[i])?.type === 'road';
+
+/** Road tiles (as tile indices) touching building b's footprint: where goods leave or arrive. */
+export function roadsBeside(w: World, b: Building) {
+  const W = w.map.width;
+  const out = new Set<number>();
+  for (const [tx, ty] of footprint(b.type, b.x, b.y))
+    for (const [nx, ny] of [
+      [tx + 1, ty],
+      [tx - 1, ty],
+      [tx, ty + 1],
+      [tx, ty - 1],
+    ])
+      if (terrainAt(w.map, nx, ny) && isRoad(w, ny * W + nx)) out.add(ny * W + nx);
+  return [...out];
+}
+
+/** Shortest route along roads (tile indices, start to goal) from any of `from` to any of `to`, or null. */
+export function roadRoute(w: World, from: number[], to: number[]) {
+  const W = w.map.width;
+  const goal = new Set(to);
+  const prev = new Map<number, number>(from.map((i) => [i, -1]));
+  const queue = [...from];
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    if (goal.has(i)) {
+      const route = [i];
+      for (let p = prev.get(i)!; p >= 0; p = prev.get(p)!) route.push(p);
+      return route.reverse();
+    }
+    const x = i % W;
+    for (const j of [x + 1 < W ? i + 1 : -1, x > 0 ? i - 1 : -1, i + W, i - W])
+      if (j >= 0 && j < w.map.tiles.length && !prev.has(j) && isRoad(w, j)) {
+        prev.set(j, i);
+        queue.push(j);
+      }
+  }
+  return null;
+}

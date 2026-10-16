@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { parseMap } from './map';
-import { buildingAt, createWorld, demolish, place, placementError, roadPath } from './world';
+import { buildingAt, createWorld, demolish, place, placementError, roadPath, roadRoute, roadsBeside } from './world';
 
 const MAP = `
 ~~~~~~~~~~~
@@ -60,5 +60,30 @@ test('roadPath is an L along x then y', () => {
     [2, 2],
     [2, 1],
     [2, 0],
+  ]);
+});
+
+test('carts find the shortest road route between buildings', () => {
+  const w = createWorld(parseMap(MAP));
+  place(w, 'harbor', 1, 1);
+  for (const [x, y] of roadPath(3, 1, 3, 4)) place(w, 'road', x, y);
+  place(w, 'road', 4, 4);
+  place(w, 'house', 5, 1);
+  const W = w.map.width;
+  const harbor = buildingAt(w, 1, 1)!;
+  const house = buildingAt(w, 5, 1)!;
+  // The road at (3,1) touches the harbor; the house (5..6) has no road beside it until (4,1) is built.
+  expect(roadsBeside(w, harbor)).toContain(1 * W + 3);
+  expect(roadsBeside(w, house)).toEqual([]);
+  place(w, 'road', 4, 1);
+  const route = roadRoute(w, roadsBeside(w, harbor), roadsBeside(w, house));
+  expect(route?.[route.length - 1]).toBe(1 * W + 4);
+  expect(roadRoute(w, [4 * W + 4], roadsBeside(w, house))).toEqual([
+    4 * W + 4,
+    4 * W + 3,
+    3 * W + 3,
+    2 * W + 3,
+    1 * W + 3,
+    1 * W + 4,
   ]);
 });

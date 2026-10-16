@@ -98,6 +98,7 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Táj: folyók a hegyekből a tengerig (patakként indulnak, kanyarognak, folyásiránnyal áramló víz), vízesés a hegy peremén, híd ahol út keresztezi; sziklás partszakaszok, dűnés széles strandok, dombok, virágos mezők
 - [x] Domborzat: teraszok (2 szint) sziklafallal, peremfénnyel és lábárnyékkal; a folyó szintenként lép le, ott valódi vízesés zúdul a sziklafalon habbal és párával; folyó-sodrás flowmappel (kanyarban és a partnál is egyenletes); épület nem állhat szintek határán, az út rámpaként átmehet
 - [x] Hangulat: időjárás (derült, felhős, eső, köd; néhány percenként vált), sodródó felhőárnyékok, eső cseppekkel és gyűrűkkel a vízen, köd a tengeren, szélre hajló fák; beállítás: változó / mindig derült; `?idojaras=rain`
+- [x] Mozgó élet: emberkék sétálnak az utakon, szekerek a raktár/kikötő és a házak között (legrövidebb úton), halászcsónakok a halászkunyhóknál; vitorlások a nyílt tengeren hullámnyommal, orrhullámmal és tükörképpel
 - [ ] Grafika finomítása (épület sprite-ok, animációk)
 - [ ] Hangok, zene
 - [x] Teljesítmény: statikus világ darabonként textúrába sütve (zoomhoz igazított felbontás, csak a változott darab sül újra, nem látott darabok felszabadulnak), élő csak a víz-shader; JS idő/képkocka 9,5 → 1,1 ms
