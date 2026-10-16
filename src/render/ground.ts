@@ -341,12 +341,13 @@ export function createGround(map: GameMap) {
     },
   });
   const noise = bakeNoise();
+  // highp: positions are thousands of world pixels, and phones' mediump (16-bit) turns them into blocks.
   const waterShader = Shader.from({
-    gl: { vertex, fragment: waterFragment, name: 'water' },
+    gl: { vertex, fragment: waterFragment, name: 'water', preferredFragmentPrecision: 'highp' },
     resources: resources('water'),
   });
   const landShader = Shader.from({
-    gl: { vertex, fragment: landFragment, name: 'land' },
+    gl: { vertex, fragment: landFragment, name: 'land', preferredFragmentPrecision: 'highp' },
     resources: resources('land'),
   });
 
