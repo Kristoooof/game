@@ -598,8 +598,8 @@ export function makeArt() {
     boulder,
     /** Sea rocks: three low ones, then three tall stacks. */
     seaRocks: [71, 72, 73].map((k) => seaRock(k, false)).concat([74, 75, 76].map((k) => seaRock(k, true))),
-    peaks: [21, 22, 23].map((k) => mountain(k, true)),
-    hills: [24, 25, 26, 27].map((k) => mountain(k, false)),
+    peaks: [21, 22, 23, 28, 29].map((k) => mountain(k, true)),
+    hills: [24, 25, 26, 27, 30].map((k) => mountain(k, false)),
   };
 }
 

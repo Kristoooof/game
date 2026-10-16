@@ -229,6 +229,18 @@ void main() {
 // Baked once per chunk: a fine terrace search, for smooth cliff edges.
 const landFragment = /* glsl */ `#define SURFACE_STEPS 20
 ${common}
+// Short slanted brush strokes, two offset layers: −1 (dark dab) .. 1 (light dab).
+float dabs(vec2 q) {
+  float s = 0.0;
+  for (int k = 0; k < 2; k++) {
+    vec2 c = q + float(k) * vec2(0.5, 0.37), i = floor(c), f = fract(c) - 0.5;
+    f -= (vec2(hash(i + 11.0), hash(i + 17.0)) - 0.5) * 0.5;
+    float a = -0.5 + (hash(i + 23.0) - 0.5) * 0.6;
+    vec2 r = mat2(cos(a), sin(a), -sin(a), cos(a)) * f;
+    s += (1.0 - smoothstep(0.7, 1.0, length(r / vec2(0.42, 0.12)))) * (hash(i + 29.0) * 2.0 - 1.0);
+  }
+  return s;
+}
 // Inland rise, small bumps, rolling hills, and dune ridges where the sand is wide.
 float height(vec2 q) {
   float sand = smp(uMask, q).g;
@@ -279,9 +291,14 @@ void main() {
   vec2 g = vec2(vg.x, vg.y * 2.0) / 32.0;
   vec4 m = smp(uMask, p + warp * 0.7);
 
+  // Grass in three moods, in broad patches that read even from far off: deep lush green,
+  // fresh green, and sun-dried olive-gold.
   float n = fbm(p * 0.22);
-  vec3 grass = mix(vec3(0.36, 0.6, 0.22), vec3(0.52, 0.7, 0.28), n);
-  grass = mix(grass, vec3(0.66, 0.68, 0.34), smoothstep(0.62, 0.8, fbm(p * 0.13 + 7.0)) * 0.7);
+  vec3 grass = mix(vec3(0.26, 0.47, 0.18), vec3(0.46, 0.63, 0.25), smoothstep(0.25, 0.75, fbm(p * 0.06 + 3.0)));
+  grass = mix(grass, vec3(0.6, 0.6, 0.31), smoothstep(0.52, 0.78, fbm(p * 0.11 + 7.0)) * 0.75);
+  grass *= 0.88 + 0.24 * n;
+  // Brush dabs of lighter and darker green: the ground looks painted, not printed.
+  grass *= 1.0 + 0.09 * dabs(g * 5.0) * (1.0 - uFar);
   float fine = noise(g * 8.0) * 0.6 + noise(g * 19.0) * 0.4;
   grass *= 0.9 + 0.2 * fine;
   // Blade streaks: thin vertical grain on screen, bent by noise; darker clumps of long grass.
@@ -307,7 +324,10 @@ void main() {
   vec3 floorCol = vec3(0.23, 0.38, 0.16) * (0.85 + 0.3 * fine);
   float bumps = noise(p * 4.0) * 0.6 + noise(p * 9.0) * 0.4;
   vec3 canopy = mix(vec3(0.12, 0.27, 0.13), vec3(0.3, 0.48, 0.2), bumps);
-  col = mix(col, mix(floorCol, canopy, uFar), smoothstep(0.3, 0.7, smp(uDist, pf).b));
+  float wood = smp(uDist, pf).b;
+  col = mix(col, mix(floorCol, canopy, uFar), smoothstep(0.3, 0.7, wood));
+  // Shade spilling out of the wood onto the grass beside it.
+  col *= 1.0 - 0.22 * smoothstep(0.0, 0.35, wood) * (1.0 - smoothstep(0.35, 0.7, wood));
 
   // Rock: ridged noise gives crevices and ledges; scree and moss where it meets the grass.
   // Highland ground: pale stone with ochre and lichen, gravel, scrub where it meets the grass.

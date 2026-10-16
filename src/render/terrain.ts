@@ -84,16 +84,20 @@ export function createTerrain(world: World, renderer: Renderer) {
   let sunStep = 3;
   let shade = sunShadow(sunStep);
 
-  // Mountain tiles deep inside a range get taller peaks.
-  const rockDepth = new Uint8Array(W * H);
-  for (let pass = 1; pass <= 3; pass++)
-    for (let y = 1; y < H - 1; y++)
-      for (let x = 1; x < W - 1; x++) {
-        const i = y * W + x;
-        if (at(x, y) !== 'mountain' || rockDepth[i] !== pass - 1) continue;
-        if ([i - 1, i + 1, i - W, i + W].every((j) => map.tiles[j] === 'mountain' && rockDepth[j] >= pass - 1))
-          rockDepth[i] = pass;
-      }
+  /** Tiles of `type` `depth` steps or more inside their patch (up to 3): taller peaks, darker woods. */
+  const depthIn = (type: string) => {
+    const depth = new Uint8Array(W * H);
+    for (let pass = 1; pass <= 3; pass++)
+      for (let y = 1; y < H - 1; y++)
+        for (let x = 1; x < W - 1; x++) {
+          const i = y * W + x;
+          if (at(x, y) !== type || depth[i] !== pass - 1) continue;
+          if ([i - 1, i + 1, i - W, i + W].every((j) => map.tiles[j] === type && depth[j] >= pass - 1)) depth[i] = pass;
+        }
+    return depth;
+  };
+  const rockDepth = depthIn('mountain');
+  const woodDepth = depthIn('forest');
 
   /**
    * Draw order of something standing at tile point (px, py), given its own depth `z`: a building is
@@ -147,9 +151,10 @@ export function createTerrain(world: World, renderer: Renderer) {
       const t = at(x, y);
       const r = mulberry32(x * 92821 + y * 68917 + 7);
       /** `lean`: trees bend a little with the prevailing wind. */
-      const put = (a: Art, u: number, v: number, scale: number, lean = false) => {
+      const put = (a: Art, u: number, v: number, scale: number, lean = false, tint = 0xffffff) => {
         const s = groundToScreen(x + u, y + v);
         const sp = sprite(a, s.x, s.y, scale);
+        sp.tint = tint;
         if (lean) sp.skew.x = -(0.05 + ((x * 7 + y * 13) % 5) * 0.012);
         sp.zIndex = depthBeside(x + u, y + v, x + y + u + v);
         into.addChild(sp);
@@ -172,23 +177,28 @@ export function createTerrain(world: World, renderer: Renderer) {
       // Small rocks are always low ones; big ones may be tall stacks.
       if (rock) put(art.seaRocks[rock[2] < 0.35 ? rock[3] % 3 : rock[3]], rock[0], rock[1], rock[2] * 1.4);
       else if (t === 'forest' && !far) {
-        const n = 2 + Math.floor(r() * 3);
+        // Young trees and undergrowth at the edge; old, tall, shadowed trees deep inside.
+        const d = woodDepth[y * W + x];
+        const n = 3 + Math.floor(r() * 2) + (d > 1 ? 1 : 0);
+        const grow = 0.85 + d * 0.08;
+        const dark = [0xffffff, 0xe6ece4, 0xccd6ca, 0xb8c4b6][d];
         for (let i = 0; i < n; i++) {
           const u = 0.1 + r() * 0.8;
           const v = 0.1 + r() * 0.8;
           const k = r();
-          if (k < 0.6) put(art.conifers[Math.floor(r() * 3)], u, v, 0.75 + r() * 0.45, true);
-          else if (k < 0.93) put(leaf(r()), u, v, 0.7 + r() * 0.4, true);
+          const bush = d === 0 ? 0.75 : 0.93;
+          if (k < 0.55) put(art.conifers[Math.floor(r() * 3)], u, v, (0.75 + r() * 0.45) * grow, true, dark);
+          else if (k < bush) put(leaf(r()), u, v, (0.7 + r() * 0.4) * grow, true, dark);
           else put(art.bushes[Math.floor(r() * 2)], u, v, 0.8 + r() * 0.4);
         }
       } else if (t === 'mountain') {
-        // Sparse peaks on a checkerboard so they do not stack into rows; snow only deep inside a range.
+        // Peaks on a checkerboard at the edge of a range, crowded into a massif deep inside; snow only deep inside.
         const d = rockDepth[y * W + x];
         const p = r();
         const k = r();
         // A peak is about two tiles wide: on one terrace all round, or it would hang over a
         // cliff edge or stand against the foot of one.
-        if ((x + y) % 2 === 0 && p < 0.45 + d * 0.15 && flatAround(x, y, 1)) {
+        if (((x + y) % 2 === 0 || d >= 2) && p < 0.45 + d * 0.15 && flatAround(x, y, 1)) {
           // Near a cliff only a small hill, kept within its own tile.
           const roomy = flatAround(x, y, 2);
           const kinds = d >= 2 && roomy ? art.peaks : art.hills;
