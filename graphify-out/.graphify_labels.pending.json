@@ -22,5 +22,6 @@
   "20": "settings.ts",
   "21": "textures.ts",
   "22": "showPreview",
-  "23": "world.ts"
+  "23": "world.ts",
+  "24": "refresh"
 }

@@ -91,7 +91,11 @@ export function createTerrain(world: World, renderer: Renderer) {
 
   /** Within two tiles of the sea: its reflections are drawn. */
   const nearWater = (x: number, y: number) => {
-    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (at(x + dx, y + dy) === 'water') return true;
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        const t = at(x + dx, y + dy);
+        if (t === 'water' || t === 'river') return true;
+      }
     return false;
   };
   /** A pier from the middle of a waterside footprint edge out over the sea, front sides first. */
@@ -169,6 +173,11 @@ export function createTerrain(world: World, renderer: Renderer) {
           else if (coastal && p < 0.2)
             put(art.driftwood[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.9 + r() * 0.4);
           else if (p < 0.12) put(art.pebbles[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.8 + r() * 0.5);
+        } else if (t === 'rocky' && !far) {
+          // Stony shore: boulders and loose stones.
+          const p = r();
+          if (p < 0.35) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.6 + r() * 0.9);
+          else if (p < 0.6) put(art.pebbles[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.9 + r() * 0.5);
         } else if (t === 'grass' && !far) {
           const p = r();
           if (p < 0.035) put(leaf(r()), 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.75 + r() * 0.35);

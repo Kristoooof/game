@@ -637,11 +637,14 @@ export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.widt
     y < w.map.height &&
     w.buildings.get(w.occupied[y * w.map.width + x])?.type === 'road';
   const segs: number[][] = [];
+  /** Road over a river: a wooden bridge instead of dirt. */
+  const bridges: number[][] = [];
   for (let y = y0; y < y1; y++)
     for (let x = x0; x < x1; x++) {
       if (!isRoad(x, y)) continue;
       const c = tileToScreen(x + 0.5, y + 0.5);
-      segs.push([c.x, c.y, c.x, c.y]);
+      const over = w.map.tiles[y * w.map.width + x] === 'river' ? bridges : segs;
+      over.push([c.x, c.y, c.x, c.y]);
       // All four directions: a neighbour in another chunk draws its own half.
       for (const [dx, dy] of [
         [1, 0],
@@ -651,9 +654,27 @@ export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.widt
       ])
         if (isRoad(x + dx, y + dy)) {
           const n = tileToScreen(x + dx / 2 + 0.5, y + dy / 2 + 0.5);
-          segs.push([c.x, c.y, n.x, n.y]);
+          over.push([c.x, c.y, n.x, n.y]);
         }
     }
+  // Bridge: dark rails either side of a plank deck, with planks across it.
+  for (const [width, color] of [
+    [24, 0x3e2c1a],
+    [19, 0x9a7048],
+  ] as const) {
+    for (const [ax, ay, bx, by] of bridges) g.moveTo(ax, ay).lineTo(bx, by);
+    if (bridges.length) g.stroke({ width, color, cap: 'butt', join: 'round' });
+  }
+  for (const [ax, ay, bx, by] of bridges) {
+    const len = Math.hypot(bx - ax, by - ay);
+    if (len < 1) continue;
+    const [ux, uy] = [(bx - ax) / len, (by - ay) / len];
+    for (let d = 2; d < len; d += 4) {
+      const [px, py] = [ax + ux * d, ay + uy * d];
+      g.moveTo(px - uy * 9, py + ux * 9).lineTo(px + uy * 9, py - ux * 9);
+    }
+  }
+  if (bridges.length) g.stroke({ width: 0.7, color: 0x5a3e24 });
   if (!segs.length) return;
   // Layered strokes: dark verge, packed dirt, then a lighter worn centre.
   for (const [width, color, alpha] of [

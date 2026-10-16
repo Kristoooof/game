@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-16)
 
 ## Corpus Check
-- 43 files · ~30,461 words
+- 43 files · ~32,483 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 382 nodes · 763 edges · 24 communities (22 shown, 2 thin omitted)
+- 383 nodes · 766 edges · 25 communities (23 shown, 2 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 2 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0a2193a8`
+- Built from commit: `85978d2b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -40,6 +40,7 @@
 - textures.ts
 - showPreview
 - world.ts
+- refresh
 
 ## God Nodes (most connected - your core abstractions)
 1. `drawBuilding()` - 26 edges
@@ -50,7 +51,7 @@
 6. `walls()` - 15 edges
 7. `tileToScreen()` - 15 edges
 8. `showPreview()` - 14 edges
-9. `terrainAt()` - 13 edges
+9. `terrainAt()` - 14 edges
 10. `house()` - 12 edges
 
 ## Surprising Connections (you probably didn't know these)
@@ -68,7 +69,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (24 total, 2 thin omitted)
+## Communities (25 total, 2 thin omitted)
 
 ### Community 0 - "package.json"
 Cohesion: 0.07
@@ -88,7 +89,7 @@ Nodes (20): caveman, Example output, How to invoke, See also, What it does, 1. A
 
 ### Community 4 - "main.ts"
 Cohesion: 0.05
-Nodes (41): app, applySettings(), cam, countFps, effects, fixedTime, fxaa, ghost (+33 more)
+Nodes (39): app, applySettings(), cam, countFps, effects, fixedTime, fxaa, ghost (+31 more)
 
 ### Community 5 - "compilerOptions"
 Cohesion: 0.17
@@ -135,8 +136,8 @@ Cohesion: 0.21
 Nodes (12): active(), attachCameraControls(), Camera, cancel(), end(), Handlers, MAX_SCALE, MIN_SCALE (+4 more)
 
 ### Community 18 - "world.ts"
-Cohesion: 0.23
-Nodes (12): CHARS, GameMap, generateMap(), labelIslands(), lerp(), parseMap(), smooth(), Terrain (+4 more)
+Cohesion: 0.22
+Nodes (12): carveRiver(), CHARS, GameMap, generateMap(), labelIslands(), lerp(), parseMap(), smooth() (+4 more)
 
 ### Community 19 - "data/buildings.ts"
 Cohesion: 0.18
@@ -158,6 +159,10 @@ Nodes (18): anchorFor(), cancel(), construction, demolishAt(), end(), footprint(
 Cohesion: 0.44
 Nodes (7): createWorld(), demolish(), footprint(), place(), placementError(), roadPath(), updateTerritory()
 
+### Community 24 - "refresh"
+Cohesion: 0.67
+Nodes (3): icon(), refresh(), showResources()
+
 ## Knowledge Gaps
 - **3 isolated node(s):** `eslint`, `prettier`, `typescript`
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 181 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
@@ -167,7 +172,7 @@ Nodes (7): createWorld(), demolish(), footprint(), place(), placementError(), ro
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `pixi.js` connect `terrain.ts` to `package.json`, `main.ts`, `render/buildings.ts`, `data/buildings.ts`, `textures.ts`?**
-  _High betweenness centrality (0.100) - this node is a cross-community bridge._
+  _High betweenness centrality (0.099) - this node is a cross-community bridge._
 - **What connects `eslint`, `prettier`, `typescript` to the rest of the system?**
   _3 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**

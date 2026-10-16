@@ -27,7 +27,34 @@ describe('generateMap', () => {
         expect(terrainAt(map, x, y)).toBe('water');
     }
     expect(landAreas(map).filter((a) => a >= 40).length).toBeGreaterThanOrEqual(3);
-    expect(new Set(map.tiles)).toEqual(new Set(['water', 'beach', 'grass', 'forest', 'mountain']));
+    expect(new Set(map.tiles)).toEqual(new Set(['water', 'beach', 'rocky', 'grass', 'forest', 'mountain', 'river']));
+  });
+
+  test('rivers reach the sea without splitting their island', () => {
+    const map = generateMap(1234);
+    const labels = labelIslands(map);
+    let mouths = 0;
+    map.tiles.forEach((t, i) => {
+      if (t !== 'river') return;
+      const x = i % map.width;
+      const y = Math.floor(i / map.width);
+      // Every river tile belongs to an island, and some river tiles open onto the sea.
+      expect(labels[i]).toBeGreaterThan(0);
+      if (
+        [
+          terrainAt(map, x + 1, y),
+          terrainAt(map, x - 1, y),
+          terrainAt(map, x, y + 1),
+          terrainAt(map, x, y - 1),
+        ].includes('water')
+      )
+        mouths++;
+    });
+    expect(mouths).toBeGreaterThan(0);
+    expect(map.waterfalls!.length).toBeGreaterThan(0);
+    // Same islands as without rivers: a river counts as part of its island.
+    const dry = { ...map, tiles: map.tiles.map((t) => (t === 'river' ? 'grass' : t)) };
+    expect(Math.max(...labels)).toBe(Math.max(...labelIslands(dry)));
   });
 });
 

@@ -49,7 +49,8 @@ export function placementError(w: World, type: BuildingId, x: number, y: number)
   const tiles = footprint(type, x, y);
   for (const [tx, ty] of tiles) {
     const t = terrainAt(w.map, tx, ty);
-    if (!t || t === 'water' || t === 'mountain') return 'Ide nem lehet építeni';
+    // Roads may cross a river (as a bridge); nothing else stands in it.
+    if (!t || t === 'water' || t === 'mountain' || (t === 'river' && type !== 'road')) return 'Ide nem lehet építeni';
     const i = ty * w.map.width + tx;
     if (w.occupied[i]) return 'A hely foglalt';
     if (!def.settles && !w.owned[i]) return 'Saját területen kívül';

@@ -34,6 +34,7 @@ uniform vec3 uAmbient;
 uniform vec3 uSun;
 uniform vec3 uMoon;
 uniform sampler2D uRocks;
+uniform sampler2D uRiver;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 // Baked, tileable noise (see bakeNoise): r = 4-octave fbm, g = single octave, b = second fbm.
@@ -100,7 +101,7 @@ void main() {
   float bend = (noise(p * 1.1) - 0.5) * 0.3 + (fbm(p * 0.6) - 0.5) * 0.12;
   float swell = sin((depthRaw + bend) * 19.0 - t * 2.4 + h0 * 6.0);
   float patchy = smoothstep(0.45, 0.8, noise(p * 0.9 + vec2(t * 0.03, 0.0)));
-  float breaker = smoothstep(0.75, 1.0, swell) * patchy * (1.0 - smoothstep(0.03, 0.26, depthRaw)) * (1.0 - fade);
+  float breaker = smoothstep(0.75, 1.0, swell) * (1.0 - smoothstep(0.1, 0.4, smp(uRiver, pc).r)) * patchy * (1.0 - smoothstep(0.03, 0.26, depthRaw)) * (1.0 - fade);
   col = mix(col, vec3(0.92, 0.96, 0.95), breaker * 0.5);
   // Offshore rocks (uRocks: r size, gb position in the tile): foam collar and ripple rings.
   // The 3×3 neighbourhood, so a big rock's rings are not cut at its tile's edge.
@@ -123,14 +124,28 @@ void main() {
       }
     col = mix(col, vec3(0.88, 0.94, 0.94), clamp(rings, 0.0, 1.0) * 0.6 * (1.0 - uFar) * (1.0 - fade));
   }
+  // Rivers (uRiver: r coverage, gb flow direction): fresh water with streaks running downstream.
+  vec4 rv = smp(uRiver, pc);
+  float river = smoothstep(0.2, 0.6, rv.r);
+  if (river > 0.0) {
+    vec2 f = rv.gb * 2.0 - 1.0;
+    f = length(f) > 0.05 ? normalize(f) : vec2(0.0, 1.0);
+    vec2 q = vec2(dot(p, vec2(-f.y, f.x)), dot(p, f));
+    float s1 = noise(vec2(q.x * 3.0, q.y * 0.7 - t * 1.2));
+    float s2 = noise(vec2(q.x * 7.0 + 3.0, q.y * 1.5 - t * 2.2));
+    vec3 rc = mix(vec3(0.15, 0.4, 0.43), vec3(0.27, 0.56, 0.54), s1);
+    rc += vec3(0.55, 0.6, 0.6) * smoothstep(0.72, 0.92, s2) * 0.3;
+    col = mix(col, rc, river);
+  }
   if (land > 0.01) {
-    col = mix(col, vec3(0.5, 0.76, 0.7), smoothstep(0.2, 0.5, land) * 0.5);
+    col = mix(col, vec3(0.5, 0.76, 0.7), smoothstep(0.2, 0.5, land) * 0.5 * (1.0 - river));
     float roll = sin(land * 40.0 - t * 2.2 + fbm(p * 0.8) * 4.0 + noise(p * 0.7) * 6.0) * noise(p * 1.2 + t * 0.05);
     col += vec3(0.2) * smoothstep(0.88, 0.99, roll) * smoothstep(0.02, 0.3, land);
     float wave = 0.32 + 0.06 * sin(t * 1.4 + noise(p * 1.3) * 7.0);
     float foam = smoothstep(wave - 0.04, wave + 0.02, land) * (0.6 + 0.4 * noise(p * 9.0 + t));
     foam = max(foam, smoothstep(0.42, 0.49, land));
-    col = mix(col, vec3(0.94, 0.97, 0.96), clamp(foam, 0.0, 1.0) * 0.85);
+    // In a river only a thin rim of foam along the banks.
+    col = mix(col, vec3(0.94, 0.97, 0.96), clamp(foam, 0.0, 1.0) * 0.85 * (1.0 - river * 0.85));
   }
   col = pow(col, vec3(0.95)) * vec3(1.04, 1.0, 0.94) * uAmbient;
   // Moonlight: a glittering column under the moon (uMoon: world x, half width, strength).
@@ -149,7 +164,14 @@ void main() {
  * relief. Sea pixels come out transparent so the live water shows through.
  */
 const landFragment = /* glsl */ `${common}
-float height(vec2 q) { return smp(uDist, q).g * 1.6 + fbm(q * 0.5) * 0.9; }
+// Inland rise, small bumps, rolling hills, and dune ridges where the sand is wide.
+float height(vec2 q) {
+  float sand = smp(uMask, q).g;
+  // Ridged, warped noise: crests that bend, fork and fade, not parallel stripes.
+  float crest = 1.0 - abs(noise(q * 0.8 + warpN(q * 0.6) * 1.5) * 2.0 - 1.0);
+  float dune = sand * sand * crest * crest * 0.9;
+  return smp(uDist, q).g * 1.6 + fbm(q * 0.5) * 0.9 + smoothstep(0.3, 0.8, fbm(q * 0.1 + 11.0)) * 9.0 + dune;
+}
 void main() {
   vec2 p = tileCoord();
   float land = smp(uMask, coastWarp(p)).r;
@@ -177,8 +199,14 @@ void main() {
   grass = mix(grass, grass * 1.3, blade * 0.6);
   vec2 cf = g * 6.0, iff = floor(cf);
   float dot = 1.0 - smoothstep(0.06, 0.12, length(fract(cf) - 0.3 - 0.4 * vec2(hash(iff + 4.0), hash(iff + 5.0))));
-  vec3 flower = mix(vec3(1.0, 0.95, 0.75), vec3(0.95, 0.6, 0.75), hash(iff + 9.0));
-  grass = mix(grass, flower, dot * step(0.97, hash(iff + 3.0)) * step(0.6, noise(p * 0.7)) * (1.0 - uFar));
+  // Meadows: patches of the island thick with poppies, buttercups, cornflowers and daisies.
+  float meadow = smoothstep(0.55, 0.7, fbm(p * 0.06 + 31.0));
+  grass = mix(grass, grass * vec3(1.05, 1.08, 0.9), meadow * 0.5);
+  float fh = hash(iff + 9.0);
+  vec3 flower = fh < 0.25 ? vec3(0.88, 0.2, 0.15) : fh < 0.5 ? vec3(0.98, 0.85, 0.25) : fh < 0.75 ? vec3(0.55, 0.45, 0.9) : vec3(1.0, 0.97, 0.9);
+  flower = mix(mix(vec3(1.0, 0.95, 0.75), vec3(0.95, 0.6, 0.75), fh), flower, meadow);
+  float bloom = step(mix(0.97, 0.55, meadow), hash(iff + 3.0)) * max(step(0.6, noise(p * 0.7)), meadow);
+  grass = mix(grass, flower, dot * bloom * (1.0 - uFar));
   vec3 col = grass;
 
   vec3 floorCol = vec3(0.23, 0.38, 0.16) * (0.85 + 0.3 * fine);
@@ -208,6 +236,8 @@ void main() {
   sandCol -= 0.03 * sin((p.x + p.y) * 9.0 + noise(p * 2.0) * 4.0);
   // Low threshold: a one-tile beach only reaches ~0.375 after the mask blur.
   // Sand edge: wobbles a little, but stays a wide band so grass never breaks into the beach.
+  // Marram grass in tufts on the dunes.
+  sandCol = mix(sandCol, vec3(0.56, 0.6, 0.32), blade * smoothstep(0.75, 0.9, m.g) * step(0.5, noise(p * 1.3)) * 0.7);
   float sandEdge = m.g + (noise(p * 3.5) - 0.5) * 0.12;
   col = mix(col, sandCol, smoothstep(0.14, 0.34, sandEdge));
   col = mix(col, vec3(0.68, 0.6, 0.42), (1.0 - smoothstep(0.5, 0.58, land)) * 0.8);
@@ -336,7 +366,7 @@ export function createGround(map: GameMap) {
   const { width: W, height: H, tiles } = map;
   const mask = new Uint8Array(W * H * 4);
   const dist = new Uint8Array(W * H * 4);
-  const toSea = distance(W, H, (i) => tiles[i] !== 'water');
+  const toSea = distance(W, H, (i) => tiles[i] !== 'water' && tiles[i] !== 'river');
   /**
    * Offshore rocks, in clusters: many in some stretches of coast, almost none elsewhere; mostly
    * small with the odd big one further out. [u, v, size, variant] per water tile, or null.
@@ -388,8 +418,51 @@ export function createGround(map: GameMap) {
     W,
     H,
   );
+  // Rivers are cut in after the blur, sharp: blurred, the inside of every bend would flood into a pond.
+  tiles.forEach((t, i) => {
+    if (t === 'river') land[i] = Math.min(land[i], 0.15);
+  });
   const sand = blur(is('beach'), W, H);
-  const rock = blur(is('mountain'), W, H);
+  const rock = blur(
+    Float32Array.from(tiles, (t) => (t === 'mountain' || t === 'rocky' ? 1 : 0)),
+    W,
+    H,
+  );
+  // Rivers: coverage, and the direction to the next tile downstream (distance to the sea along the river).
+  const riverData = new Uint8Array(W * H * 4);
+  {
+    const down = new Int32Array(W * H).fill(-1);
+    const queue: number[] = [];
+    tiles.forEach((t, i) => {
+      if (t !== 'water') return;
+      down[i] = 0;
+      queue.push(i);
+    });
+    for (let q = 0; q < queue.length; q++) {
+      const i = queue[q];
+      for (const j of [i + 1, i - 1, i + W, i - W])
+        if (j >= 0 && j < W * H && tiles[j] === 'river' && down[j] < 0) {
+          down[j] = down[i] + 1;
+          queue.push(j);
+        }
+    }
+    const cover = blur(is('river'), W, H).map((v, i) => (tiles[i] === 'river' ? 1 : v));
+    tiles.forEach((t, i) => {
+      let fx = 0;
+      let fy = 0;
+      if (t === 'river')
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ]) {
+          const j = i + dx + dy * W;
+          if (down[j] >= 0 && down[j] < down[i]) [fx, fy] = [dx, dy];
+        }
+      riverData.set([cover[i] * 255, (fx * 0.5 + 0.5) * 255, (fy * 0.5 + 0.5) * 255, 255], i * 4);
+    });
+  }
   const forestRaw = is('forest');
   // Alpha stays 255 in both: a zero alpha would wipe the other channels (premultiplied upload).
   const packForest = () => blur(forestRaw, W, H).forEach((v, i) => (dist[i * 4 + 2] = v * 255));
@@ -402,11 +475,13 @@ export function createGround(map: GameMap) {
   const maskSrc = new BufferImageSource({ resource: mask, ...opts, addressMode: 'clamp-to-edge' });
   const distSrc = new BufferImageSource({ resource: dist, ...opts, addressMode: 'clamp-to-edge' });
   const rockSrc = new BufferImageSource({ resource: rockData, ...opts, addressMode: 'clamp-to-edge' });
+  const riverSrc = new BufferImageSource({ resource: riverData, ...opts, addressMode: 'clamp-to-edge' });
 
   const resources = (name: string) => ({
     uMask: maskSrc,
     uDist: distSrc,
     uRocks: rockSrc,
+    uRiver: riverSrc,
     uNoise: noise,
     [name]: {
       uSize: { value: new Float32Array([W, H]), type: 'vec2<f32>' },

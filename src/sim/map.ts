@@ -1,12 +1,15 @@
 import { mulberry32 } from './rng';
 
-export type Terrain = 'water' | 'beach' | 'grass' | 'forest' | 'mountain';
+/** `rocky`: stony shore instead of sand. `river`: fresh water across an island (only roads, as bridges). */
+export type Terrain = 'water' | 'beach' | 'rocky' | 'grass' | 'forest' | 'mountain' | 'river';
 
 export interface GameMap {
   width: number;
   height: number;
   /** Row-major: tiles[y * width + x]. */
   tiles: Terrain[];
+  /** Where a river drops out of the highlands: the first tile below the fall and the flow direction. */
+  waterfalls?: { x: number; y: number; dx: number; dy: number }[];
 }
 
 export const terrainAt = (map: GameMap, x: number, y: number): Terrain | undefined =>
@@ -48,16 +51,22 @@ export function generateMap(seed: number, size = 256, islandCount = 8): GameMap 
   const shape = valueNoise(rand, size, size, 12);
   const woods = valueNoise(rand, size, size, 14);
   const rocks = valueNoise(rand, size, size, 9);
+  const dunes = valueNoise(rand, size, size, 10);
+  const shore = valueNoise(rand, size, size, 7);
   const tiles: Terrain[] = [];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const e = Math.max(-1, ...islands.map((i) => 1 - Math.hypot(i.x - x, i.y - y) / i.r));
       const h = e + (shape(x, y) - 0.5) * 0.4;
+      // Beaches widen into dune fields in places; some stretches of coast are bare rock.
+      const beach = 0.09 + Math.max(0, dunes(x, y) - 0.5) * 0.5;
       tiles.push(
         h < 0
           ? 'water'
-          : h < 0.12
-            ? 'beach'
+          : h < beach
+            ? shore(x, y) > 0.68
+              ? 'rocky'
+              : 'beach'
             : h > 0.6 && rocks(x, y) > 0.55
               ? 'mountain'
               : woods(x, y) > 0.55
@@ -66,12 +75,90 @@ export function generateMap(seed: number, size = 256, islandCount = 8): GameMap 
       );
     }
   }
-  return { width: size, height: size, tiles };
+  const map: GameMap = { width: size, height: size, tiles, waterfalls: [] };
+  for (const isl of islands) if (rand() < 0.8) carveRiver(map, isl, shape, rand);
+  return map;
 }
 
-const CHARS: Record<string, Terrain> = { '~': 'water', '.': 'beach', g: 'grass', f: 'forest', m: 'mountain' };
+/**
+ * A river from the island's highlands (its highest mountain, else its centre) down to the sea:
+ * it follows the island's slope with some meander and is two tiles wide. Where it leaves the
+ * mountains it falls over the rock edge.
+ */
+function carveRiver(
+  map: GameMap,
+  isl: { x: number; y: number; r: number },
+  shape: (x: number, y: number) => number,
+  rand: () => number,
+) {
+  const { width: W, tiles } = map;
+  const orig = tiles.slice();
+  const slope = (x: number, y: number) => 1 - Math.hypot(isl.x - x, isl.y - y) / isl.r + (shape(x, y) - 0.5) * 0.15;
+  let start = -1;
+  let best = -Infinity;
+  for (let y = Math.floor(isl.y - isl.r); y <= isl.y + isl.r; y++)
+    for (let x = Math.floor(isl.x - isl.r); x <= isl.x + isl.r; x++) {
+      const t = terrainAt(map, x, y);
+      if (!t || t === 'water') continue;
+      const score = slope(x, y) + (t === 'mountain' ? 10 : 0);
+      if (score > best) [best, start] = [score, y * W + x];
+    }
+  if (start < 0) return;
+  const seen = new Set<number>();
+  let fell = false;
+  let narrow = 8;
+  let prev = [0, 0];
+  for (let cur = start, steps = 0; steps < 200; steps++) {
+    const x = cur % W;
+    const y = Math.floor(cur / W);
+    seen.add(cur);
+    let next = -1;
+    let low = Infinity;
+    let dir = [0, 0];
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const j = (y + dy) * W + x + dx;
+      if (seen.has(j) || !terrainAt(map, x + dx, y + dy)) continue;
+      // Never alongside its own earlier course: a winding river would otherwise smear into a pond.
+      const touches = [j + 1, j - 1, j + W, j - W].some((k) => k !== cur && seen.has(k));
+      // Always further from the island's centre, so it cannot circle in a hollow; the noise picks the bends.
+      const out = Math.hypot(x + dx - isl.x, y + dy - isl.y) > Math.hypot(x - isl.x, y - isl.y);
+      const v = shape(x + dx, y + dy) + (rand() - 0.5) * 0.15 + (touches ? 10 : 0) + (out ? 0 : 100);
+      if (v < low) [low, next, dir] = [v, j, [dx, dy]];
+    }
+    if (next < 0) return;
+    // A one-tile stream in the highlands and for a while below the fall, then two tiles wide.
+    if (orig[cur] !== 'mountain') narrow--;
+    // The second tile only on straight runs: on a diagonal the staircase is already wide enough.
+    const wide = narrow <= 0 && dir[0] === prev[0] && dir[1] === prev[1];
+    for (const k of wide ? [cur, cur + Math.abs(dir[1]) + Math.abs(dir[0]) * W] : [cur])
+      if (tiles[k] !== 'water') tiles[k] = 'river';
+    prev = dir;
+    if (tiles[next] === 'water') return;
+    if (!fell && orig[cur] === 'mountain' && orig[next] !== 'mountain') {
+      fell = true;
+      narrow = 6;
+      map.waterfalls!.push({ x: next % W, y: Math.floor(next / W), dx: dir[0], dy: dir[1] });
+    }
+    cur = next;
+  }
+}
 
-/** Hand-made map: one char per tile (~ water, . beach, g grass, f forest, m mountain), one line per row. */
+const CHARS: Record<string, Terrain> = {
+  '~': 'water',
+  '.': 'beach',
+  k: 'rocky',
+  g: 'grass',
+  f: 'forest',
+  m: 'mountain',
+  r: 'river',
+};
+
+/** Hand-made map, one char per tile (~ water, . beach, k rocky shore, g grass, f forest, m mountain, r river), one line per row. */
 export function parseMap(text: string): GameMap {
   const rows = text
     .trim()

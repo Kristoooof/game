@@ -76,6 +76,24 @@ export function createEffects(map: GameMap) {
     };
   });
 
+  // Waterfalls where rivers leave the highlands: a rock step, falling water, foam and spray.
+  const falls = (map.waterfalls ?? []).map((f) => {
+    const edge = tileToScreen(f.x + 0.5 - f.dx * 0.5, f.y + 0.5 - f.dy * 0.5);
+    const rock = new Graphics();
+    rock
+      .poly([edge.x - 16, edge.y + 2, edge.x - 13, edge.y - 18, edge.x + 13, edge.y - 18, edge.x + 16, edge.y + 2])
+      .fill(0x6a645a);
+    rock
+      .poly([edge.x - 16, edge.y + 2, edge.x - 13, edge.y - 18, edge.x - 9, edge.y - 18, edge.x - 11, edge.y + 2])
+      .fill(0x8a8478);
+    rock
+      .poly([edge.x + 11, edge.y + 2, edge.x + 9, edge.y - 18, edge.x + 13, edge.y - 18, edge.x + 16, edge.y + 2])
+      .fill(0x4e4a42);
+    const water = new Graphics();
+    layer.addChild(rock, water);
+    return { x: edge.x, y: edge.y, water, rock, next: 0 };
+  });
+
   let time = 0;
   return {
     layer,
@@ -137,6 +155,33 @@ export function createEffects(map: GameMap) {
         p.s.y -= p.vy * dt;
         p.s.scale.set(0.12 + k * p.size);
         p.s.alpha = p.alpha * Math.min(1, k * 5) * (1 - k);
+      }
+
+      for (const f of falls) {
+        f.water.visible = f.rock.visible = inView(f.x, f.y);
+        if (!f.water.visible) continue;
+        // Sheet of water with bright streaks sliding down it, and a pulsing pool of foam below.
+        f.water.clear();
+        f.water.rect(f.x - 9, f.y - 19, 18, 20).fill({ color: 0x8ccad0, alpha: 0.9 });
+        for (let k = 0; k < 6; k++) {
+          const lx = f.x - 8 + k * 3.2;
+          for (let s = 0; s < 3; s++) {
+            const sy = f.y - 19 + ((time * 34 + k * 5.3 + s * 7) % 21);
+            f.water.moveTo(lx, sy).lineTo(lx, Math.min(f.y, sy + 4));
+          }
+        }
+        f.water.stroke({ width: 1, color: 0xffffff, alpha: 0.75 });
+        const pulse = 1 + 0.12 * Math.sin(time * 6);
+        f.water.ellipse(f.x, f.y + 1, 14 * pulse, 4.5 * pulse).fill({ color: 0xf2fafa, alpha: 0.85 });
+        f.water.ellipse(f.x, f.y + 3, 20, 6).fill({ color: 0xe8f6f6, alpha: 0.3 });
+        f.next -= dt;
+        if (f.next <= 0 && puffs.length < MAX_PUFFS) {
+          f.next = 0.25;
+          const s = new Sprite({ texture: puffTex, anchor: 0.5, alpha: 0 });
+          s.position.set(f.x + (Math.random() - 0.5) * 16, f.y);
+          layer.addChild(s);
+          puffs.push({ s, age: 0, life: 1.4, vx: (Math.random() - 0.5) * 10, vy: 10, size: 0.3, alpha: 0.4 });
+        }
       }
 
       for (const g of gulls) {

@@ -95,6 +95,7 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Napszakok: 8 perces nap (hajnal, dél, naplemente, éjszaka), színes fény, hosszú reggeli/esti árnyékok, éjjel világító ablakok és lámpák, holdfény-csík a vízen; beállítás: változó / mindig nappal; `?ido=0.8`
 - [x] Épületek saját formával: kikötő darura taposókerékkel, raktár kőalappal és emelőgerendával, favágó rönkház farakással, halászkunyhó hálóval és csónakkal, kápolna haranggal és temetővel; építés állvánnyal és porral, bontáskor porfelhő
 - [x] Vízi sziklák csoportokban, kicsitől a nagy szirtig (5×), sirálypöttyökkel, hullámgyűrűvel
+- [x] Táj: folyók a hegyekből a tengerig (patakként indulnak, kanyarognak, folyásiránnyal áramló víz), vízesés a hegy peremén, híd ahol út keresztezi; sziklás partszakaszok, dűnés széles strandok, dombok, virágos mezők
 - [ ] Grafika finomítása (épület sprite-ok, animációk)
 - [ ] Hangok, zene
 - [x] Teljesítmény: statikus világ darabonként textúrába sütve (zoomhoz igazított felbontás, csak a változott darab sül újra, nem látott darabok felszabadulnak), élő csak a víz-shader; JS idő/képkocka 9,5 → 1,1 ms

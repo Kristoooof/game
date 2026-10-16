@@ -31,6 +31,8 @@ const TERRAIN_NAMES: Record<Terrain, string> = {
   grass: 'Fű',
   forest: 'Erdő',
   mountain: 'Hegy',
+  rocky: 'Sziklás part',
+  river: 'Folyó',
 };
 
 // ?map=pelda loads a hand-made map, ?seed=123 a generated one; otherwise a random seed.
