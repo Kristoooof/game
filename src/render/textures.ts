@@ -111,22 +111,23 @@ const broadleaf = (seed: number, palette: string[], size = 1) => {
     shadow(c, 26, 50, 15, 5);
     // Trunk flaring into roots at the foot, bark streaks, and two boughs forking into the crown.
     const trunk = c.createLinearGradient(19, 0, 25, 0);
-    trunk.addColorStop(0, '#8a6440');
-    trunk.addColorStop(1, '#4e3520');
+    // A stout grey-brown trunk: a thin red stick under a small crown reads as a toy.
+    trunk.addColorStop(0, '#7d6a56');
+    trunk.addColorStop(1, '#45382c');
     c.fillStyle = trunk;
     c.beginPath();
-    c.moveTo(17.5, 51.5);
-    c.quadraticCurveTo(20, 49, 20.6, 44);
-    c.lineTo(21, 30);
-    c.lineTo(23, 30);
-    c.lineTo(23.4, 44);
-    c.quadraticCurveTo(24, 49, 26.5, 51.5);
+    c.moveTo(16.2, 51.5);
+    c.quadraticCurveTo(19.4, 49, 19.9, 44);
+    c.lineTo(20.4, 32);
+    c.lineTo(23.6, 32);
+    c.lineTo(24.1, 44);
+    c.quadraticCurveTo(24.6, 49, 27.8, 51.5);
     c.closePath();
     c.fill();
     c.strokeStyle = 'rgba(40,26,14,0.55)';
     c.lineWidth = 0.35;
     for (let k = 0; k < 5; k++) {
-      const x = 21 + r() * 2;
+      const x = 20.6 + r() * 2.8;
       c.beginPath();
       c.moveTo(x, 50 - r() * 3);
       c.lineTo(x + (r() - 0.5) * 0.6, 34 + r() * 6);
@@ -138,10 +139,10 @@ const broadleaf = (seed: number, palette: string[], size = 1) => {
       [-7, 22],
       [6, 20],
     ]) {
-      c.lineWidth = 1.6;
+      c.lineWidth = 2.2;
       c.beginPath();
-      c.moveTo(22, 34);
-      c.quadraticCurveTo(22 + dx * 0.3, 28, 22 + dx, h);
+      c.moveTo(22, 36);
+      c.quadraticCurveTo(22 + dx * 0.3, 30, 22 + dx, h + 3);
       c.stroke();
     }
     // Crown in three layers: dark balls at the back, mid, then lit ones in front; a few gaps
@@ -149,13 +150,13 @@ const broadleaf = (seed: number, palette: string[], size = 1) => {
     const balls: number[][] = [];
     for (let i = 0; i < 26; i++) {
       const a = r() * Math.PI * 2;
-      const d = Math.sqrt(r()) * 11.5 * size;
-      balls.push([22 + Math.cos(a) * d, 21 + Math.sin(a) * d * 0.8, (3.8 + r() * 3.4) * size]);
+      const d = Math.sqrt(r()) * 12.5 * size;
+      balls.push([22 + Math.cos(a) * d, 23 + Math.sin(a) * d * 0.8, (4.2 + r() * 3.6) * size]);
     }
     // Depth for each ball: the crown is round towards the viewer too; a few left out are gaps.
     const crown = balls
       .filter((_, k) => k % 7 !== 3)
-      .map(([x, y, rad]) => [x, y, rad, (1 - Math.hypot(x - 22, y - 21) / 14) * 9]);
+      .map(([x, y, rad]) => [x, y, rad, (1 - Math.hypot(x - 22, y - 23) / 15) * 9]);
     litCrown(c, S, crown, palette, seed);
   });
 };

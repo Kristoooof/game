@@ -13,6 +13,7 @@ import {
 import { BUILDINGS } from '../data/buildings';
 import { levelAt, terrainAt } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
+import { noise2 } from './sculpt';
 import type { World } from '../sim/world';
 import { drawBuilding, drawPier, drawRoads, pierBox, setGlow, setSun } from './buildings';
 import { sunShadow } from './daylight';
@@ -65,7 +66,9 @@ interface Chunk {
 export function createTerrain(world: World, renderer: Renderer) {
   const { map } = world;
   const art = makeArt();
-  const leaf = (k: number) => art.broadleaves[k < 0.08 ? 3 : Math.floor(k * 3) % 3];
+  /** A broadleaf for tile (x, y): autumn comes to whole stretches of woodland, not tree by tree. */
+  const leaf = (k: number, x: number, y: number) =>
+    art.broadleaves[k < (noise2(x * 0.09, y * 0.09, 5) > 0.6 ? 0.65 : 0.015) ? 3 : Math.floor(k * 3) % 3];
   const massif = createMassif(map);
   const ground = createGround(map, massif.peaks);
   const { width: W, height: H } = map;
@@ -101,6 +104,20 @@ export function createTerrain(world: World, renderer: Renderer) {
   /** Boulders lie in screes, a few 3×3 patches of the highland, not sprinkled evenly over it. */
   const scree = (x: number, y: number) => mulberry32(Math.floor(x / 3) * 7919 + Math.floor(y / 3) * 104729)() < 0.35;
   const woodDepth = depthIn('forest', 3);
+  /** Steps out from the nearest wood: 1 beside it, 2 one tile further, 0 beyond or in it. */
+  const woodNear = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (at(x, y) === 'forest') continue;
+      let d = 0;
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++)
+          if (at(x + dx, y + dy) === 'forest') {
+            const k = Math.max(Math.abs(dx), Math.abs(dy));
+            d = d === 0 ? k : Math.min(d, k);
+          }
+      woodNear[y * W + x] = d;
+    }
 
   /**
    * Draw order of something standing at tile point (px, py), given its own depth `z`: a building is
@@ -121,6 +138,20 @@ export function createTerrain(world: World, renderer: Renderer) {
       }
     return z;
   };
+  /** Ground worn bare by the town: round each building, fading over two tiles, and beside roads. */
+  const wear = (x: number, y: number) => {
+    let w = 0;
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        if (x + dx < 0 || y + dy < 0 || x + dx >= W || y + dy >= H) continue;
+        const b = world.buildings.get(world.occupied[(y + dy) * W + x + dx]);
+        if (!b) continue;
+        const d = Math.max(Math.abs(dx), Math.abs(dy));
+        w = Math.max(w, b.type === 'road' ? (d <= 1 ? 0.5 : 0) : 1 - d / 3);
+      }
+    return w;
+  };
+  ground.setWear(wear);
   /** Within two tiles of the sea: its reflections are drawn. */
   const nearWater = (x: number, y: number) => {
     for (let dy = -2; dy <= 2; dy++)
@@ -184,7 +215,7 @@ export function createTerrain(world: World, renderer: Renderer) {
           const k = r();
           const bush = d === 0 ? 0.75 : 0.93;
           if (k < 0.55) put(art.conifers[Math.floor(r() * 3)], u, v, (0.75 + r() * 0.45) * grow, true, dark);
-          else if (k < bush) put(leaf(r()), u, v, (0.7 + r() * 0.4) * grow, true, dark);
+          else if (k < bush) put(leaf(r(), x, y), u, v, (0.7 + r() * 0.4) * grow, true, dark);
           else put(art.bushes[Math.floor(r() * 2)], u, v, 0.8 + r() * 0.4);
         }
       } else if (t === 'mountain') {
@@ -221,9 +252,21 @@ export function createTerrain(world: World, renderer: Renderer) {
         ) {
           put(art.boulder, 0.15 + r() * 0.3, 0.15 + r() * 0.3, 0.5 + r() * 0.6);
           if (r() < 0.6) put(art.pebbles[Math.floor(r() * 2)], 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.8 + r() * 0.4);
-        } else if (p < 0.035) put(leaf(r()), 0.3 + r() * 0.4, 0.3 + r() * 0.4, 0.75 + r() * 0.35, true);
-        else if (p < 0.09) put(art.bushes[Math.floor(r() * 2)], 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.7 + r() * 0.5);
-        else if (p < 0.105) put(art.boulder, 0.2 + r() * 0.6, 0.2 + r() * 0.6, 0.6 + r() * 0.5);
+        } else {
+          // Out from the wood: a hem of scrub and young trees, then groves, and here and there a
+          // big lone tree in the open.
+          const edge = woodNear[y * W + x];
+          const [u, v] = [0.2 + r() * 0.6, 0.2 + r() * 0.6];
+          if ((edge === 1 && p < 0.45) || (edge === 2 && p < 0.2)) {
+            if (r() < 0.55) put(art.bushes[Math.floor(r() * 2)], u, v, 0.7 + r() * 0.5);
+            else if (r() < 0.5) put(art.conifers[Math.floor(r() * 3)], u, v, 0.5 + r() * 0.25, true);
+            else put(leaf(r(), x, y), u, v, 0.5 + r() * 0.25, true);
+          } else if (noise2(x * 0.13, y * 0.13, 6) > 0.64 && p < 0.35)
+            put(leaf(r(), x, y), u, v, 0.75 + r() * 0.4, true);
+          else if (p < 0.006) put(leaf(r(), x, y), u, v, 1.15 + r() * 0.25, true);
+          else if (p < 0.05) put(art.bushes[Math.floor(r() * 2)], u, v, 0.7 + r() * 0.5);
+          else if (p < 0.065) put(art.boulder, u, v, 0.6 + r() * 0.5);
+        }
       }
     }
   }
@@ -447,6 +490,7 @@ export function createTerrain(world: World, renderer: Renderer) {
     /** Tiles changed by building or demolishing: clear their forest and rebake around them. */
     changed(tiles: [number, number][]) {
       ground.clearForest(tiles);
+      ground.setWear(wear);
       this.invalidate(tiles);
     },
     update(dt: number, view: Rectangle, scale: number) {

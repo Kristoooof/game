@@ -105,11 +105,12 @@ export function createMassif(map: GameMap) {
         const s = tileToScreen(gx, gy);
         return { gx, gy, h, sx: s.x, sy: s.y - lift - h };
       });
-      if (vs.some((v) => v.h > 0.5)) {
+      if (vs.some((v) => v.h > 3)) {
         ctx = new GraphicsContext();
         const tri = (p: (typeof vs)[0], q: (typeof vs)[0], r: (typeof vs)[0]) => {
           const avg = (p.h + q.h + r.h) / 3;
-          if (Math.max(p.h, q.h, r.h) < 0.5) return;
+          // Barely raised: leave it to the ground shader's scree.
+          if (avg < 3) return;
           const a = [(q.gx - p.gx) * RUN, (q.gy - p.gy) * RUN, q.h - p.h];
           const b = [(r.gx - p.gx) * RUN, (r.gy - p.gy) * RUN, r.h - p.h];
           let n = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];

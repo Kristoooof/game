@@ -39,8 +39,8 @@ uniform vec3 uWeather;
 uniform sampler2D uRocks;
 uniform sampler2D uRiver;
 uniform sampler2D uLevel;
-// Mountain ranges: r = height of the highest summit on the tile / TOP.
-uniform sampler2D uPeaks;
+// r: height of the mountain range's highest point on the tile / TOP; g: ground worn by the town.
+uniform sampler2D uMarks;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 // Baked, tileable noise (see bakeNoise): r = 4-octave fbm, g = single octave, b = second fbm.
@@ -303,8 +303,16 @@ void main() {
   // Grass in three moods, in broad patches that read even from far off: deep lush green,
   // fresh green, and sun-dried olive-gold.
   float n = fbm(p * 0.22);
-  vec3 grass = mix(vec3(0.26, 0.47, 0.18), vec3(0.46, 0.63, 0.25), smoothstep(0.25, 0.75, fbm(p * 0.06 + 3.0)));
-  grass = mix(grass, vec3(0.6, 0.6, 0.31), smoothstep(0.52, 0.78, fbm(p * 0.11 + 7.0)) * 0.75);
+  vec3 grass = mix(vec3(0.27, 0.44, 0.2), vec3(0.46, 0.6, 0.3), smoothstep(0.25, 0.75, fbm(p * 0.06 + 3.0)));
+  // Damp banks along the rivers: darker, bluer grass.
+  float damp = 0.0;
+  for (int k = 0; k < 4; k++) {
+    vec2 o = vec2(k == 0 ? 1.0 : k == 1 ? -1.0 : 0.0, k == 2 ? 1.0 : k == 3 ? -1.0 : 0.0) * 1.1;
+    damp = max(damp, smp(uRiver, p + o).r);
+  }
+  damp = smoothstep(0.2, 0.7, damp + (noise(p * 1.5) - 0.5) * 0.4);
+  grass = mix(grass, vec3(0.6, 0.6, 0.33), smoothstep(0.52, 0.78, fbm(p * 0.11 + 7.0)) * 0.75 * (1.0 - damp));
+  grass = mix(grass, vec3(0.23, 0.41, 0.24), damp * 0.55);
   grass *= 0.88 + 0.24 * n;
   // Brush dabs of lighter and darker green: the ground looks painted, not printed.
   grass *= 1.0 + 0.09 * dabs(g * 5.0) * (1.0 - uFar);
@@ -324,11 +332,14 @@ void main() {
   float meadow = smoothstep(0.55, 0.7, fbm(p * 0.06 + 31.0));
   grass = mix(grass, grass * vec3(1.05, 1.08, 0.9), meadow * 0.5);
   float fh = hash(iff + 9.0);
-  vec3 flower = fh < 0.25 ? vec3(0.88, 0.2, 0.15) : fh < 0.5 ? vec3(0.98, 0.85, 0.25) : fh < 0.75 ? vec3(0.55, 0.45, 0.9) : vec3(1.0, 0.97, 0.9);
-  flower = mix(mix(vec3(1.0, 0.95, 0.75), vec3(0.95, 0.6, 0.75), fh), flower, meadow);
+  // Coloured, never white: white specks read as noise.
+  vec3 flower = fh < 0.25 ? vec3(0.88, 0.2, 0.15) : fh < 0.5 ? vec3(0.98, 0.85, 0.25) : fh < 0.75 ? vec3(0.55, 0.45, 0.9) : vec3(0.95, 0.55, 0.75);
+  flower = mix(mix(vec3(0.95, 0.85, 0.4), vec3(0.9, 0.55, 0.7), fh), flower, meadow);
   float bloom = step(mix(0.97, 0.55, meadow), hash(iff + 3.0)) * max(step(0.6, noise(p * 0.7)), meadow);
   grass = mix(grass, flower, dot * bloom * (1.0 - uFar));
   vec3 col = grass;
+  // Sedge in tufts along the damp banks.
+  col = mix(col, vec3(0.3, 0.42, 0.22), blade * damp * 0.8);
 
   vec3 floorCol = vec3(0.23, 0.38, 0.16) * (0.85 + 0.3 * fine);
   float bumps = noise(p * 4.0) * 0.6 + noise(p * 9.0) * 0.4;
@@ -337,6 +348,10 @@ void main() {
   col = mix(col, mix(floorCol, canopy, uFar), smoothstep(0.3, 0.7, wood));
   // Shade spilling out of the wood onto the grass beside it.
   col *= 1.0 - 0.22 * smoothstep(0.0, 0.35, wood) * (1.0 - smoothstep(0.35, 0.7, wood));
+  // Ground worn bare round the houses and along the roads, in patches.
+  float worn = smp(uMarks, p).g * (0.55 + 0.9 * noise(p * 2.3 + 17.0));
+  vec3 dirt = vec3(0.55, 0.47, 0.34) * (0.88 + 0.24 * noise(g * 6.0));
+  col = mix(col, dirt, smoothstep(0.25, 0.7, worn) * 0.85);
 
   // Rock: ridged noise gives crevices and ledges; scree and moss where it meets the grass.
   // Highland ground: pale stone with ochre and lichen, gravel, scrub where it meets the grass.
@@ -384,7 +399,7 @@ void main() {
   float peakShade = 0.0;
   for (int k = 1; k <= 12; k++) {
     float t = float(k) * 0.5;
-    float ph = smp(uPeaks, p - vec2(t, t * 0.25)).r * ${TOP.toFixed(1)};
+    float ph = smp(uMarks, p - vec2(t, t * 0.25)).r * ${TOP.toFixed(1)};
     peakShade = max(peakShade, smoothstep(0.0, 14.0, ph - t * 24.0));
   }
   col *= 1.0 - 0.38 * peakShade;
@@ -664,9 +679,9 @@ export function createGround(map: GameMap, peaks: Float32Array) {
   const levelSrc = new BufferImageSource({ resource: levelData, ...opts, addressMode: 'clamp-to-edge' });
   const rockSrc = new BufferImageSource({ resource: rockData, ...opts, addressMode: 'clamp-to-edge' });
   const riverSrc = new BufferImageSource({ resource: riverData, ...opts, addressMode: 'clamp-to-edge' });
-  const peakData = new Uint8Array(W * H * 4);
-  peaks.forEach((h, i) => peakData.set([Math.min(255, (h / TOP) * 255), 0, 0, 255], i * 4));
-  const peakSrc = new BufferImageSource({ resource: peakData, ...opts, addressMode: 'clamp-to-edge' });
+  const marks = new Uint8Array(W * H * 4);
+  peaks.forEach((h, i) => marks.set([Math.min(255, (h / TOP) * 255), 0, 0, 255], i * 4));
+  const marksSrc = new BufferImageSource({ resource: marks, ...opts, addressMode: 'clamp-to-edge' });
 
   const resources = (name: string) => ({
     uMask: maskSrc,
@@ -674,7 +689,7 @@ export function createGround(map: GameMap, peaks: Float32Array) {
     uRocks: rockSrc,
     uRiver: riverSrc,
     uLevel: levelSrc,
-    uPeaks: peakSrc,
+    uMarks: marksSrc,
     uNoise: noise,
     [name]: {
       uSize: { value: new Float32Array([W, H]), type: 'vec2<f32>' },
@@ -730,6 +745,11 @@ export function createGround(map: GameMap, peaks: Float32Array) {
         indexBuffer: [0, 1, 2, 0, 2, 3],
       });
       return new Mesh({ geometry, shader: landShader });
+    },
+    /** Ground worn by the town: `wear(x, y)` in [0, 1] per tile. */
+    setWear(wear: (x: number, y: number) => number) {
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) marks[(y * W + x) * 4 + 1] = wear(x, y) * 255;
+      marksSrc.update();
     },
     /** Forest gone from these tiles (cleared for building). */
     clearForest(tiles: [number, number][]) {

@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-16)
 
 ## Corpus Check
-- 47 files · ~45,625 words
+- 47 files · ~46,267 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 451 nodes · 962 edges · 28 communities (26 shown, 2 thin omitted)
+- 451 nodes · 966 edges · 28 communities (26 shown, 2 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 5 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ee9062f3`
+- Built from commit: `fb32903e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -48,8 +48,8 @@
 ## God Nodes (most connected - your core abstractions)
 1. `drawBuilding()` - 27 edges
 2. `mulberry32()` - 24 edges
-3. `fill()` - 21 edges
-4. `createTerrain()` - 21 edges
+3. `createTerrain()` - 22 edges
+4. `fill()` - 21 edges
 5. `terrainAt()` - 21 edges
 6. `P()` - 18 edges
 7. `walls()` - 17 edges
@@ -187,13 +187,13 @@ Nodes (3): applySettings(), waterRes(), resolutionOf()
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `pixi.js` connect `atmosphere.ts` to `package.json`, `main.ts`, `terrain.ts`, `render/buildings.ts`, `world.ts`, `textures.ts`?**
-  _High betweenness centrality (0.107) - this node is a cross-community bridge._
+  _High betweenness centrality (0.105) - this node is a cross-community bridge._
 - **What connects `eslint`, `prettier`, `typescript` to the rest of the system?**
   _3 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._
 - **Why does `mulberry32()` connect `textures.ts` to `terrain.ts`, `render/buildings.ts`, `map.ts`?**
-  _High betweenness centrality (0.024) - this node is a cross-community bridge._
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
 - **Should `Caveman Help` be split into smaller, more focused modules?**
   _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._
 - **Should `Mérföldkövek` be split into smaller, more focused modules?**
