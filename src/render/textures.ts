@@ -215,7 +215,8 @@ interface Rock {
   detail: number;
   amp: number;
   snow?: number;
-  grass?: { color: string; height: number };
+  /** Fade to `color` towards the foot: grass round a boulder, scree round a mountain. */
+  foot?: { color: string; height: number };
   wet?: number;
 }
 
@@ -333,16 +334,16 @@ const rock = (c: Ctx, r: () => number, o: Rock) => {
   }
   c.restore();
 
-  if (o.grass || o.wet) {
+  if (o.foot || o.wet) {
     c.save();
     trace(c, outline);
     c.clip();
-    if (o.grass) {
-      const g = c.createLinearGradient(0, foot - o.grass.height, 0, foot - o.depth);
-      g.addColorStop(0, `${o.grass.color}00`);
-      g.addColorStop(1, `${o.grass.color}e0`);
+    if (o.foot) {
+      const g = c.createLinearGradient(0, foot - o.foot.height, 0, foot - o.depth);
+      g.addColorStop(0, `${o.foot.color}00`);
+      g.addColorStop(1, `${o.foot.color}e0`);
       c.fillStyle = g;
-      c.fillRect(L[0] - 2, foot - o.grass.height, R[0] - L[0] + 4, o.grass.height + 2);
+      c.fillRect(L[0] - 2, foot - o.foot.height, R[0] - L[0] + 4, o.foot.height + 2);
     }
     if (o.wet) {
       const g = c.createLinearGradient(0, foot - o.depth - o.wet, 0, foot - o.depth);
@@ -353,7 +354,7 @@ const rock = (c: Ctx, r: () => number, o: Rock) => {
     }
     c.restore();
   }
-  // Sunlit west rim and a soft dark outline to sit with the painted trees.
+  // Sunlit west rim, and a thin outline in the rock's own deepest shade (black reads as cut paper).
   c.beginPath();
   c.moveTo(...sil[0]);
   for (const q of sil.slice(1, pk + 1)) c.lineTo(...q);
@@ -361,8 +362,8 @@ const rock = (c: Ctx, r: () => number, o: Rock) => {
   c.lineWidth = 0.7;
   c.stroke();
   trace(c, outline);
-  c.strokeStyle = 'rgba(34,30,36,0.4)';
-  c.lineWidth = 0.6;
+  c.strokeStyle = `${o.shade[1]}99`;
+  c.lineWidth = 0.5;
   c.stroke();
 };
 
@@ -383,7 +384,7 @@ const boulder = paint(20, 14, 10, 11, (c) => {
     facets: 2,
     detail: 1,
     amp: 0.12,
-    grass: { color: '#6a8040', height: 3 },
+    foot: { color: '#6a8040', height: 3 },
   });
 });
 
@@ -396,7 +397,8 @@ const mountain = (seed: number, snowy: boolean) => {
     shade: ['#858592', '#5c5b66'] as [string, string],
     detail: 3,
     amp: 0.14,
-    grass: { color: '#6f8a44', height: snowy ? 18 : 22 },
+    // Scree the colour of the highland ground, so the mountain grows out of it.
+    foot: { color: '#aaa18c', height: snowy ? 16 : 20 },
   };
   return paint(120, 100, 60, 84, (c) => {
     shadow(c, 66, 84, 50, 12);
@@ -415,17 +417,29 @@ const mountain = (seed: number, snowy: boolean) => {
       facets: 3,
       snow: snowy && sH > 34 ? 82 - sH * 0.7 : undefined,
     });
-    const px = 60 + (r() - 0.5) * 16;
+    // Lone summit or a twin one with a saddle, set off centre.
+    const px = 60 + (r() - 0.5) * 24;
+    const twin = r() < 0.4;
     rock(c, r, {
       ...colours,
-      ridge: [
-        [8, 82],
-        [px - 18 - r() * 8, 84 - H * (0.45 + r() * 0.15)],
-        [px, 84 - H],
-        [px + 14 + r() * 8, 84 - H * (0.5 + r() * 0.15)],
-        [112, 82],
-      ],
-      peak: 2,
+      ridge: twin
+        ? [
+            [8, 82],
+            [px - 26, 84 - H * (0.4 + r() * 0.15)],
+            [px - 12, 84 - H * (0.82 + r() * 0.1)],
+            [px - 4, 84 - H * 0.7],
+            [px + 6, 84 - H],
+            [px + 22 + r() * 6, 84 - H * (0.45 + r() * 0.15)],
+            [112, 82],
+          ]
+        : [
+            [8, 82],
+            [px - 18 - r() * 8, 84 - H * (0.45 + r() * 0.15)],
+            [px, 84 - H],
+            [px + 14 + r() * 8, 84 - H * (0.5 + r() * 0.15)],
+            [112, 82],
+          ],
+      peak: twin ? 4 : 2,
       depth: 6,
       facets: 4,
       snow: snowy ? 84 - H * 0.62 : undefined,

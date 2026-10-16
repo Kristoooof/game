@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-16)
 
 ## Corpus Check
-- 46 files · ~44,056 words
+- 46 files · ~44,574 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 443 nodes · 926 edges · 28 communities (26 shown, 2 thin omitted)
+- 443 nodes · 927 edges · 28 communities (26 shown, 2 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 3 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `b490ecb6`
+- Built from commit: `9e423892`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -107,7 +107,7 @@ Cohesion: 0.18
 Nodes (9): caveman-review, Example output, How to invoke, See also, What it does, Auto-Clarity, Boundaries, Examples (+1 more)
 
 ### Community 8 - "terrain.ts"
-Cohesion: 0.11
+Cohesion: 0.12
 Nodes (33): pixi.js, drawRoads(), pierBox(), setGlow(), setSun(), sunShadow(), createEffects(), Puff (+25 more)
 
 ### Community 9 - "Ponytail Help"
@@ -144,7 +144,7 @@ Nodes (12): BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, 
 
 ### Community 19 - "world.ts"
 Cohesion: 0.10
-Nodes (35): bake(), Baked, Cart, cartArt(), createLife(), Load, SKIN, TUNICS (+27 more)
+Nodes (34): bake(), Baked, Cart, cartArt(), createLife(), Load, SKIN, TUNICS (+26 more)
 
 ### Community 20 - "settings.ts"
 Cohesion: 0.19
@@ -152,7 +152,7 @@ Nodes (13): Antialias, createFpsCounter(), createSettingsPanel(), DAY_CYCLE, DEF
 
 ### Community 21 - "textures.ts"
 Cohesion: 0.12
-Nodes (34): blit(), clamp01(), Ctx, fbm2(), hexRGB(), litCrown(), mix(), noise2() (+26 more)
+Nodes (35): blit(), clamp01(), Ctx, fbm2(), hexRGB(), litCrown(), mix(), noise2() (+27 more)
 
 ### Community 22 - "showPreview"
 Cohesion: 0.26

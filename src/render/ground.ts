@@ -263,18 +263,24 @@ void main() {
     vec2 gl = vec2(levelAt(p + vec2(0.25, 0.0)) - levelAt(p - vec2(0.25, 0.0)), levelAt(p + vec2(0.0, 0.25)) - levelAt(p - vec2(0.0, 0.25)));
     vec2 nrm = length(gl) > 0.001 ? -normalize(gl) : vec2(0.7);
     float shade = 0.82 + 0.28 * (nrm.y - nrm.x) * 0.5;
-    float strata = noise(vec2(vPos.x * 0.04, vPos.y * 0.45));
-    float cracks = noise(vec2(vPos.x * 0.55, vPos.y * 0.07));
-    vec3 c = mix(vec3(0.5, 0.45, 0.38), vec3(0.68, 0.62, 0.52), strata);
-    c *= 0.82 + 0.3 * smoothstep(0.3, 0.7, cracks);
+    // Rock face of blocks split by cracks: columns of blocks staggered against each other, so no
+    // joint runs on as a stripe; each block lit at its top edge, darker below.
+    vec2 bq = vec2(vPos.x / 13.0, sf.w * 2.2) + (vec2(noise(vPos * 0.11), noise(vPos * 0.11 + 7.0)) - 0.5) * 0.9;
+    bq.y += hash(vec2(floor(bq.x), 3.0)) * 0.8;
+    vec2 bi = floor(bq), bf = fract(bq);
+    float joint = min(min(bf.x, 1.0 - bf.x) * 13.0, min(bf.y, 1.0 - bf.y) * 9.0) + noise(vPos * 0.4) * 1.2;
+    vec3 c = mix(vec3(0.5, 0.45, 0.38), vec3(0.7, 0.64, 0.54), hash(bi));
+    c = mix(c, vec3(0.56, 0.52, 0.48), smoothstep(0.6, 0.85, noise(vPos * 0.05)) * 0.5);
+    c *= 1.1 - 0.22 * bf.y;
+    c *= 1.0 - 0.3 * (1.0 - smoothstep(0.4, 1.4, joint));
     c *= mix(1.05, 0.68, sf.w);
-    // Ledges catching the light, and moss trickling down from the grassy top.
-    float ledge = smoothstep(0.86, 1.0, fract(sf.w * 3.0 + noise(vPos * 0.08) * 0.7));
-    c *= 1.0 + ledge * 0.16;
+    // Moss trickling down from the grassy top.
     float moss = smoothstep(0.55, 0.8, noise(vec2(vPos.x * 0.3, vPos.y * 0.035))) * smoothstep(0.75, 0.1, sf.w);
     c = mix(c, vec3(0.3, 0.42, 0.2), moss * 0.55);
-    // A lip of grass hanging over the top edge.
-    c = mix(c, vec3(0.3, 0.47, 0.2), smoothstep(0.14, 0.02, sf.w) * 0.85);
+    // Sunlit lip of the top edge, and a fringe of grass hanging over it in uneven tufts.
+    float lip = 0.1 + 0.12 * noise(vec2(vPos.x * 0.25, 1.0));
+    c *= 1.0 + 0.35 * smoothstep(lip + 0.1, lip + 0.02, sf.w);
+    c = mix(c, vec3(0.3, 0.47, 0.2), smoothstep(lip, lip - 0.06, sf.w) * 0.9);
     c *= shade;
     finalColor = vec4(pow(c, vec3(0.95)) * vec3(1.04, 1.0, 0.94) * (1.0 - open), 1.0 - open);
     return;
@@ -360,7 +366,17 @@ void main() {
   // Terraces read from above: a pale rim along the top of each cliff, shade along its foot.
   float lv = levelAt(p);
   col *= 1.0 + 0.12 * smoothstep(0.35, 0.0, lv - (sf.z - 0.5)) * step(0.5, sf.z);
-  col *= 1.0 - 0.3 * smoothstep(0.0, 0.4, levelAt(p - vec2(0.35)) - (sf.z + 0.5) + 0.4);
+  // A cliff above casts a soft shadow away from the sun (upper left) over the ground at its foot,
+  // and the ground right against any cliff lies in its shade.
+  float fall = 0.0;
+  for (int k = 1; k <= 6; k++)
+    fall = max(fall, smoothstep(-0.1, 0.3, levelAt(p - vec2(0.32, 0.22) * float(k)) - sf.z - 0.5) * (1.25 - 0.13 * float(k)));
+  float foot = 0.0;
+  for (int k = 0; k < 4; k++) {
+    vec2 d = vec2(k == 0 ? 1.0 : k == 1 ? -1.0 : 0.0, k == 2 ? 1.0 : k == 3 ? -1.0 : 0.0) * 0.3;
+    foot = max(foot, smoothstep(-0.1, 0.3, levelAt(p + d) - sf.z - 0.5));
+  }
+  col *= (1.0 - 0.42 * min(fall, 1.0)) * (1.0 - 0.18 * foot);
 
   // Relief: height from inland distance plus noise (rock raised), lit from the upper left.
   float h0 = height(p) + rockMask * ridge * 0.4;
