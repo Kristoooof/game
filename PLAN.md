@@ -84,7 +84,7 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Grafika v3: GPU shaderes talaj és tenger (szerves partvonal, lágy terepátmenetek, domborzati árnyékolás, mélység szerinti víz, hullámok, tajték, csillogás, felhőárnyék), új fák/bokrok/sziklák/hegyek, összefüggő utak, távoli LOD
 - [x] Grafika v4: éles kép nagy DPI-n, partra futó hullámok, szélben hullámzó fű, ringó fák, részletes épületek (cserép, ablakkeret, zsalu, virágláda, lábazat), kéményfüst, sirályok
 - [x] Optimalizálás: sütött zajtextúra a shaderben (mipmappel), CPU-n elmosott maszkok, effektek csak a képernyőn látható részen
-- [x] Beállítások: felbontás (automatikus vagy 960–3840 px szélesség), élsimítás (ki/MSAA/FXAA), FPS számláló; mentve a böngészőbe
+- [x] Beállítások: felbontás (automatikus = kijelző sűrűsége, max 2×; vagy 960–3840 px szélesség), élsimítás (ki/MSAA/FXAA), FPS számláló; mentve a böngészőbe
 - [x] Grafika v5: egységes fényirány (árnyékok jobbra-lent), lágy és irányított árnyékok, fal-szemcsézés, élesebb sziklák és partvonal, fű-szálak, lombgömbök napos peremmel és sötét résekkel, tűlevél-részletek, meleg napfény-fény
 - [x] Megjelenés: sima vagy pixeles (beállítás); hegyvidéki talaj újrarajzolva (fakó kő, zuzalék, zuzmó, cserje a szélén)
 - [x] Víz külön pixeles/sima beállítás; víz-sávok javítása (chamfer távolságmező, a térkép szélén mély víz); parti pálmák, sodort fa és kavicsok

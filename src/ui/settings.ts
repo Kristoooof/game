@@ -31,14 +31,9 @@ const save = (s: Settings) => {
   }
 };
 
-/** Pixels 'auto' aims for: about a 1080p frame, so a big window stays as fast as a small one. */
-const AUTO_PIXELS = 2_200_000;
-
-/** Canvas scale (render pixels per CSS pixel) for the chosen render width. */
+/** 'Automatic' renders at the display's own density, capped at 2×: sharp water and foam on any screen. */
 export const resolutionOf = (s: Settings) =>
-  s.width === 'auto'
-    ? Math.max(0.5, Math.min(devicePixelRatio, 1.5, Math.sqrt(AUTO_PIXELS / (innerWidth * innerHeight))))
-    : Math.min(4, Math.max(0.25, s.width / innerWidth));
+  s.width === 'auto' ? Math.min(devicePixelRatio, 2) : Math.min(4, Math.max(0.25, s.width / innerWidth));
 
 const WIDTHS: [Settings['width'], string][] = [
   ['auto', 'Automatikus'],
