@@ -244,6 +244,8 @@ function garden(g: Graphics, x: number, y: number, flower: number) {
 /** A house with one or two floors, a gable or hip roof, a painted wall and a coloured door and awning. */
 function house(g: Graphics, x: number, y: number, variant: number) {
   const pick = (n: number) => Math.floor(rnd() * n);
+  // The garden first: the fence behind the house must sit under the roof.
+  garden(g, x, y, [0xd04a5a, 0xe07aa8, 0x7a5ad0][variant % 3]);
   const wallColor = WALL_COLORS[pick(WALL_COLORS.length)];
   const roof = ROOFS[pick(ROOFS.length)];
   const floors = rnd() < 0.4 ? 2 : 1;
@@ -273,7 +275,6 @@ function house(g: Graphics, x: number, y: number, variant: number) {
   const at = (a: number, b: number, c: number, d: number): Box => ({ x0: x + a, y0: y + b, x1: x + c, y1: y + d });
   walls(g, at(0.45, 0.45, 0.62, 0.62), wallH + 3, wallH + 14, 0x8a5a44);
   walls(g, at(0.42, 0.42, 0.65, 0.65), wallH + 14, wallH + 15.5, 0x5e3e30);
-  garden(g, x, y, [0xd04a5a, 0xe07aa8, 0x7a5ad0][variant % 3]);
 }
 
 /** Draws building `type` with its top corner at tile (x, y). `variant` picks colours. */

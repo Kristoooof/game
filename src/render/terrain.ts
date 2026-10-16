@@ -77,6 +77,11 @@ export function createTerrain(world: World, renderer: Renderer) {
           rockDepth[i] = pass;
       }
 
+  /** Within two tiles of the sea: its reflections are drawn. */
+  const nearWater = (x: number, y: number) => {
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (at(x + dx, y + dy) === 'water') return true;
+    return false;
+  };
   /** Trees, bushes, boulders and peaks standing on free tiles of a chunk. */
   function addNature(c: Chunk, into: Container, far: boolean) {
     for (let y = c.y0; y < c.y1; y++)
@@ -89,6 +94,15 @@ export function createTerrain(world: World, renderer: Renderer) {
           const sp = sprite(a, s.x, s.y, scale);
           sp.zIndex = x + y + u + v;
           into.addChild(sp);
+          // Coastal things mirror into the sea: the same sprite flipped about its base, bluish and faint.
+          if (!far && nearWater(x, y)) {
+            const mirror = sprite(a, s.x, s.y, scale);
+            mirror.scale.y = -mirror.scale.y;
+            mirror.tint = 0x2a6a8a;
+            mirror.alpha = 0.2;
+            mirror.zIndex = sp.zIndex - 0.01;
+            into.addChild(mirror);
+          }
         };
         if (t === 'forest' && !far) {
           const n = 2 + Math.floor(r() * 3);

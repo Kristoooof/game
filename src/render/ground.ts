@@ -71,9 +71,19 @@ void main() {
   float caustic = noise(p * 4.0 + vec2(t * 0.5, -t * 0.35)) * noise(p * 5.5 - vec2(t * 0.4, t * 0.3));
   vec3 bottom = mix(vec3(0.85, 0.78, 0.55), vec3(0.6, 0.55, 0.42), noise(p * 1.7)) * (0.85 + 0.25 * caustic);
   col = mix(col, bottom, (1.0 - smoothstep(0.04, 0.3, depthRaw)) * 0.55);
+  // Reef: darker, greener patches in the shallows.
+  float reef = smoothstep(0.62, 0.75, noise(p * 4.5 + 4.0)) * (1.0 - smoothstep(0.02, 0.16, depthRaw));
+  col = mix(col, vec3(0.16, 0.42, 0.4), reef * 0.15);
+  // Broad sun band: a soft light sheen sliding across the sea, slower than the ripples.
+  float sheen = smoothstep(0.55, 1.0, sin(p.x * 0.35 - p.y * 0.6 + t * 0.25 + noise(p * 0.8) * 2.0));
+  col += vec3(1.0, 0.96, 0.85) * sheen * 0.05 * (1.0 - uFar * 0.7);
+  // Breaking swells: crests roll in towards the shore and whiten as they arrive.
+  float swell = sin(depthRaw * 19.0 - t * 2.4 + fbm(p * 0.5) * 3.0);
+  float breaker = smoothstep(0.75, 1.0, swell) * (1.0 - smoothstep(0.03, 0.26, depthRaw)) * (1.0 - fade);
+  col = mix(col, vec3(0.92, 0.96, 0.95), breaker * 0.5);
   // Short, broken swell crests running diagonally, fading in and out in patches.
   float w = sin(p.x * 1.3 + p.y * 0.5 + t * 1.1 + fbm(p * 0.3 + t * 0.04) * 7.0);
-  float patch = smoothstep(0.45, 0.7, noise(p * 0.35 + vec2(t * 0.05, 0.0)));
+  float patch = 0.7 + 0.3 * noise(p * 0.9 + vec2(t * 0.05, 0.0));
   col += vec3(0.07, 0.09, 0.1) * smoothstep(0.9, 1.0, w) * patch * (0.3 + depth * 0.7);
   float glint = noise(p * 5.0 + vec2(t * 0.9, t * 0.3));
   col += vec3(0.25, 0.3, 0.32) * smoothstep(0.9, 0.97, glint) * depth * (1.0 - uFar * 0.8);
