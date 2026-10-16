@@ -104,6 +104,10 @@ void main() {
   grass = mix(grass, vec3(0.66, 0.68, 0.34), smoothstep(0.62, 0.8, fbm(p * 0.13 + 7.0)) * 0.7);
   float fine = noise(g * 8.0) * 0.6 + noise(g * 19.0) * 0.4;
   grass *= 0.9 + 0.2 * fine;
+  // Blade streaks: thin vertical grain on screen, bent by noise; darker clumps of long grass.
+  float streak = noise(vec2(g.x * 1.5 + noise(g * 4.0) * 3.0, g.y * 22.0));
+  grass *= 0.93 + 0.14 * streak;
+  grass *= 1.0 - 0.08 * smoothstep(0.55, 0.75, noise(g * 2.2 + 5.0));
   // Tufts and flowers as small round dots jittered inside a fine grid.
   vec2 cb = g * 16.0, ib = floor(cb);
   float blade = step(0.8, hash(ib)) * (1.0 - smoothstep(0.08, 0.2, length(fract(cb) - 0.25 - 0.5 * vec2(hash(ib + 1.0), hash(ib + 2.0)))));
@@ -120,20 +124,29 @@ void main() {
   col = mix(col, mix(floorCol, canopy, uFar), smoothstep(0.3, 0.7, smp(uDist, pf).b));
 
   // Rock: ridged noise gives crevices and ledges; scree and moss where it meets the grass.
-  float rockMask = smoothstep(0.22, 0.55, smp(uMask, pf).b);
+  // Crisp, noise-broken edges: a soft blur reads as smudges, not terrain.
+  float rockEdge = smp(uMask, pf).b + (noise(p * 3.0) - 0.5) * 0.35;
+  float rockMask = smoothstep(0.42, 0.5, rockEdge);
+  float rockRim = smoothstep(0.36, 0.44, rockEdge) - rockMask;
   float ridge = 1.0 - abs(noise(p * vec2(2.2, 0.9)) * 2.0 - 1.0);
   float strata = 0.5 + 0.5 * sin((p.x - p.y) * 6.0 + fbm(p * 1.2) * 8.0);
-  vec3 rock = mix(vec3(0.42, 0.39, 0.35), vec3(0.62, 0.58, 0.52), ridge * 0.7 + strata * 0.3);
+  vec3 rock = mix(vec3(0.5, 0.47, 0.42), vec3(0.7, 0.66, 0.6), ridge * 0.7 + strata * 0.3);
   rock = mix(rock, vec3(0.3, 0.27, 0.24), smoothstep(0.75, 0.95, 1.0 - ridge) * 0.6);
   rock *= 0.88 + 0.24 * noise(g * 6.0);
+  // Stony grain and thin cracks where the ridged noise dips to its midline.
+  rock *= 0.8 + 0.4 * smoothstep(0.6, 0.9, noise(g * 14.0));
+  rock *= 1.0 - 0.3 * smoothstep(0.03, 0.0, abs(noise(p * 5.0) - 0.5));
   vec3 scree = mix(vec3(0.5, 0.47, 0.4), vec3(0.42, 0.45, 0.32), noise(g * 3.0));
-  col = mix(col, scree, smoothstep(0.08, 0.3, rockMask) * (1.0 - rockMask));
-  col = mix(col, rock, smoothstep(0.3, 0.6, rockMask));
+  col = mix(col, scree, smoothstep(0.3, 0.5, rockEdge) * (1.0 - rockMask) * 0.8);
+  col = mix(col, vec3(0.5, 0.47, 0.43), rockRim * 0.5);
+  col = mix(col, rock, rockMask);
 
   vec3 sandCol = vec3(0.9, 0.81, 0.58) * (0.94 + 0.12 * noise(g * 10.0));
   sandCol -= 0.03 * sin((p.x + p.y) * 9.0 + noise(p * 2.0) * 4.0);
   // Low threshold: a one-tile beach only reaches ~0.375 after the mask blur.
-  col = mix(col, sandCol, smoothstep(0.16, 0.34, m.g));
+  // Sand edge: wobbles a little, but stays a wide band so grass never breaks into the beach.
+  float sandEdge = m.g + (noise(p * 3.5) - 0.5) * 0.12;
+  col = mix(col, sandCol, smoothstep(0.14, 0.34, sandEdge));
   col = mix(col, vec3(0.68, 0.6, 0.42), (1.0 - smoothstep(0.5, 0.58, land)) * 0.8);
 
   // Relief: height from inland distance plus noise (rock raised), lit from the upper left.

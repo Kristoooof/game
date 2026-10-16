@@ -39,23 +39,24 @@ const poly = (c: Ctx, fill: string | CanvasGradient, pts: number[][]) => {
   c.fill();
 };
 
+/** Soft contact shadow, cast towards the lower right (the sun is upper left, as in buildings.ts). */
 const shadow = (c: Ctx, x: number, y: number, rx: number, ry: number) => {
-  const g = c.createRadialGradient(x, y, 0, x, y, rx);
-  g.addColorStop(0, 'rgba(10,25,10,0.35)');
-  g.addColorStop(1, 'rgba(10,25,10,0)');
-  c.save();
-  c.translate(x, y);
-  c.scale(1, ry / rx);
-  c.translate(-x, -y);
-  c.fillStyle = g;
-  c.beginPath();
-  c.arc(x, y, rx, 0, Math.PI * 2);
-  c.fill();
-  c.restore();
+  const cx = x + rx * 0.3;
+  for (const [k, alpha] of [
+    [1, 0.07],
+    [0.8, 0.09],
+    [0.6, 0.12],
+    [0.4, 0.14],
+  ] as const) {
+    c.fillStyle = `rgba(10,25,12,${alpha})`;
+    c.beginPath();
+    c.ellipse(cx, y, rx * k, ry * k, 0, 0, Math.PI * 2);
+    c.fill();
+  }
 };
 
-/** A ball of foliage lit from the upper left. */
-const leafBall = (c: Ctx, x: number, y: number, r: number, [dark, mid, light]: string[]) => {
+/** A ball of foliage: sunlit upper-left rim, a shaded crescent lower right, and leaf specks. */
+const leafBall = (c: Ctx, x: number, y: number, r: number, [dark, mid, light]: string[], rnd = Math.random) => {
   const g = c.createRadialGradient(x - r * 0.4, y - r * 0.45, r * 0.1, x, y, r);
   g.addColorStop(0, light);
   g.addColorStop(0.55, mid);
@@ -64,6 +65,18 @@ const leafBall = (c: Ctx, x: number, y: number, r: number, [dark, mid, light]: s
   c.beginPath();
   c.arc(x, y, r, 0, Math.PI * 2);
   c.fill();
+  // Leaf clusters: lit specks on the sun side, dark gaps on the shadow side.
+  for (let i = 0; i < Math.max(3, r * 1.6); i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = Math.sqrt(rnd()) * r * 0.85;
+    const lit = Math.cos(a - 3.9) > 0;
+    c.fillStyle = lit ? light : dark;
+    c.globalAlpha = lit ? 0.75 : 0.55;
+    c.beginPath();
+    c.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 0.5 + rnd() * 0.5, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.globalAlpha = 1;
 };
 
 const conifer = (seed: number, palette: string[], tiers: number) => {
@@ -90,6 +103,20 @@ const conifer = (seed: number, palette: string[], tiers: number) => {
       c.moveTo(17, ty + 1);
       c.lineTo(17 + hw * 0.15, by - 1);
       c.stroke();
+      // Needle tips: short strokes outward from the lower edge, lit on the left.
+      for (let k = 0; k < 14; k++) {
+        const u = r();
+        const x0 = 17 - hw + u * hw * 2;
+        const y0 = by - 1 - (1 - Math.abs(u - 0.5) * 2) * 1.5;
+        c.strokeStyle = u < 0.5 ? `${palette[2]}` : 'rgba(5,25,10,0.5)';
+        c.globalAlpha = 0.6;
+        c.lineWidth = 0.5;
+        c.beginPath();
+        c.moveTo(x0, y0);
+        c.lineTo(x0 + (u - 0.5) * 2, y0 + 1.6);
+        c.stroke();
+      }
+      c.globalAlpha = 1;
     }
   });
 };
@@ -115,7 +142,7 @@ const broadleaf = (seed: number, palette: string[], size = 1) => {
       balls.push([22 + Math.cos(a) * d, 22 + Math.sin(a) * d * 0.8, (4.5 + r() * 3.5) * size]);
     }
     balls.sort((a, b) => a[1] - b[1]);
-    for (const [x, y, rad] of balls) leafBall(c, x, y, rad, palette);
+    for (const [x, y, rad] of balls) leafBall(c, x, y, rad, palette, r);
   });
 };
 
@@ -123,7 +150,7 @@ const bush = (seed: number, palette: string[]) => {
   const r = mulberry32(seed);
   return paint(26, 20, 13, 16, (c) => {
     shadow(c, 15, 16, 10, 3.5);
-    for (let i = 0; i < 6; i++) leafBall(c, 7 + r() * 12, 8 + r() * 5, 3.2 + r() * 2.2, palette);
+    for (let i = 0; i < 6; i++) leafBall(c, 7 + r() * 12, 8 + r() * 5, 3.2 + r() * 2.2, palette, r);
   });
 };
 

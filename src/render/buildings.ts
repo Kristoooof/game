@@ -1,6 +1,7 @@
 import { Graphics } from 'pixi.js';
 import { BUILDINGS, type BuildingId } from '../data/buildings';
 import type { World } from '../sim/world';
+import { mulberry32 } from '../sim/rng';
 import { diamond, tileToScreen } from './iso';
 
 const shade = (color: number, k: number) =>
@@ -17,6 +18,20 @@ const P = (x: number, y: number, h: number) => {
 const fill = (g: Graphics, pts: number[][], color: number) => g.poly(pts.flat()).fill(color);
 const edge = (g: Graphics, pts: number[][], color: number, width = 0.8) =>
   g.poly(pts.flat()).stroke({ width, color, alpha: 0.6 });
+
+/** Random seeded per building, so the same building always looks the same. */
+let rnd: () => number = Math.random;
+
+/** Scatter dots over a quad (corners bottom-left, bottom-right, top-right, top-left): plaster, stone grain. */
+function speckle(g: Graphics, q: number[][], color: number, n: number, alpha: number) {
+  for (let i = 0; i < n; i++) {
+    const s = rnd();
+    const t = rnd();
+    const lerp = (a: number[], b: number[], k: number) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+    const [x, y] = lerp(lerp(q[0], q[1], s), lerp(q[3], q[2], s), t);
+    g.circle(x, y, 0.35 + rnd() * 0.35).fill({ color, alpha: alpha * (0.5 + rnd() * 0.5) });
+  }
+}
 
 interface Box {
   x0: number;
@@ -35,6 +50,11 @@ function walls(g: Graphics, b: Box, h0: number, h1: number, color: number, top =
   if (top) fill(g, [P(x0, y0, h1), P(x1, y0, h1), P(x1, y1, h1), P(x0, y1, h1)], color);
   edge(g, left, shade(color, 0.5));
   edge(g, right, shade(color, 0.45));
+  // Plaster grain: darker and lighter flecks, denser on the shaded face.
+  const n = Math.round((h1 - h0) * 1.6);
+  speckle(g, left, shade(color, 0.7), n, 0.35);
+  speckle(g, left, shade(color, 1.1), n / 2, 0.3);
+  speckle(g, right, shade(color, 0.55), n, 0.35);
   if (h0 === 0 && h1 > 8) {
     // Stone plinth with a darker contact line where the wall meets the ground.
     onLeft(g, b, 0, 1, 0, 2.2, 0x8c867a);
@@ -134,19 +154,18 @@ const SHUTTERS = [0x3f6b4a, 0x4a5f8a, 0x8a3a2a, 0x6a5a2a];
 
 const ROOFS = [0xb5452b, 0xa0522d, 0x9b3b2b, 0x8e5a3a];
 
+/** Soft cast shadow of a footprint, falling towards the lower right (the sun is upper left). */
 function shadow(g: Graphics, x: number, y: number, size: number) {
-  const [tx, ty, rx, ry, bx, by, lx, ly] = [
-    ...P(x, y, 0),
-    ...P(x + size, y, 0),
-    ...P(x + size, y + size, 0),
-    ...P(x, y + size, 0),
-  ];
-  g.poly([tx + 7, ty + 3, rx + 7, ry + 3, bx + 7, by + 3, lx + 7, ly + 3]).fill({ color: 0x000000, alpha: 0.18 });
+  const foot = [P(x, y, 0), P(x + size, y, 0), P(x + size, y + size, 0), P(x, y + size, 0)].flat();
+  const moved = (dx: number, dy: number) => foot.map((v, i) => (i % 2 ? v + dy : v + dx));
+  g.poly(moved(12, 5)).fill({ color: 0x0a1a10, alpha: 0.1 });
+  g.poly(moved(7, 3)).fill({ color: 0x0a1a10, alpha: 0.12 });
 }
 
 /** Draws building `type` with its top corner at tile (x, y). `variant` picks colours. */
 export function drawBuilding(g: Graphics, type: BuildingId, x: number, y: number, variant = 0) {
   const size = BUILDINGS[type].size;
+  rnd = mulberry32(variant * 7919 + x * 131 + y * 31 + type.length);
   shadow(g, x, y, size);
   const box = (a: number, b: number, c: number, d: number): Box => ({ x0: x + a, y0: y + b, x1: x + c, y1: y + d });
   switch (type) {

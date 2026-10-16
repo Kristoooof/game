@@ -87,9 +87,22 @@ vg.addColorStop(1, 'rgba(5,15,30,0.45)');
 vctx.fillStyle = vg;
 vctx.fillRect(0, 0, 256, 256);
 const vignette = new Sprite({ texture: Texture.from(vignetteCanvas), eventMode: 'none' });
-const fitVignette = () => vignette.setSize(app.screen.width, app.screen.height);
+// Warm light from the upper left, as the shading assumes; added on top so it only brightens.
+const sunCanvas = Object.assign(document.createElement('canvas'), { width: 512, height: 512 });
+const sctx = sunCanvas.getContext('2d')!;
+const sg = sctx.createRadialGradient(128, 96, 0, 128, 96, 420);
+sg.addColorStop(0, 'rgba(255,236,190,0.16)');
+sg.addColorStop(0.5, 'rgba(255,220,160,0.06)');
+sg.addColorStop(1, 'rgba(255,200,140,0)');
+sctx.fillStyle = sg;
+sctx.fillRect(0, 0, 512, 512);
+const sunlight = new Sprite({ texture: Texture.from(sunCanvas), eventMode: 'none', blendMode: 'add' });
+const fitVignette = () => {
+  vignette.setSize(app.screen.width, app.screen.height);
+  sunlight.setSize(app.screen.width, app.screen.height);
+};
 fitVignette();
-app.stage.addChild(vignette);
+app.stage.addChild(vignette, sunlight);
 
 const fxaa = createFxaa();
 // A fixed filter area: measuring the huge sea mesh for bounds every frame is wasted work.
