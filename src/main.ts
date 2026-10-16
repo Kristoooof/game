@@ -121,7 +121,7 @@ const construction = createConstruction(effects.dust, (id) => {
 const fixedWeather = new URLSearchParams(location.search).get('idojaras') as Weather | null;
 const atmosphere = createAtmosphere(fixedWeather ?? undefined);
 // People, carts and boats; their wakes and reflections lie on the water, under the land.
-const life = createLife(world, app.renderer, terrain.front);
+const life = createLife(world, app.renderer, terrain.front, terrain.rockAt);
 const lit = new Container({
   children: [
     terrain.reflections,

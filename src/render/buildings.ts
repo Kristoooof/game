@@ -1,5 +1,6 @@
 import { Graphics } from 'pixi.js';
 import { BUILDINGS, type BuildingId } from '../data/buildings';
+import { type GameMap, terrainAt } from '../sim/map';
 import type { World } from '../sim/world';
 import { mulberry32 } from '../sim/rng';
 import { diamond, groundToScreen, liftAt, tileToScreen } from './iso';
@@ -412,6 +413,20 @@ function crane(g: Graphics, x: number, y: number) {
     g.moveTo(w[0] - Math.cos(a) * 4.5, w[1] - Math.sin(a) * 9).lineTo(w[0] + Math.cos(a) * 4.5, w[1] + Math.sin(a) * 9);
   }
   g.stroke({ width: 0.6, color: 0x5a3e22 });
+}
+
+/** A harbour's or fisher's pier: from the middle of a waterside footprint edge out over the sea, front sides first. */
+export function pierBox(map: GameMap, x: number, y: number, size: number) {
+  const water = (u: number, v: number) => terrainAt(map, u, v) === 'water';
+  const m = size / 2;
+  const L = 2.2;
+  const W2 = 0.25;
+  const mid = Math.floor(m);
+  if (water(x + size, y + mid)) return { x0: x + size, y0: y + m - W2, x1: x + size + L, y1: y + m + W2 };
+  if (water(x + mid, y + size)) return { x0: x + m - W2, y0: y + size, x1: x + m + W2, y1: y + size + L };
+  if (water(x - 1, y + mid)) return { x0: x - L, y0: y + m - W2, x1: x, y1: y + m + W2 };
+  if (water(x + mid, y - 1)) return { x0: x + m - W2, y0: y - L, x1: x + m + W2, y1: y };
+  return null;
 }
 
 /** Wooden pier over the tile box (x0, y0)–(x1, y1): a plank deck on posts standing in the sea. */

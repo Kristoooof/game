@@ -1,6 +1,8 @@
 import { Container, Graphics, type Rectangle, type Renderer, Sprite, type Texture } from 'pixi.js';
 import { terrainAt } from '../sim/map';
 import { roadRoute, roadsBeside, type World } from '../sim/world';
+import { BUILDINGS } from '../data/buildings';
+import { pierBox } from './buildings';
 import { groundToScreen } from './iso';
 
 /** Texture of a small drawing, anchored at its local origin (feet, waterline). */
@@ -106,7 +108,7 @@ const cartArt = (r: Renderer) =>
   });
 
 /** A screen-space drawing of a vessel heading at angle `a` (tile space), origin on the waterline. */
-function drawShip(g: Graphics, a: number, small: boolean) {
+function drawShip(g: Graphics, a: number, small: boolean, mirrored = false) {
   const hx = Math.cos(a);
   const hy = Math.sin(a);
   const k = small ? 0.38 : 1;
@@ -114,7 +116,8 @@ function drawShip(g: Graphics, a: number, small: boolean) {
   const S = (u: number, v: number, h = 0) => {
     const tx = (hx * u - hy * v) * k;
     const ty = (hy * u + hx * v) * k;
-    return [(tx - ty) * 32, (tx + ty) * 16 - h * k];
+    // Mirrored: every point hangs below its own waterline point, so the reflection heads the same way.
+    return [(tx - ty) * 32, (tx + ty) * 16 + (mirrored ? h : -h) * k];
   };
   // Hull outline from bow round to bow: tapered at the bow, broad amidships, a squared stern;
   // the sheer rises at both ends (a raised stern castle).
@@ -248,7 +251,12 @@ const CART_SPEED = 1.1;
  * off the fishers' huts and sailing ships at sea. They go in `front`, depth-sorted with the
  * buildings and trees; wakes and reflections in `water`, between the sea and the land.
  */
-export function createLife(world: World, renderer: Renderer, front: Container) {
+export function createLife(
+  world: World,
+  renderer: Renderer,
+  front: Container,
+  rockAt: (x: number, y: number) => readonly number[] | null,
+) {
   const { map } = world;
   const W = map.width;
   const wakes = new Graphics({ eventMode: 'none' });
@@ -284,7 +292,22 @@ export function createLife(world: World, renderer: Renderer, front: Container) {
           queue.push(j);
         }
   }
+  /** Piers stand in the water: vessels keep a little way off them. */
+  let piers: { x0: number; y0: number; x1: number; y1: number }[] = [];
+  const onPier = (x: number, y: number) =>
+    piers.some((p) => x > p.x0 - 0.45 && x < p.x1 + 0.45 && y > p.y0 - 0.45 && y < p.y1 + 0.45);
+  /** Inside an offshore rock (its size is about its width in tiles), with a little room around it. */
+  const onRock = (x: number, y: number) => {
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const [tx, ty] = [Math.floor(x) + dx, Math.floor(y) + dy];
+        const r = rockAt(tx, ty);
+        if (r && Math.hypot(x - tx - r[0], y - ty - r[1]) < r[2] * 0.75 + 0.3) return true;
+      }
+    return false;
+  };
   const sea = (x: number, y: number, min: number) => {
+    if (onPier(x, y) || onRock(x, y)) return false;
     const i = Math.floor(y) * W + Math.floor(x);
     return terrainAt(map, Math.floor(x), Math.floor(y)) === 'water' && toLand[i] >= min;
   };
@@ -303,7 +326,6 @@ export function createLife(world: World, renderer: Renderer, front: Container) {
   const newVessel = (x: number, y: number, small: boolean, home?: Vessel['home']): Vessel => {
     const g = new Graphics();
     const mirror = new Graphics({ tint: 0x2a6a8a });
-    mirror.scale.y = -1;
     front.addChild(g);
     mirrors.addChild(mirror);
     return {
@@ -383,6 +405,9 @@ export function createLife(world: World, renderer: Renderer, front: Container) {
         front.addChild(s);
         carts.push({ s, route, pos: 0, dir: 1, wait: 1, home });
       }
+      piers = [...world.buildings.values()].flatMap((b) =>
+        b.type === 'harbor' || b.type === 'fisher' ? (pierBox(map, b.x, b.y, BUILDINGS[b.type].size) ?? []) : [],
+      );
       // Fishing boats: one per fisher hut.
       for (const v of boats) {
         v.g.destroy();
@@ -516,7 +541,7 @@ export function createLife(world: World, renderer: Renderer, front: Container) {
         if (q !== v.drawn) {
           v.drawn = q;
           drawShip(v.g, (q / 32) * Math.PI * 2, v.small);
-          drawShip(v.mirror, (q / 32) * Math.PI * 2, v.small);
+          drawShip(v.mirror, (q / 32) * Math.PI * 2, v.small, true);
         }
         const bob = Math.sin(performance.now() / 600 + v.tx) * 0.8;
         v.g.position.set(p.x, p.y + bob);

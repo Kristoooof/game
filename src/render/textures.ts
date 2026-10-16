@@ -126,7 +126,13 @@ const conifer = (seed: number, palette: string[], tiers: number) => {
       c.moveTo(17, ty + 1);
       c.lineTo(17 + hw * 0.15, by - 1);
       c.stroke();
-      // Needle tips: short strokes outward from the lower edge, lit on the left.
+      // Needles: short strokes over the tier, lit on the left, clipped to its outline so none
+      // stick out past the silhouette.
+      c.save();
+      c.beginPath();
+      [[17, ty], ...edge].forEach(([px, py], j) => (j ? c.lineTo(px, py) : c.moveTo(px, py)));
+      c.closePath();
+      c.clip();
       for (let k = 0; k < 40; k++) {
         const u = r();
         const x0 = 17 - hw + u * hw * 2;
@@ -139,6 +145,7 @@ const conifer = (seed: number, palette: string[], tiers: number) => {
         c.lineTo(x0 + (u - 0.5) * 2, y0 + 1.6);
         c.stroke();
       }
+      c.restore();
       c.globalAlpha = 1;
     }
   });

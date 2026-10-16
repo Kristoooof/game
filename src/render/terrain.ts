@@ -14,7 +14,7 @@ import { BUILDINGS } from '../data/buildings';
 import { levelAt, terrainAt } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
 import type { World } from '../sim/world';
-import { drawBuilding, drawPier, drawRoads, setGlow, setSun } from './buildings';
+import { drawBuilding, drawPier, drawRoads, pierBox, setGlow, setSun } from './buildings';
 import { sunShadow } from './daylight';
 import { createGround } from './ground';
 import { groundToScreen, LEVEL_H, MAX_LEVEL, tileToScreen } from './iso';
@@ -95,6 +95,25 @@ export function createTerrain(world: World, renderer: Renderer) {
           rockDepth[i] = pass;
       }
 
+  /**
+   * Draw order of something standing at tile point (px, py), given its own depth `z`: a building is
+   * one depth for its whole footprint, so next to one, anything past its front faces goes after it
+   * and anything else before it.
+   */
+  const depthBeside = (px: number, py: number, z: number) => {
+    const fx = Math.floor(px);
+    const fy = Math.floor(py);
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        if (fx + dx < 0 || fy + dy < 0 || fx + dx >= W || fy + dy >= H) continue;
+        const b = world.buildings.get(world.occupied[(fy + dy) * W + fx + dx]);
+        if (!b || b.type === 'road') continue;
+        const size = BUILDINGS[b.type].size;
+        const bz = b.x + b.y + size;
+        z = px >= b.x + size || py >= b.y + size ? Math.max(z, bz + 0.01) : Math.min(z, bz - 0.01);
+      }
+    return z;
+  };
   /** Every tile within `r` of (x, y) on the same terrace. */
   const flatAround = (x: number, y: number, r: number) => {
     const l = levelAt(map, x, y);
@@ -110,18 +129,6 @@ export function createTerrain(world: World, renderer: Renderer) {
         if (t === 'water' || t === 'river') return true;
       }
     return false;
-  };
-  /** A pier from the middle of a waterside footprint edge out over the sea, front sides first. */
-  const pierBox = (x: number, y: number, size: number) => {
-    const m = size / 2;
-    const L = 2.2;
-    const W2 = 0.25;
-    const mid = Math.floor(m);
-    if (at(x + size, y + mid) === 'water') return { x0: x + size, y0: y + m - W2, x1: x + size + L, y1: y + m + W2 };
-    if (at(x + mid, y + size) === 'water') return { x0: x + m - W2, y0: y + size, x1: x + m + W2, y1: y + size + L };
-    if (at(x - 1, y + mid) === 'water') return { x0: x - L, y0: y + m - W2, x1: x, y1: y + m + W2 };
-    if (at(x + mid, y - 1) === 'water') return { x0: x + m - W2, y0: y - L, x1: x + m + W2, y1: y };
-    return null;
   };
   /** Coastal things mirror into the sea: the same picture flipped about its base line `y`. */
   const mirror = (d: Container, y: number, into: Container) => {
@@ -144,7 +151,7 @@ export function createTerrain(world: World, renderer: Renderer) {
         const s = groundToScreen(x + u, y + v);
         const sp = sprite(a, s.x, s.y, scale);
         if (lean) sp.skew.x = -(0.05 + ((x * 7 + y * 13) % 5) * 0.012);
-        sp.zIndex = x + y + u + v;
+        sp.zIndex = depthBeside(x + u, y + v, x + y + u + v);
         into.addChild(sp);
         if (!reflections) return;
         // Cast shadow: the silhouette laid flat along the sun's direction.
@@ -338,7 +345,7 @@ export function createTerrain(world: World, renderer: Renderer) {
       setGlow(lights);
       o.addChild(draw());
       setGlow(null);
-      const pier = b.type === 'harbor' || b.type === 'fisher' ? pierBox(b.x, b.y, size) : null;
+      const pier = b.type === 'harbor' || b.type === 'fisher' ? pierBox(map, b.x, b.y, size) : null;
       const drawP = (mirrored = false) => {
         const pg = new Graphics({ zIndex: pier!.x0 + pier!.y0 + 0.5 });
         drawPier(pg, pier!.x0, pier!.y0, pier!.x1, pier!.y1, mirrored);
@@ -377,6 +384,8 @@ export function createTerrain(world: World, renderer: Renderer) {
     objects: objectLayer,
     reflections: reflectionLayer,
     front,
+    /** Offshore rock on a water tile, if any: [u, v, size, variant]. */
+    rockAt: ground.rockAt,
     /** Rebuild the live copies in `front` after the roads or buildings changed. */
     refreshFront() {
       for (const o of occluders) o.destroy();
