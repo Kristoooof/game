@@ -17,13 +17,14 @@
   "15": "CLAUDE.md",
   "16": ".claude/CLAUDE.md",
   "17": "camera.ts",
-  "18": "map.ts",
-  "19": "data/buildings.ts",
+  "18": "world.ts",
+  "19": "say",
   "20": "settings.ts",
   "21": "textures.ts",
   "22": "end",
   "23": "atmosphere.ts",
-  "24": "world.ts",
+  "24": "terrainAt",
   "25": "daylight.ts",
-  "26": "refresh"
+  "26": "refresh",
+  "27": "applySettings"
 }

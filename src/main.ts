@@ -169,7 +169,7 @@ const fitVignette = () => {
   sunlight.setSize(app.screen.width, app.screen.height);
 };
 fitVignette();
-// Haze, sunbeams, dust and rain over the scene, under the vignette.
+// Rain over the scene, under the vignette.
 app.stage.addChild(atmosphere.screen, vignette, sunlight);
 
 const fxaa = createFxaa();
@@ -213,7 +213,6 @@ app.ticker.add((t) => {
     const grey = (a[0] + a[1] + a[2]) / 3;
     return (v + (grey - v) * rain * 0.35) * dim;
   });
-  atmosphere.haze.tint = hex(ambient);
   lit.tint = hex(ambient);
   terrain.lights.alpha = day.night;
   // Invisible layers are skipped, not drawn at zero opacity: full-screen blending is the main cost.

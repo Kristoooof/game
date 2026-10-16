@@ -1,4 +1,4 @@
-import { Container, Graphics, type Rectangle, Sprite, Texture, TilingSprite } from 'pixi.js';
+import { Container, Graphics, type Rectangle, Texture, TilingSprite } from 'pixi.js';
 
 export type Weather = 'clear' | 'cloudy' | 'rain' | 'fog';
 /** How much of each the sky holds right now, 0..1, eased towards the current weather. */
@@ -47,83 +47,14 @@ const cloudTexture = () =>
     }
   });
 
-/** Distance haze at the top of the screen, fading out towards the middle. */
-const hazeTexture = () =>
-  canvasTexture(4, 256, (c) => {
-    const g = c.createLinearGradient(0, 0, 0, 256);
-    g.addColorStop(0, 'rgba(185,208,232,0.55)');
-    g.addColorStop(0.55, 'rgba(185,208,232,0)');
-    c.fillStyle = g;
-    c.fillRect(0, 0, 4, 256);
-  });
-/** Warmth rising from the bottom of the screen (added light). */
-const warmTexture = () =>
-  canvasTexture(4, 256, (c) => {
-    const g = c.createLinearGradient(0, 256, 0, 0);
-    g.addColorStop(0, 'rgba(255,170,90,0.22)');
-    g.addColorStop(0.5, 'rgba(255,170,90,0)');
-    c.fillStyle = g;
-    c.fillRect(0, 0, 4, 256);
-  });
-/** Shafts of sunlight slanting down from the upper left. */
-const raysTexture = () =>
-  canvasTexture(512, 512, (c) => {
-    // Blurred: hard-edged beams read as stripes painted across the screen.
-    c.filter = 'blur(18px)';
-    c.translate(-40, -60);
-    c.rotate(-0.55);
-    for (const [x, w, a] of [
-      [60, 30, 0.35],
-      [130, 55, 0.25],
-      [230, 22, 0.4],
-      [300, 70, 0.2],
-      [420, 35, 0.3],
-    ]) {
-      const g = c.createLinearGradient(0, 0, 0, 760);
-      g.addColorStop(0, `rgba(255,240,200,${a})`);
-      g.addColorStop(1, 'rgba(255,240,200,0)');
-      c.fillStyle = g;
-      c.fillRect(x, 0, w, 760);
-    }
-    // Fade out away from the sunny corner, so no beam is cut off at the texture's edge.
-    c.resetTransform();
-    c.filter = 'none';
-    c.globalCompositeOperation = 'destination-in';
-    const fade = c.createRadialGradient(0, 0, 0, 0, 0, 500);
-    fade.addColorStop(0, 'rgba(0,0,0,1)');
-    fade.addColorStop(1, 'rgba(0,0,0,0)');
-    c.fillStyle = fade;
-    c.fillRect(0, 0, 512, 512);
-  });
-const moteTexture = () =>
-  canvasTexture(16, 16, (c) => {
-    const g = c.createRadialGradient(8, 8, 0, 8, 8, 8);
-    g.addColorStop(0, 'rgba(255,248,220,1)');
-    g.addColorStop(1, 'rgba(255,248,220,0)');
-    c.fillStyle = g;
-    c.fillRect(0, 0, 16, 16);
-  });
-
-/**
- * Weather and air: cloud shadows over the world, rain, distance haze and warmth, sunbeams and
- * floating dust. `world` goes in the world container (cloud shadows), `screen` over the scene.
- */
+/** Weather: cloud shadows over the world (`world`, in the world container) and rain (`screen`, over the scene). */
 export function createAtmosphere(fixed?: Weather) {
   const shadows = new TilingSprite({ texture: cloudTexture(), width: 1, height: 1, eventMode: 'none' });
   shadows.tileScale.set(2);
   const world = new Container({ children: [shadows], eventMode: 'none' });
 
-  const haze = new Sprite({ texture: hazeTexture(), eventMode: 'none' });
-  const warm = new Sprite({ texture: warmTexture(), eventMode: 'none', blendMode: 'add' });
-  const rays = new Sprite({ texture: raysTexture(), eventMode: 'none', blendMode: 'add' });
   const rain = new Graphics({ eventMode: 'none' });
-  const moteTex = moteTexture();
-  const motes = Array.from({ length: 70 }, () => {
-    const s = new Sprite({ texture: moteTex, anchor: 0.5, blendMode: 'add', eventMode: 'none' });
-    return { s, x: Math.random(), y: Math.random(), phase: Math.random() * 10, speed: 0.004 + Math.random() * 0.01 };
-  });
-  const moteLayer = new Container({ children: motes.map((m) => m.s), eventMode: 'none' });
-  const screen = new Container({ children: [haze, warm, rays, moteLayer, rain], eventMode: 'none' });
+  const screen = new Container({ children: [rain], eventMode: 'none' });
 
   const drops = Array.from({ length: 400 }, () => ({
     x: Math.random(),
@@ -138,8 +69,6 @@ export function createAtmosphere(fixed?: Weather) {
   return {
     world,
     screen,
-    /** Tinted with the light of the hour, so the haze darkens at night. */
-    haze,
     sky,
     update(dt: number, view: Rectangle, size: { width: number; height: number }, sun: number, changing: boolean) {
       time += dt;
@@ -159,29 +88,6 @@ export function createAtmosphere(fixed?: Weather) {
       shadows.alpha = (0.25 + sky.cloud * 0.55) * (0.3 + 0.7 * sun);
 
       const { width, height } = size;
-      haze.setSize(width, height * 0.9);
-      haze.alpha = Math.min(1, 0.45 + sky.fog * 0.9 + sky.rain * 0.3);
-      warm.setSize(width, height);
-      warm.y = 0;
-      warm.alpha = sun * (1 - sky.cloud * 0.6);
-      rays.setSize(width * 0.9, height * 0.9);
-      // Strongest through broken cloud; faint on a clear day, gone in rain.
-      rays.alpha =
-        sun * (0.1 + 0.9 * sky.cloud * (1 - sky.cloud)) * (1 - sky.rain) * (0.75 + 0.25 * Math.sin(time * 0.4));
-      rays.visible = rays.alpha > 0.01;
-
-      // Dust motes catching the light, drifting with the wind, mostly on the sunny side.
-      moteLayer.visible = sun > 0.1 && sky.rain < 0.5;
-      if (moteLayer.visible)
-        for (const m of motes) {
-          m.x = (m.x + m.speed * dt * 0.6) % 1;
-          m.y = (m.y + Math.sin(time * 0.3 + m.phase) * 0.0006) % 1;
-          m.s.position.set(m.x * width * 0.7, m.y * height * 0.7);
-          m.s.scale.set(0.12 + 0.08 * Math.sin(m.phase * 3));
-          m.s.alpha =
-            sun * (1 - sky.rain) * (0.3 + 0.7 * Math.max(0, Math.sin(time * 1.7 + m.phase * 5))) * (1 - m.x * m.y);
-        }
-
       // Rain: slanting streaks, as many as the shower is heavy.
       rain.clear();
       const n = Math.round(drops.length * sky.rain);
