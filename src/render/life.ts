@@ -16,34 +16,93 @@ type Baked = ReturnType<typeof bake>;
 const spriteOf = (b: Baked) =>
   new Sprite({ texture: b.texture as Texture, anchor: { x: b.ax, y: b.ay }, eventMode: 'none' });
 
-const TUNICS = [0x8a3a2a, 0x3f5f8a, 0x5a7a3a, 0x9a7a3a, 0x6a4a7a];
-/** Two walking frames per tunic colour: legs apart, legs together. */
+const TUNICS = [0x8a3a2a, 0x3f5f8a, 0x5a7a3a, 0x9a7a3a, 0x6a4a7a, 0x7a6a5a];
+const SKIN = [0xe8c09a, 0xd8a880, 0xc08a64];
+/**
+ * Villagers in two walking frames (legs and arms swinging opposite ways): men in breeches with
+ * a straw hat or cap, women in long skirts and a kerchief.
+ */
 const walkerArt = (r: Renderer) =>
-  TUNICS.map((tunic) =>
-    [2, 0.6].map((stride) =>
-      bake(r, (g) => {
-        g.moveTo(-stride, 0).lineTo(-0.6, -4).moveTo(stride, 0).lineTo(0.6, -4).stroke({ width: 1.2, color: 0x3a2a1a });
-        g.roundRect(-2.2, -9.5, 4.4, 6, 1.5).fill(tunic);
-        g.circle(0, -11, 1.9).fill(0xe0b08a);
-        g.circle(0, -11.8, 1.9).fill({ color: 0x4a3020, alpha: 0.9 });
-      }),
-    ),
+  TUNICS.flatMap((tunic, n) =>
+    [false, true].map((woman) => {
+      const skin = SKIN[n % SKIN.length];
+      return [1, -1].map((phase) =>
+        bake(r, (g) => {
+          const dark = 0x2e2418;
+          if (woman) {
+            g.poly([-2.6, -0.2, 2.6, -0.2, 1.6, -5, -1.6, -5]).fill(n % 2 ? 0x5a4a6a : 0x6a5038);
+            g.moveTo(-1.6, -0.3).lineTo(1.6, -0.3).stroke({ width: 0.6, color: dark, alpha: 0.5 });
+          } else {
+            g.moveTo(-0.8, -4.5)
+              .lineTo(-0.8 - 1.4 * phase, 0)
+              .moveTo(0.8, -4.5)
+              .lineTo(0.8 + 1.4 * phase, 0);
+            g.stroke({ width: 1.3, color: 0x4a3a28, cap: 'round' });
+          }
+          // Body: tunic shaded on the side away from the sun, a belt, swinging arms.
+          g.roundRect(-2.2, -9.6, 4.4, 5.6, 1.4).fill(tunic);
+          g.rect(0.6, -9.2, 1.6, 5).fill({ color: 0x000000, alpha: 0.18 });
+          g.rect(-2.2, -5.6, 4.4, 0.8).fill({ color: dark, alpha: 0.6 });
+          g.moveTo(-2, -8.8)
+            .lineTo(-2.6 + 1.2 * phase, -5.2)
+            .moveTo(2, -8.8)
+            .lineTo(2.6 + 1.2 * phase, -5.2);
+          g.stroke({ width: 1.1, color: tunic, cap: 'round' });
+          g.circle(-2.6 + 1.2 * phase, -5.1, 0.6).fill(skin);
+          g.circle(2.6 + 1.2 * phase, -5.1, 0.6).fill(skin);
+          g.circle(0, -11.2, 1.9).fill(skin);
+          if (woman) g.poly([-2.1, -11, 0, -13.6, 2.1, -11, 1.4, -10.2, -1.4, -10.2]).fill(n % 2 ? 0xe8e0c8 : 0xb84a3a);
+          else if (n % 2) {
+            g.ellipse(0, -12.4, 3.2, 0.9).fill(0xd8c080);
+            g.ellipse(0, -13, 1.6, 1).fill(0xc8b070);
+          } else g.ellipse(0, -12.6, 2, 1.1).fill(0x4a3020);
+        }),
+      );
+    }),
   );
-/** Horse-drawn cart with a load of crates, facing right. */
+/** Horse-drawn cart with a load of crates and a driver, facing right. */
 const cartArt = (r: Renderer) =>
   bake(r, (g) => {
-    g.ellipse(-3, -1, 11, 2.5).fill({ color: 0x000000, alpha: 0.15 });
-    g.roundRect(-11, -9, 13, 5, 1).fill(0x7a5230);
-    g.rect(-10, -14, 5, 5).fill(0xa07a46);
-    g.rect(-5, -13, 5, 4).fill(0x8f6a3c);
-    g.circle(-8, -3, 3).fill(0x3a2a1a);
-    g.circle(-8, -3, 1.6).fill(0x8a6a48);
-    g.moveTo(2, -6).lineTo(6, -6).stroke({ width: 1, color: 0x4a3420 });
-    // Horse.
-    g.ellipse(9, -8, 4.5, 2.6).fill(0x6a4428);
-    g.moveTo(6.5, -6).lineTo(6, 0).moveTo(11.5, -6).lineTo(12, 0).stroke({ width: 1.2, color: 0x5a3820 });
-    g.poly([12, -9, 15.5, -13, 16.5, -11.5, 13.5, -8]).fill(0x6a4428);
-    g.circle(-2, -10.5, 1.6).fill(0xe0b08a);
+    g.ellipse(-2, -0.5, 14, 2.6).fill({ color: 0x000000, alpha: 0.15 });
+    // Cart bed, load and driver.
+    g.roundRect(-13, -10, 15, 5.5, 1).fill(0x7a5230);
+    g.rect(-13, -10, 15, 1.2).fill(0x9a7048);
+    g.rect(-12, -15.5, 5.5, 5.5).fill(0xa07a46).stroke({ width: 0.5, color: 0x5a3e22 });
+    g.rect(-6.2, -14.5, 5, 4.5).fill(0x8f6a3c).stroke({ width: 0.5, color: 0x5a3e22 });
+    g.moveTo(-12, -15.5)
+      .lineTo(-6.5, -10)
+      .moveTo(-6.2, -14.5)
+      .lineTo(-1.2, -10)
+      .stroke({ width: 0.4, color: 0x5a3e22 });
+    g.roundRect(-2.6, -15, 3.4, 5, 1).fill(0x3f5f8a);
+    g.circle(-0.9, -16.6, 1.6).fill(0xe0b08a);
+    g.ellipse(-0.9, -17.8, 2.6, 0.8).fill(0xd8c080);
+    // Wheel with spokes.
+    g.circle(-8, -3.4, 3.4).stroke({ width: 1, color: 0x3a2a1a });
+    for (let k = 0; k < 4; k++) {
+      const a = (k * Math.PI) / 4;
+      g.moveTo(-8 - Math.cos(a) * 3, -3.4 - Math.sin(a) * 3).lineTo(-8 + Math.cos(a) * 3, -3.4 + Math.sin(a) * 3);
+    }
+    g.stroke({ width: 0.5, color: 0x5a4028 });
+    g.circle(-8, -3.4, 0.8).fill(0x3a2a1a);
+    // Shafts and harness to the horse.
+    g.moveTo(2, -7).lineTo(8, -8.5).stroke({ width: 0.9, color: 0x4a3420 });
+    // Horse: body, legs, neck and head, mane and tail.
+    g.moveTo(7.5, -6.5)
+      .lineTo(7, 0)
+      .moveTo(9, -6.5)
+      .lineTo(9.6, 0)
+      .moveTo(13, -6.5)
+      .lineTo(12.5, 0)
+      .moveTo(14.4, -6.5)
+      .lineTo(15, 0);
+    g.stroke({ width: 1.2, color: 0x4a2e18, cap: 'round' });
+    g.ellipse(11, -8.6, 5, 2.8).fill(0x6a4428);
+    g.ellipse(10, -9.6, 3.5, 1.2).fill({ color: 0x8a5a34, alpha: 0.8 });
+    g.poly([14.2, -10, 17.2, -15, 19.4, -13.8, 16, -9]).fill(0x6a4428);
+    g.ellipse(19.2, -13.6, 2.3, 1.3).fill(0x6a4428);
+    g.moveTo(14.6, -10.6).lineTo(17.2, -15.4).stroke({ width: 1, color: 0x2e1c10 });
+    g.moveTo(6.2, -9).quadraticCurveTo(4.6, -7.5, 5, -4.5).stroke({ width: 1.1, color: 0x2e1c10 });
   });
 
 /** A screen-space drawing of a vessel heading at angle `a` (tile space), origin on the waterline. */
@@ -120,7 +179,31 @@ function drawShip(g: Graphics, a: number, small: boolean) {
     ...S(0.2, 0, 32),
     ...S(0.07, -0.57, 33),
   ]).fill(0xb8402e);
+  // The half of the sail turned from the sun is in shade; seams run down the cloth.
+  g.poly([...S(0.05, 0.6, 18), ...S(0.2, 0, 15), ...S(0.17, 0, 48), ...S(0.05, 0.55, 47)]).fill({
+    color: 0x5a4a30,
+    alpha: 0.18,
+  });
+  for (const v of [-0.3, 0.3]) {
+    const a = S(0.11, v, 17);
+    const b = S(0.11, v, 47.5);
+    g.moveTo(a[0], a[1]).lineTo(b[0], b[1]);
+  }
+  g.stroke({ width: 0.4, color: 0xb8a888, alpha: 0.8 });
+  // Rigging: stays to bow and stern, shrouds to either side, a crow's nest near the top.
+  const stays = [S(1.5, 0, 12), S(-0.95, 0, 12), S(0.05, 0.3, 7), S(0.05, -0.3, 7)];
+  for (const [x, y] of stays) g.moveTo(head[0], head[1] + 2).lineTo(x, y);
+  g.stroke({ width: 0.45, color: 0x2a1c10, alpha: 0.75 });
+  const nest = S(0.05, 0, 50);
+  g.rect(nest[0] - 2, nest[1] - 1.5, 4, 2.4).fill(0x5a3a1e);
   g.poly([...head, ...S(-0.35, 0, 51), ...S(0.05, 0, 48)]).fill(0xc0392b);
+  // Stern windows catching the light, when the stern faces us.
+  const st = S(-0.97, 0, 8.5);
+  if (st[1] > S(0, 0, 8.5)[1])
+    g.rect(st[0] - 2.5, st[1] - 1, 1.6, 1.4)
+      .fill(0xe8c870)
+      .rect(st[0] + 0.9, st[1] - 1, 1.6, 1.4)
+      .fill(0xe8c870);
 }
 
 interface Walker {

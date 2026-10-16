@@ -255,6 +255,11 @@ void main() {
     vec3 c = mix(vec3(0.5, 0.45, 0.38), vec3(0.68, 0.62, 0.52), strata);
     c *= 0.82 + 0.3 * smoothstep(0.3, 0.7, cracks);
     c *= mix(1.05, 0.68, sf.w);
+    // Ledges catching the light, and moss trickling down from the grassy top.
+    float ledge = smoothstep(0.86, 1.0, fract(sf.w * 3.0 + noise(vPos * 0.08) * 0.7));
+    c *= 1.0 + ledge * 0.16;
+    float moss = smoothstep(0.55, 0.8, noise(vec2(vPos.x * 0.3, vPos.y * 0.035))) * smoothstep(0.75, 0.1, sf.w);
+    c = mix(c, vec3(0.3, 0.42, 0.2), moss * 0.55);
     // A lip of grass hanging over the top edge.
     c = mix(c, vec3(0.3, 0.47, 0.2), smoothstep(0.14, 0.02, sf.w) * 0.85);
     c *= shade;

@@ -2,7 +2,7 @@ import { Sprite, Texture } from 'pixi.js';
 import { mulberry32 } from '../sim/rng';
 
 /** Textures are painted at 2× so they stay crisp when zoomed in. */
-const S = 2;
+const S = 4;
 
 export interface Art {
   texture: Texture;
@@ -65,17 +65,40 @@ const leafBall = (c: Ctx, x: number, y: number, r: number, [dark, mid, light]: s
   c.beginPath();
   c.arc(x, y, r, 0, Math.PI * 2);
   c.fill();
-  // Leaf clusters: lit specks on the sun side, dark gaps on the shadow side.
-  for (let i = 0; i < Math.max(3, r * 1.6); i++) {
+  // Self-shadow: the lower right of the ball turned away from the sun.
+  const o = c.createRadialGradient(x + r * 0.45, y + r * 0.5, r * 0.2, x + r * 0.3, y + r * 0.35, r * 1.05);
+  o.addColorStop(0, 'rgba(5,20,8,0.35)');
+  o.addColorStop(1, 'rgba(5,20,8,0)');
+  c.fillStyle = o;
+  c.beginPath();
+  c.arc(x, y, r, 0, Math.PI * 2);
+  c.fill();
+  // Leaf clusters: many small lit leaves on the sun side, dark gaps on the shadow side.
+  for (let i = 0; i < Math.max(8, r * 5); i++) {
     const a = rnd() * Math.PI * 2;
-    const d = Math.sqrt(rnd()) * r * 0.85;
-    const lit = Math.cos(a - 3.9) > 0;
+    const d = Math.sqrt(rnd()) * r * 0.9;
+    const lit = Math.cos(a - 3.9) > -0.1;
     c.fillStyle = lit ? light : dark;
-    c.globalAlpha = lit ? 0.75 : 0.55;
+    c.globalAlpha = lit ? 0.7 : 0.5;
     c.beginPath();
-    c.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 0.5 + rnd() * 0.5, 0, Math.PI * 2);
+    c.ellipse(
+      x + Math.cos(a) * d,
+      y + Math.sin(a) * d,
+      0.35 + rnd() * 0.45,
+      0.25 + rnd() * 0.3,
+      rnd() * 3,
+      0,
+      Math.PI * 2,
+    );
     c.fill();
   }
+  // A thin rim of sunlight along the upper-left edge.
+  c.globalAlpha = 0.45;
+  c.strokeStyle = light;
+  c.lineWidth = Math.max(0.4, r * 0.08);
+  c.beginPath();
+  c.arc(x, y, r * 0.92, Math.PI * 1.05, Math.PI * 1.6);
+  c.stroke();
   c.globalAlpha = 1;
 };
 
@@ -104,15 +127,15 @@ const conifer = (seed: number, palette: string[], tiers: number) => {
       c.lineTo(17 + hw * 0.15, by - 1);
       c.stroke();
       // Needle tips: short strokes outward from the lower edge, lit on the left.
-      for (let k = 0; k < 14; k++) {
+      for (let k = 0; k < 40; k++) {
         const u = r();
         const x0 = 17 - hw + u * hw * 2;
         const y0 = by - 1 - (1 - Math.abs(u - 0.5) * 2) * 1.5;
         c.strokeStyle = u < 0.5 ? `${palette[2]}` : 'rgba(5,25,10,0.5)';
         c.globalAlpha = 0.6;
-        c.lineWidth = 0.5;
+        c.lineWidth = 0.35;
         c.beginPath();
-        c.moveTo(x0, y0);
+        c.moveTo(x0, y0 - r() * (by - ty) * 0.5);
         c.lineTo(x0 + (u - 0.5) * 2, y0 + 1.6);
         c.stroke();
       }

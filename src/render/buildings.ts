@@ -79,6 +79,24 @@ function walls(g: Graphics, b: Box, h0: number, h1: number, color: number, top =
   fill(g, left, shade(color, 0.92));
   fill(g, right, shade(color, 0.72));
   if (top) fill(g, [P(x0, y0, h1), P(x1, y0, h1), P(x1, y1, h1), P(x0, y1, h1)], color);
+  // Weathering: rain-splash grime along the foot of the wall, the top a touch lighter.
+  if (h1 - h0 > 6) {
+    for (const [face, k] of [
+      [left, 1],
+      [right, 0.8],
+    ] as const) {
+      const at = (t: number, v: number) => [
+        face[0][0] + (face[1][0] - face[0][0]) * t,
+        face[0][1] + (face[1][1] - face[0][1]) * t - v,
+      ];
+      const foot = Math.min(4, (h1 - h0) * 0.3);
+      g.poly([...at(0, 0), ...at(1, 0), ...at(1, foot), ...at(0, foot)]).fill({ color: 0x2a2018, alpha: 0.16 * k });
+      g.poly([...at(0, h1 - h0 - 2.5), ...at(1, h1 - h0 - 2.5), ...at(1, h1 - h0), ...at(0, h1 - h0)]).fill({
+        color: 0xffffff,
+        alpha: 0.07 * k,
+      });
+    }
+  }
   edge(g, left, shade(color, 0.5));
   edge(g, right, shade(color, 0.45));
   // Plaster grain: darker and lighter flecks, denser on the shaded face.
@@ -144,6 +162,17 @@ function gabled(g: Graphics, b: Box, wall: number, roof: number, wallColor: numb
       g.moveTo(a[0], a[1]).lineTo(e[0], e[1]);
     }
   g.stroke({ width: 0.5, color: shade(roofColor, 0.6), alpha: 0.55 });
+  // Odd tiles a shade lighter or darker, a few greened with moss: an old roof, not a flat sheet.
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      const v = rnd();
+      if (v > 0.35) continue;
+      const u0 = (c + (r % 2) * 0.5) / cols;
+      const u1 = Math.min(1, u0 + 1 / cols);
+      const q = [at(r / rows, u0), at(r / rows, u1), at((r + 1) / rows, u1), at((r + 1) / rows, u0)];
+      const color = v < 0.06 ? 0x5a6a3a : shade(roofColor, v < 0.2 ? 0.85 : 1.15);
+      g.poly(q.flat()).fill({ color, alpha: v < 0.06 ? 0.45 : 0.35 });
+    }
   // Light catching the lower edge of each row.
   for (let r = 0; r < rows; r++) {
     const a = at(r / rows + 0.02, 0);
@@ -699,6 +728,25 @@ export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.widt
     for (const [ax, ay, bx, by] of segs) g.moveTo(ax, ay).lineTo(bx, by);
     g.stroke({ width, color, alpha, cap: 'round', join: 'round' });
   }
+  // Wheel ruts either side of the crown, and loose stones scattered along the verges.
+  const ruts: number[][] = [];
+  for (const [ax, ay, bx, by] of segs) {
+    const len = Math.hypot(bx - ax, by - ay);
+    if (len < 1) continue;
+    const [nx, ny] = [-(by - ay) / len, (bx - ax) / len];
+    for (const side of [-4.5, 4.5])
+      ruts.push([ax + nx * side, ay + ny * side * 0.6, bx + nx * side, by + ny * side * 0.6]);
+    const r = mulberry32(Math.round(ax * 7 + ay * 13));
+    for (let k = 0; k < 4; k++) {
+      const t = r();
+      const side = (r() < 0.5 ? -1 : 1) * (8 + r() * 3);
+      const x = ax + (bx - ax) * t + nx * side;
+      const y = ay + (by - ay) * t + ny * side * 0.6;
+      g.ellipse(x, y, 1 + r() * 0.8, 0.7 + r() * 0.5).fill({ color: r() < 0.5 ? 0x8a8478 : 0xa8a090, alpha: 0.9 });
+    }
+  }
+  for (const [ax, ay, bx, by] of ruts) g.moveTo(ax, ay).lineTo(bx, by);
+  if (ruts.length) g.stroke({ width: 1.6, color: 0x6e5636, alpha: 0.45, cap: 'round' });
 }
 
 /** Light grid over the land the player may build on. */
