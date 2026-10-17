@@ -152,16 +152,16 @@ export function createTerrain(world: World, renderer: Renderer) {
     return w;
   };
   ground.setWear(wear);
-  /** Within two tiles of the sea: its reflections are drawn. */
-  const nearWater = (x: number, y: number) => {
-    for (let dy = -2; dy <= 2; dy++)
-      for (let dx = -2; dx <= 2; dx++) {
-        const t = at(x + dx, y + dy);
-        if (t === 'water' || t === 'river') return true;
+  /** Beside a road (any of the eight neighbours): trees kept back so their crowns do not hang over it. */
+  const byRoad = (x: number, y: number) => {
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        if (x + dx < 0 || y + dy < 0 || x + dx >= W || y + dy >= H) continue;
+        if (world.buildings.get(world.occupied[(y + dy) * W + x + dx])?.type === 'road') return true;
       }
     return false;
   };
-  /** Water right in front (below on screen): only then does a tree's mirror image meet the shore. */
+  /** Water right in front (below on screen): only then does a building's mirror image meet the shore. */
   const waterInFront = (x: number, y: number) =>
     [at(x + 1, y), at(x, y + 1), at(x + 1, y + 1)].some((t) => t === 'water' || t === 'river');
   /** Coastal things mirror into the sea: the same picture flipped about its base line `y`. */
@@ -182,6 +182,8 @@ export function createTerrain(world: World, renderer: Renderer) {
       const r = mulberry32(x * 92821 + y * 68917 + 7);
       /** `lean`: trees bend a little with the prevailing wind. */
       const put = (a: Art, u: number, v: number, scale: number, lean = false, tint = 0xffffff) => {
+        // Trees (the ones that lean) keep off the roadside.
+        if (lean && byRoad(x, y)) return;
         const s = groundToScreen(x + u, y + v);
         const sp = sprite(a, s.x, s.y, scale);
         sp.tint = tint;
@@ -197,7 +199,9 @@ export function createTerrain(world: World, renderer: Renderer) {
         sh.alpha = 0.22 * shade.alpha;
         sh.zIndex = sp.zIndex - 0.5;
         into.addChild(sh);
-        if (!far && waterInFront(x, y)) {
+        // Only things standing in the water mirror in it: a tree set back on the shore shows only
+        // its crown in the water, hanging there apart from it.
+        if (!far && t === 'water') {
           const m = sprite(a, s.x, s.y, scale);
           m.zIndex = sp.zIndex;
           mirror(m, s.y, reflections);
@@ -411,7 +415,7 @@ export function createTerrain(world: World, renderer: Renderer) {
       setGlow(lights);
       if (pier) o.addChild(drawP());
       setGlow(null);
-      if (far || !nearWater(b.x + size - 1, b.y + size - 1)) continue;
+      if (far || !waterInFront(b.x + size - 1, b.y + size - 1)) continue;
       // Drawn in mirror mode: every point hangs below its own ground point, as in still water.
       refl.addChild(draw(true));
       if (pier) refl.addChild(drawP(true));

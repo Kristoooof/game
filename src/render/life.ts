@@ -254,6 +254,8 @@ function drawShip(g: Graphics, a: number, small: boolean, mirrored = false) {
   const foot = S(0.05, 0, 6);
   const head = S(0.05, 0, 54);
   g.moveTo(foot[0], foot[1]).lineTo(head[0], head[1]).stroke({ width: 2, color: 0x3a2412 });
+  // In the water only hull and mast show: a sail's broad flat mirror image reads as a ghostly box.
+  if (mirrored) return;
   // Square sail bellied forward, a red band across it, and a pennant streaming aft.
   const sail = [
     S(0.05, -0.6, 18),
@@ -414,7 +416,17 @@ export function createLife(
   let carts: Cart[] = [];
   const ships: Vessel[] = [];
   let boats: Vessel[] = [];
-  const wake: { x: number; y: number; vx: number; vy: number; age: number; life: number; size: number }[] = [];
+  /** Wake foam left at the stern; `trail` joins the points of one side of one vessel into a line. */
+  const wake: {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    age: number;
+    life: number;
+    size: number;
+    trail: Vessel;
+  }[] = [];
 
   const newVessel = (x: number, y: number, small: boolean, home?: Vessel['home']): Vessel => {
     const g = new Graphics();
@@ -667,7 +679,8 @@ export function createLife(
               vy: py * side,
               age: 0,
               life: v.small ? 1.6 : 3.5,
-              size: k,
+              size: k * side,
+              trail: v,
             });
         }
       }
@@ -682,11 +695,25 @@ export function createLife(
         }
         w.x += w.vx * dt;
         w.y += w.vy * dt;
-        if (!inView(w.x, w.y)) continue;
+      }
+      // Two arms of foam from each stern, widening and fading as they spread: one line per arm,
+      // joined point to point, so no stacked blobs band the water.
+      const last = new Map<string, (typeof wake)[0]>();
+      for (const w of wake) {
+        const key = `${all.indexOf(w.trail)}:${Math.sign(w.size)}`;
+        const prev = last.get(key);
+        last.set(key, w);
+        if (!prev || !inView(w.x, w.y) || Math.hypot(w.x - prev.x, w.y - prev.y) > 30) continue;
         const k = w.age / w.life;
         wakes
-          .ellipse(w.x, w.y, (4 + k * 10) * w.size + 1, (1.8 + k * 4.5) * w.size + 0.5)
-          .fill({ color: 0xf2fafa, alpha: 0.28 * (1 - k) });
+          .moveTo(prev.x, prev.y)
+          .lineTo(w.x, w.y)
+          .stroke({
+            width: (1.5 + k * 5) * Math.abs(w.size) + 0.5,
+            color: 0xf2fafa,
+            alpha: 0.32 * (1 - k),
+            cap: 'round',
+          });
       }
       // Bow waves: a curl of white water at the bow of every moving ship.
       for (const v of ships) {

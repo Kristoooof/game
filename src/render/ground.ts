@@ -210,9 +210,9 @@ void main() {
     // Streaks drawn out along the current: noise squeezed across the flow and stretched along it.
     vec2 fd = normalize(f + vec2(1e-4)), fs = vec2(-fd.y, fd.x);
     vec2 q0 = p - f * ph0 * 2.0, q1 = p - f * ph1 * 2.0 + 0.53;
-    float streak = mix(noise(vec2(dot(q0, fd) * 1.2, dot(q0, fs) * 8.0)), noise(vec2(dot(q1, fd) * 1.2, dot(q1, fs) * 8.0)), w);
+    float streak = mix(noise(vec2(dot(q0, fd) * 0.9, dot(q0, fs) * 4.0)), noise(vec2(dot(q1, fd) * 0.9, dot(q1, fs) * 4.0)), w);
     vec3 rc = mix(vec3(0.15, 0.4, 0.43), vec3(0.27, 0.56, 0.54), s1);
-    rc += vec3(0.55, 0.6, 0.6) * smoothstep(0.6, 0.85, streak) * 0.3 * length(f);
+    rc += vec3(0.55, 0.6, 0.6) * smoothstep(0.5, 0.9, streak) * 0.16 * length(f);
     // White water where it lands at the foot of a cliff.
     // White water where it lands at the foot of a cliff: a churning basin of foam with bubbles
     // boiling up and drifting off downstream.
@@ -307,6 +307,8 @@ void main() {
     c *= 1.0 + 0.35 * smoothstep(lip + 0.1, lip + 0.02, sf.w);
     c = mix(c, vec3(0.3, 0.47, 0.2), smoothstep(lip, lip - 0.06, sf.w) * 0.9);
     c *= shade;
+    // At the edge of the opening the rock is wet and lost in spray, not smeared into the fall.
+    c = mix(c, vec3(0.88, 0.93, 0.94), smoothstep(0.0, 0.7, open) * (0.6 + 0.4 * noise(vPos * 0.4)));
     finalColor = vec4(pow(c, vec3(0.95)) * vec3(1.04, 1.0, 0.94) * (1.0 - open), 1.0 - open);
     return;
   }
@@ -401,7 +403,8 @@ void main() {
   sandCol = mix(sandCol, vec3(0.56, 0.6, 0.32), blade * smoothstep(0.75, 0.9, m.g) * step(0.5, noise(p * 1.3)) * 0.7);
   float sandEdge = m.g + (noise(p * 3.5) - 0.5) * 0.12;
   col = mix(col, sandCol, smoothstep(0.14, 0.34, sandEdge));
-  col = mix(col, vec3(0.68, 0.6, 0.42), (1.0 - smoothstep(0.5, 0.58, land)) * 0.8);
+  // Wet margin along the water, wider in some places than others.
+  col = mix(col, vec3(0.68, 0.6, 0.42), (1.0 - smoothstep(0.5, 0.52 + 0.1 * noise(p * 1.5 + 3.0), land)) * 0.8);
 
   // Terraces read from above: a pale rim along the top of each cliff, shade along its foot.
   float lv = levelAt(p);
