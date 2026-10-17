@@ -712,7 +712,7 @@ export function createLife(
             width: (1.5 + k * 5) * Math.abs(w.size) + 0.5,
             color: 0xf2fafa,
             alpha: 0.32 * (1 - k),
-            cap: 'round',
+            cap: 'butt',
           });
       }
       // Bow waves: a curl of white water at the bow of every moving ship.
