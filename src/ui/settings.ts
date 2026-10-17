@@ -75,7 +75,8 @@ const ANTIALIAS: [Antialias, string][] = [
 ];
 
 /** Gear button with a panel for resolution, anti-aliasing and the FPS counter. */
-export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: Settings) => void) {
+/** `about`: which map is being played (a named map or the seed), shown at the foot of the panel. */
+export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: Settings) => void, about = '') {
   const panel = document.createElement('div');
   panel.className = 'panel';
   panel.hidden = true;
@@ -120,6 +121,7 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
     select('Élsimítás', ANTIALIAS, s.antialias, (antialias) => update({ antialias })),
     fps,
     note,
+    Object.assign(document.createElement('small'), { textContent: about }),
   );
   note.textContent = `Kijelző: ${displayWidth()} px széles. Kisebb érték pixeles lesz. Az MSAA váltása újratölti az oldalt.`;
   const gear = Object.assign(document.createElement('button'), {

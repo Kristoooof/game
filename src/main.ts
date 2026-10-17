@@ -49,7 +49,10 @@ const world = createWorld(map);
 const hud = document.getElementById('hud')!;
 const resources = document.getElementById('resources')!;
 const mapLabel = MAPS[mapName] ? `Térkép: ${mapName}` : `Seed: ${seed}`;
-const say = (msg = '') => (hud.textContent = msg ? `${mapLabel} · ${msg}` : mapLabel);
+const say = (msg = '') => {
+  hud.textContent = msg;
+  hud.hidden = !msg;
+};
 say();
 const ICONS: Record<'gold' | Good, string> = {
   gold: '<circle cx="12" cy="12" r="9" fill="#e8c34a" stroke="#8a6a1a" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="#b8922a" stroke-width="1.5"/>',
@@ -192,7 +195,7 @@ const applySettings = () => {
   if (r !== app.renderer.resolution) app.renderer.resize(innerWidth, innerHeight, r);
 };
 applySettings();
-createSettingsPanel(document.getElementById('settings')!, settings, applySettings);
+createSettingsPanel(document.getElementById('settings')!, settings, applySettings, mapLabel);
 // 'Auto' resolution depends on the window size.
 addEventListener('resize', applySettings);
 // Time of day: a full day takes DAY_SECONDS; `?ido=0.8` fixes it (0 midnight, 0.5 noon).
