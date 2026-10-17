@@ -91,6 +91,7 @@ export function createTerrain(world: World, renderer: Renderer) {
   /** Sun step for shadows (see daylight.ts); part of the bake key. */
   let sunStep = 3;
   let shade = sunShadow(sunStep);
+  let wet = 0;
 
   /** Tiles of `type` `depth` steps or more inside their patch (up to `max`): darker woods. */
   const depthIn = (type: string, max: number) => {
@@ -391,9 +392,17 @@ export function createTerrain(world: World, renderer: Renderer) {
     const g = new Container();
     // Bake a little past the diamond so its edge texels are fully covered: no seams.
     // The finest ground detail only where it is baked sharp enough to show.
-    const land = ground.landMesh(c.x0 - 0.25, c.y0 - 0.25, c.x1 + 0.25, c.y1 + 0.25, far ? 1 : 0, tier >= 2 ? 1 : 0);
+    const land = ground.landMesh(
+      c.x0 - 0.25,
+      c.y0 - 0.25,
+      c.x1 + 0.25,
+      c.y1 + 0.25,
+      far ? 1 : 0,
+      tier >= 2 ? 1 : 0,
+      wet,
+    );
     const roads = new Graphics();
-    drawRoads(roads, world, c.x0, c.y0, c.x1, c.y1);
+    drawRoads(roads, world, c.x0, c.y0, c.x1, c.y1, wet);
     g.addChild(land, roads);
     const groundTex = render(g, c.ground, tier);
     land.geometry.destroy();
@@ -507,6 +516,10 @@ export function createTerrain(world: World, renderer: Renderer) {
       if (on) hidden.add(id);
       else hidden.delete(id);
     },
+    /** How wet the ground is (0..1, from the rain); in thirds, each a rebake of the land on view. */
+    setWet(amount: number) {
+      wet = Math.round(Math.min(1, Math.max(0, amount)) * 3) / 3;
+    },
     /** Switch the look; chunks rebake on their next view because their key changes. */
     setPixel(on: boolean) {
       pixel = on;
@@ -527,7 +540,7 @@ export function createTerrain(world: World, renderer: Renderer) {
         // Never below native: zooming out keeps the land as sharp as zoomed in, like the sea.
         Math.max(1, 2 ** Math.ceil(Math.log2(scale * renderer.resolution))),
       );
-      const key = `${tier}/${far}/${pixel}/${sunStep}`;
+      const key = `${tier}/${far}/${pixel}/${sunStep}/${wet}`;
       const queue: Chunk[] = [];
       for (const c of chunks) {
         const visible = c.objects.intersects(view);

@@ -33,6 +33,8 @@ uniform float uTime;
 uniform float uFar;
 // 1 when the land is baked for a close view: the finest detail (blades, grit) is worth drawing.
 uniform float uDetail;
+// How wet the ground is after rain: 0 dry, 1 soaked.
+uniform float uWet;
 uniform vec3 uAmbient;
 uniform vec3 uSun;
 uniform vec3 uMoon;
@@ -492,6 +494,16 @@ void main() {
   float hy = height(p + vec2(0.0, 0.35)) + smp(uMask, pf + vec2(0.0, 0.35)).b * ridge * 0.4;
   col *= clamp(1.0 + ((hx - h0) * 0.9 + (hy - h0) * 0.35) * 0.9, 0.65, 1.3);
 
+  // After rain: darker, richer ground, and puddles in the hollows of bare and trodden earth
+  // mirroring the grey sky, a dark wet rim round each.
+  if (uWet > 0.0) {
+    col = mix(col, col * col * 1.6, 0.35 * uWet) * (1.0 - 0.16 * uWet);
+    float hollow = noise(p * 2.6 + 41.0) * 0.7 + noise(p * 6.0 + 3.0) * 0.3;
+    float bare = smoothstep(0.35, 0.7, worn);
+    float pool = smoothstep(0.7 - 0.05 * uWet, 0.72 - 0.05 * uWet, hollow) * bare * uWet;
+    col = mix(col, col * 0.78, smoothstep(0.67 - 0.05 * uWet, 0.7 - 0.05 * uWet, hollow) * bare * uWet);
+    col = mix(col, vec3(0.5, 0.57, 0.64) + 0.06 * noise(g * 3.0), pool * 0.85);
+  }
   col = pow(col, vec3(0.95)) * vec3(1.04, 1.0, 0.94);
   // Premultiplied alpha with a soft coastline edge.
   float a = smoothstep(0.45, 0.52, land);
@@ -778,6 +790,7 @@ export function createGround(map: GameMap, peaks: Float32Array) {
       uTime: { value: 0, type: 'f32' },
       uFar: { value: 0, type: 'f32' },
       uDetail: { value: 0, type: 'f32' },
+      uWet: { value: 0, type: 'f32' },
       uAmbient: { value: new Float32Array([1, 1, 1]), type: 'vec3<f32>' },
       uSun: { value: new Float32Array([1, 0.95, 0.8]), type: 'vec3<f32>' },
       uMoon: { value: new Float32Array([0, 1, 0]), type: 'vec3<f32>' },
@@ -820,9 +833,10 @@ export function createGround(map: GameMap, peaks: Float32Array) {
       wu.uWeather.set(weather);
     },
     /** A mesh covering tiles [x0, x1) × [y0, y1), to render that chunk's land once. */
-    landMesh(x0: number, y0: number, x1: number, y1: number, far: number, detail: number) {
+    landMesh(x0: number, y0: number, x1: number, y1: number, far: number, detail: number, wet: number) {
       landShader.resources.land.uniforms.uFar = far;
       landShader.resources.land.uniforms.uDetail = detail;
+      landShader.resources.land.uniforms.uWet = wet;
       const pt = (x: number, y: number) => [((x - y) * TILE_W) / 2, ((x + y) * TILE_H) / 2];
       const geometry = new Geometry({
         attributes: { aPosition: [...pt(x0, y0), ...pt(x1, y0), ...pt(x1, y1), ...pt(x0, y1)] },

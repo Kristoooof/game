@@ -92,16 +92,21 @@ export function createAtmosphere(fixed?: Weather) {
       rain.clear();
       const n = Math.round(drops.length * sky.rain);
       if (n > 0) {
-        for (let i = 0; i < n; i++) {
-          const d = drops[i];
-          d.y += dt * d.v * 1.3;
-          d.x += dt * d.v * 0.25;
-          if (d.y > 1) [d.y, d.x] = [0, Math.random()];
-          d.x %= 1;
-          const [x, y] = [d.x * width, d.y * height];
-          rain.moveTo(x, y).lineTo(x - 4, y - 16);
+        // Two depths: far drops short, faint and slow, near ones long, bright and fast.
+        for (const near of [false, true]) {
+          for (let i = 0; i < n; i++) {
+            const d = drops[i];
+            if (d.v > 1 !== near) continue;
+            d.y += dt * d.v * 1.3;
+            d.x += dt * d.v * 0.25;
+            if (d.y > 1) [d.y, d.x] = [0, Math.random()];
+            d.x %= 1;
+            const [x, y] = [d.x * width, d.y * height];
+            const len = near ? 22 : 11;
+            rain.moveTo(x, y).lineTo(x - len * 0.25, y - len);
+          }
+          rain.stroke({ width: near ? 1.2 : 0.8, color: 0xc8d8e8, alpha: (near ? 0.4 : 0.22) * sky.rain });
         }
-        rain.stroke({ width: 1, color: 0xc8d8e8, alpha: 0.35 * sky.rain });
       }
     },
   };

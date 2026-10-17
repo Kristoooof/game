@@ -230,6 +230,7 @@ app.ticker.add((t) => {
   // Invisible layers are skipped, not drawn at zero opacity: full-screen blending is the main cost.
   terrain.lights.visible = day.night > 0.01;
   terrain.setSun(day.step);
+  terrain.setWet(rain);
   sunlight.tint = hex(day.sun);
   // A low sun rakes in stronger and warmer from the upper left.
   sunlight.alpha = day.sunStrength * (1 + 1.4 * ((0.8 - day.sun[2]) / 0.45));

@@ -885,7 +885,8 @@ export function chimneyAt(type: BuildingId, x: number, y: number) {
 }
 
 /** Dirt roads on tiles [x0, x1) × [y0, y1): a rounded track joined to every road neighbour. */
-export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.width, y1 = w.map.height) {
+/** `wet`: 0 dry .. 1 after heavy rain, when puddles stand in many more ruts. */
+export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.width, y1 = w.map.height, wet = 0) {
   const isRoad = (x: number, y: number) =>
     x >= 0 &&
     y >= 0 &&
@@ -975,7 +976,7 @@ export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.widt
       for (let b = 0; b < 4; b++) g.moveTo(x + (b - 1.5) * 0.7, y).lineTo(x + (b - 1.5) * 1.2, y - 2 - r() * 1.5);
       g.stroke({ width: 0.5, color: 0x5a7a34, alpha: 0.9 });
     }
-    if (r() < 0.12) {
+    if (r() < 0.12 + 0.45 * wet) {
       const t = 0.3 + r() * 0.4;
       g.ellipse(ax + (bx - ax) * t + nx * 4.5, ay + (by - ay) * t + ny * 2.7, 3.2, 1.4).fill({
         color: 0x6a8aa0,
