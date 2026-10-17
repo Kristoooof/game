@@ -4,7 +4,7 @@ import { LEVEL_H, tileToScreen } from './iso';
 import { fbm2, noise2, smooth } from './sculpt';
 
 /** Mesh cells per tile side. */
-const R = 4;
+const R = 6;
 /** Ranges that never rise this high (px) are left flat. */
 const MIN_RANGE = 45;
 /** Height of the tallest summits, px. */
@@ -57,20 +57,28 @@ void main() {
   float paint = vnoise(vGround * 2.3) * 0.6 + vnoise(vGround * 5.1) * 0.4;
   float l = (dot(n, normalize(vec3(-0.72, -0.2, 0.66))) + 0.12) * 1.3 + (paint - 0.5) * 0.2;
   float t = clamp(l, 0.0, 0.999) * 3.0;
-  float band = (floor(t) + smoothstep(0.8, 1.0, fract(t))) / 3.0;
-  vec3 c0 = vec3(0.38, 0.37, 0.43), c1 = vec3(0.55, 0.52, 0.54), c2 = vec3(0.74, 0.66, 0.53), c3 = vec3(0.9, 0.83, 0.68);
+  // Crisp edges between the tones, softened just enough not to step: sharp paint, not a blur.
+  float band = (floor(t) + smoothstep(0.93, 1.0, fract(t))) / 3.0;
+  // Cold granite; warmth only where the sun strikes full.
+  vec3 c0 = vec3(0.3, 0.31, 0.37), c1 = vec3(0.48, 0.48, 0.52), c2 = vec3(0.66, 0.63, 0.58), c3 = vec3(0.86, 0.82, 0.74);
   vec3 col = band < 0.334 ? mix(c0, c1, band * 3.0) : band < 0.667 ? mix(c1, c2, band * 3.0 - 1.0) : mix(c2, c3, band * 3.0 - 2.0);
   col *= 0.92 + 0.16 * paint;
   // Strokes down the fall line of the steep faces: gullies and scree runs.
-  float fall = vnoise(vec2(vPos.x * 0.45, vPos.y * 0.035 + vGround.x * 3.0));
-  col *= 1.0 - 0.16 * smoothstep(0.6, 0.85, fall) * smoothstep(0.85, 0.45, up);
+  // Two layers, coarse and fine; the steeper the face, the more and longer the strokes.
+  float steep = smoothstep(0.85, 0.4, up);
+  float fall = vnoise(vec2(vPos.x * 0.45, vPos.y * mix(0.05, 0.025, steep) + vGround.x * 3.0));
+  float fine = vnoise(vec2(vPos.x * 1.3 + 7.0, vPos.y * 0.09 + vGround.y * 5.0));
+  col *= 1.0 - (0.16 * smoothstep(0.6, 0.85, fall) + 0.08 * smoothstep(0.65, 0.9, fine)) * steep;
   // Snow above a ragged line, where the slope is gentle enough to hold it.
   float line = ${(TOP * 0.6).toFixed(1)} + (vnoise(vGround * 0.8) - 0.5) * 44.0;
   float snow = smoothstep(line - 4.0, line + 4.0, vH) * smoothstep(0.32, 0.5, up + (paint - 0.5) * 0.2);
   col = mix(col, mix(vec3(0.68, 0.74, 0.86), vec3(0.96, 0.97, 0.98), smoothstep(0.3, 0.5, band)), snow);
   // Ink where the surface turns away from the eye.
   float face = dot(n, normalize(vec3(45.0, 45.0, 32.0)));
-  col = mix(col, c0 * 0.55, (1.0 - smoothstep(0.03, 0.2, face)) * 0.75);
+  float ink = 1.0 - smoothstep(0.03, 0.2, face);
+  // A warm rim of light just inside the ink where the sun strikes.
+  col += vec3(0.16, 0.12, 0.06) * smoothstep(0.2, 0.45, face) * (1.0 - smoothstep(0.45, 0.7, face)) * step(0.66, band);
+  col = mix(col, c0 * 0.55, ink * 0.75);
   // Scree at the foot, mottled; the foot itself solid with a ragged edge, never see-through.
   col = mix(vec3(0.667, 0.631, 0.549) * (0.9 + 0.2 * vnoise(vGround * 6.0)), col, smoothstep(6.0, 9.0, vH + (paint - 0.5) * 10.0));
   float a = smoothstep(0.0, 0.25, vH - 1.5 * vnoise(vGround * 3.0));

@@ -294,9 +294,9 @@
     "semantic_hash": ""
   },
   "src/render/massif.ts": {
-    "mtime": 1792235739.6997685,
-    "seen": 1792235907.5700932,
-    "ast_hash": "1fa5e90ed61901a0b9c6bf81d00dac66",
+    "mtime": 1792243155.4142363,
+    "seen": 1792243255.3372798,
+    "ast_hash": "38566a106ed2cd6f9cd368d516a59024",
     "semantic_hash": ""
   }
 }
