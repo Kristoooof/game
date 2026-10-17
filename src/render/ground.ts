@@ -72,7 +72,18 @@ vec4 surface(vec2 v) {
     float fl = float(l);
     for (int k = 0; k <= SURFACE_STEPS; k++) {
       vec2 p = toTile(v + vec2(0.0, (fl - float(k) / float(SURFACE_STEPS)) * ${LEVEL_H.toFixed(1)}));
-      if (levelAt(p) > fl - 0.5) return vec4(p, fl, float(k) / float(SURFACE_STEPS));
+      if (levelAt(p) > fl - 0.5) {
+        // Found between this step and the last: halve the gap a few times, so the depth down a
+        // cliff face is smooth (a stepped one bands the face and the falls).
+        float lo = float(k) - 1.0, hi = float(k);
+        if (k > 0)
+          for (int b = 0; b < 4; b++) {
+            float m = (lo + hi) * 0.5;
+            if (levelAt(toTile(v + vec2(0.0, (fl - m / float(SURFACE_STEPS)) * ${LEVEL_H.toFixed(1)}))) > fl - 0.5) hi = m;
+            else lo = m;
+          }
+        return vec4(toTile(v + vec2(0.0, (fl - hi / float(SURFACE_STEPS)) * ${LEVEL_H.toFixed(1)})), fl, hi / float(SURFACE_STEPS));
+      }
     }
   }
   return vec4(toTile(v), 0.0, 0.0);
@@ -120,6 +131,8 @@ void main() {
         c = mix(c, vec3(1.0), smoothstep(0.7, 0.92, d) * 0.5);
         c *= 1.0 - 0.25 * smoothstep(0.35, 0.15, noise(vec2(vPos.x * 0.2 + 3.0, t * 0.4)));
         c = mix(c, vec3(0.32, 0.58, 0.6), smoothstep(0.15, 0.0, sf.w) * 0.6);
+        // White water breaking just below the lip, where the sheet bends over the edge.
+        c = mix(c, vec3(0.95, 0.98, 0.98), exp(-pow((sf.w - 0.1) / 0.04, 2.0)) * (0.35 + 0.3 * noise(vec2(vPos.x * 0.5, t * 2.0))));
         // Spray billowing up from the foot.
         float spray = noise(vec2(vPos.x * 0.25, vPos.y * 0.25 + t * 1.5)) * noise(vPos * 0.6 - vec2(0.0, t * 2.0));
         c = mix(c, vec3(0.97, 0.99, 0.99), smoothstep(0.55, 1.0, sf.w) * (0.6 + 0.4 * smoothstep(0.15, 0.4, spray)));
@@ -286,7 +299,8 @@ void main() {
     // water shader draws the waterfall there.
     // Opened only as wide as the river shows on top (where the land there is see-through),
     // with a soft edge: a hard cut leaves the fall's sides jagged.
-    float open = 1.0 - smoothstep(0.42, 0.5, landAt(p));
+    // Wider towards the foot, as the falling water spreads, and its sides fade out softly.
+    float open = 1.0 - smoothstep(0.4 + 0.1 * sf.w, 0.5 + 0.14 * sf.w, landAt(p));
     if (open > 0.99) { finalColor = vec4(0.0); return; }
     // Facing: the slope of the level field, lit from the upper left like everything else.
     vec2 gl = vec2(levelAt(p + vec2(0.25, 0.0)) - levelAt(p - vec2(0.25, 0.0)), levelAt(p + vec2(0.0, 0.25)) - levelAt(p - vec2(0.0, 0.25)));
