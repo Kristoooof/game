@@ -156,7 +156,9 @@ void main() {
   vec3 n = normalize(vec3(-grad * 0.5, 1.0));
   vec3 sunH = normalize(vec3(-0.45, -0.55, 0.7) + vec3(0.0, 0.0, 1.0));
   float glint = pow(max(dot(n, sunH), 0.0), 600.0);
-  col += uSun * glint * 0.45 * (1.0 - uFar * 0.8) * (1.0 - depth * 0.4) * (1.0 - uWeather.z * 0.7);
+  // Only in drifting stretches where the light catches the swell, softly: not salt over the sea.
+  glint *= smoothstep(0.6, 0.85, noise(p * 0.3 + vec2(t * 0.02, -t * 0.01)));
+  col += uSun * glint * 0.22 * (1.0 - uFar * 0.8) * (1.0 - depth * 0.4) * (1.0 - uWeather.z * 0.7);
   // Rain: tiny rings spreading where drops land, a different few in every cell each moment.
   if (uWeather.y > 0.01) {
     vec2 rc = p * 3.0;
@@ -168,7 +170,7 @@ void main() {
   }
   // Crest lines: ridged noise, thin and bright, only where the sea is open.
   float ridge = 1.0 - abs(noise(p * 1.3 + warpN(p)) * 2.0 - 1.0);
-  col += vec3(0.6, 0.66, 0.68) * smoothstep(0.96, 0.995, ridge) * 0.07 * (1.0 - uFar) * (0.4 + depth * 0.6);
+  col += vec3(0.6, 0.66, 0.68) * smoothstep(0.96, 0.995, ridge) * 0.035 * smoothstep(0.4, 0.7, noise(p * 2.1 + 4.0)) * (1.0 - uFar) * (0.4 + depth * 0.6);
   // Breaking swells: crests roll in towards the shore, bent by the same height field, and whiten.
   // Distance alone makes parallel bands, so the crest lines are bent by noise and only break in patches.
   float bend = (noise(p * 1.1) - 0.5) * 0.3 + (fbm(p * 0.6) - 0.5) * 0.12;
@@ -345,18 +347,27 @@ void main() {
   grass *= 0.88 + 0.24 * n;
   // Brush dabs of lighter and darker green: the ground looks painted, not printed.
   grass *= 1.0 + 0.09 * dabs(g * 5.0) * (1.0 - uFar);
-  // Close up: blades a few pixels tall, leaning this way and that, lighter and darker.
-  vec2 bc = vg / vec2(2.6, 4.5), bi = floor(bc), bfr = fract(bc);
-  float bx = bfr.x - 0.5 - (hash(bi + 41.0) - 0.5) * 0.8 * (1.0 - bfr.y);
-  float bladeLine = (1.0 - smoothstep(0.1, 0.22, abs(bx))) * smoothstep(0.0, 0.35, bfr.y);
-  grass *= 1.0 + bladeLine * (hash(bi + 43.0) - 0.45) * 0.32 * uDetail;
-  // Grit: single specks of lighter and darker ground, for the bare places below.
-  float grit = (hash(floor(vg * 0.7)) - 0.5) * 0.14 * uDetail;
+  // Close up: blades a few pixels tall, leaning this way and that, in tussocks and thinner
+  // patches: two layers of cells, warped and staggered, so they never line up into a grid.
+  float tuft = smoothstep(0.3, 0.7, noise(g * 1.3 + 7.0));
+  float blades = 0.0;
+  for (int k = 0; k < 2; k++) {
+    float fk = float(k);
+    vec2 q = vg / vec2(2.3 + fk * 0.9, 4.2 + fk * 1.3) + (vec2(noise(g * 0.9 + fk * 5.0), noise(g * 0.9 + 3.0 + fk * 5.0)) - 0.5) * 2.0;
+    q.x += 0.5 * mod(floor(q.y), 2.0);
+    vec2 qi = floor(q), qf = fract(q);
+    if (hash(qi + 61.0 + fk) > 0.35 + 0.5 * tuft) continue;
+    float bx = qf.x - 0.3 - 0.4 * hash(qi + 41.0) - (hash(qi + 47.0) - 0.5) * 0.9 * (1.0 - qf.y);
+    blades += (1.0 - smoothstep(0.06, 0.16, abs(bx))) * smoothstep(0.0, 0.4, qf.y) * (hash(qi + 43.0) - 0.45);
+  }
+  grass *= 1.0 + blades * 0.32 * uDetail;
+  // Grit: sparse round specks of lighter and darker ground, for the bare places below.
+  vec2 gq = vg * 0.45 + (vec2(noise(g * 1.1), noise(g * 1.1 + 9.0)) - 0.5) * 3.0, gqi = floor(gq);
+  float speck = (1.0 - smoothstep(0.12, 0.3, length(fract(gq) - 0.5 - (vec2(hash(gqi + 3.0), hash(gqi + 8.0)) - 0.5) * 0.4)));
+  float grit = speck * step(0.45, hash(gqi + 13.0)) * (hash(gqi) - 0.5) * 0.3 * uDetail;
   float fine = noise(g * 8.0) * 0.6 + noise(g * 19.0) * 0.4;
   grass *= 0.9 + 0.2 * fine;
-  // Blade streaks: thin vertical grain on screen, bent by noise; darker clumps of long grass.
-  float streak = noise(vec2(g.x * 1.5 + noise(g * 4.0) * 3.0, g.y * 22.0));
-  grass *= 0.93 + 0.14 * streak;
+  // Darker clumps of long grass.
   grass *= 1.0 - 0.08 * smoothstep(0.55, 0.75, noise(g * 2.2 + 5.0));
   // Tufts and flowers as small round dots jittered inside a fine grid.
   vec2 cb = g * 16.0, ib = floor(cb);
@@ -457,9 +468,9 @@ void main() {
   for (int k = 1; k <= 16; k++) {
     float t = float(k) * 0.6;
     float ph = smp(uMarks, p - vec2(t, t * 0.25)).r * ${TOP.toFixed(1)};
-    peakShade = max(peakShade, smoothstep(0.0, 14.0, ph - t * 24.0));
+    peakShade = max(peakShade, smoothstep(0.0, 4.0, ph - t * 24.0));
   }
-  col *= 1.0 - 0.38 * peakShade;
+  col *= 1.0 - 0.3 * peakShade;
 
   // Relief: height from inland distance plus noise (rock raised), lit from the upper left.
   float h0 = height(p) + rockMask * ridge * 0.4;

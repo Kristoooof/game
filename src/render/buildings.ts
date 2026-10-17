@@ -985,14 +985,22 @@ export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.widt
   }
 }
 
-/** Road tiles in [x0, x1) × [y0, y1) with a lamp post on the verge: every few, never on a bridge. */
+/** Road tiles in [x0, x1) × [y0, y1) with a lamp post on the verge: every few, never on a bridge or by a building. */
 export function lampPosts(w: World, x0: number, y0: number, x1: number, y1: number) {
   const posts: [number, number][] = [];
   for (let y = y0; y < y1; y++)
     for (let x = x0; x < x1; x++) {
       const i = y * w.map.width + x;
-      if (w.buildings.get(w.occupied[i])?.type === 'road' && (x * 73 + y * 151) % 5 === 0 && w.map.tiles[i] !== 'river')
-        posts.push([x, y]);
+      if (w.buildings.get(w.occupied[i])?.type !== 'road' || (x * 73 + y * 151) % 5 !== 0 || w.map.tiles[i] === 'river')
+        continue;
+      // Not right beside a building: its barrels and crates stand on the verge there.
+      let clear = true;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const b = w.buildings.get(w.occupied[(y + dy) * w.map.width + x + dx]);
+          if (b && b.type !== 'road') clear = false;
+        }
+      if (clear) posts.push([x, y]);
     }
   return posts;
 }

@@ -71,9 +71,9 @@ void main() {
   // Ink where the surface turns away from the eye.
   float face = dot(n, normalize(vec3(45.0, 45.0, 32.0)));
   col = mix(col, c0 * 0.55, (1.0 - smoothstep(0.03, 0.2, face)) * 0.75);
-  // Scree at the foot, fading into the ground.
-  col = mix(vec3(0.667, 0.631, 0.549), col, smoothstep(1.0, 20.0, vH));
-  float a = smoothstep(0.5, 7.0, vH);
+  // Scree at the foot, mottled; the foot itself solid with a ragged edge, never see-through.
+  col = mix(vec3(0.667, 0.631, 0.549) * (0.9 + 0.2 * vnoise(vGround * 6.0)), col, smoothstep(6.0, 9.0, vH + (paint - 0.5) * 10.0));
+  float a = smoothstep(0.0, 0.25, vH - 1.5 * vnoise(vGround * 3.0));
   finalColor = vec4(col * a, a);
 }`;
 

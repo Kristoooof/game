@@ -365,7 +365,8 @@ export function createLife(
   const depth = (i: number, j: number, t: number) => {
     const a = (i % W) + Math.floor(i / W);
     const b = (j % W) + Math.floor(j / W);
-    return a + (b - a) * t + 1;
+    // A hair past the tile's front: level with a building, someone beside it stands before it.
+    return a + (b - a) * t + 1.01;
   };
   const isRoad = (i: number) => world.buildings.get(world.occupied[i])?.type === 'road';
   const roadNeighbours = (i: number) =>
