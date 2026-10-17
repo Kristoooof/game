@@ -22,102 +22,220 @@ const TUNICS = [0x8a3a2a, 0x3f5f8a, 0x5a7a3a, 0x9a7a3a, 0x6a4a7a, 0x7a6a5a];
 const SKIN = [0xe8c09a, 0xd8a880, 0xc08a64];
 /** Frames in a walk cycle: legs and arms swing through a full stride. */
 const STRIDE = 6;
+const HAIR = [0x3a2616, 0x6a4422, 0x2a2420, 0x8a6a3a];
+const BREECHES = [0x4a3a28, 0x3a3e4a, 0x5a4a32];
+const shade = (c: number, k: number) =>
+  (Math.round(((c >> 16) & 255) * k) << 16) | (Math.round(((c >> 8) & 255) * k) << 8) | Math.round((c & 255) * k);
+
 /**
- * Villagers in a six-frame walk (legs and arms swinging opposite ways, the body rising as a leg
- * passes under it): men in breeches with a straw hat or cap, women in long skirts and a kerchief.
- * Some carry the tools of their trade: an axe or a sack over the shoulder, a basket, a bucket.
+ * Villagers seen from the side, walking right, in six frames: legs bend at the knee and swing
+ * opposite the arms, the far limbs in shade, the body rising as a leg passes under it. Men wear
+ * a tunic and breeches with a straw hat, a cap or bare hair; women a bodice, a long skirt with an
+ * apron and a kerchief. Some carry their trade: an axe on the shoulder, a sack on the back, a
+ * basket on the hip, a bucket in the hand.
  */
 const walkerArt = (r: Renderer) =>
   TUNICS.flatMap((tunic, n) =>
     [false, true].map((woman) => {
       const skin = SKIN[n % SKIN.length];
+      const hair = HAIR[n % HAIR.length];
+      const legs = BREECHES[n % BREECHES.length];
+      const job = n % 3;
+      const axe = !woman && job === 0;
+      const sack = !woman && job === 1;
       return Array.from({ length: STRIDE }, (_, k) => {
-        const phase = Math.cos((k / STRIDE) * Math.PI * 2);
-        const up = -0.5 * (1 - Math.abs(phase));
+        const ph = (k / STRIDE) * Math.PI * 2;
+        const swing = Math.sin(ph);
+        const up = -0.6 * Math.abs(Math.cos(ph));
         return bake(r, (g) => {
-          const dark = 0x2e2418;
-          g.ellipse(0, 0, 3.2, 1.1).fill({ color: 0x000000, alpha: 0.22 });
+          const dark = 0x2a2018;
+          g.ellipse(0.3, 0, 3.6, 1.2).fill({ color: 0x000000, alpha: 0.24 });
+          const hipY = -6 + up;
+          // A leg from the hip: thigh and shin, the knee bent as it swings through, a boot.
+          const leg = (s: number, far: boolean) => {
+            const footX = s * 2.4;
+            const kneeX = footX * 0.5 + 0.7 * (1 - Math.abs(s));
+            const kneeY = hipY + 3.1;
+            const c = far ? shade(legs, 0.7) : legs;
+            g.moveTo(0, hipY)
+              .lineTo(kneeX, kneeY)
+              .lineTo(footX, -0.9)
+              .stroke({ width: 1.5, color: c, cap: 'round', join: 'round' });
+            g.roundRect(footX - 0.8, -1.3, 2.2, 1.3, 0.5).fill(far ? 0x241a12 : 0x3a2a1a);
+          };
+          // An arm from the shoulder: sleeve to the elbow, forearm, a hand.
+          const arm = (handX: number, handY: number, far: boolean) => {
+            const sx = 0;
+            const sy = -11.2 + up;
+            const ex = (sx + handX) / 2 - 0.4;
+            const ey = (sy + handY) / 2 + 0.3;
+            const c = far ? shade(tunic, 0.7) : tunic;
+            g.moveTo(sx, sy)
+              .lineTo(ex, ey)
+              .lineTo(handX, handY)
+              .stroke({ width: 1.3, color: c, cap: 'round', join: 'round' });
+            g.circle(handX, handY, 0.65).fill(far ? shade(skin, 0.8) : skin);
+          };
+          const swingHand = (s: number) => [s * 2.6, -6.6 + up + Math.abs(s) * 0.3] as const;
+          // Far side first: the far leg, the far arm (up to the sack on the back if there is one).
+          if (sack)
+            g.ellipse(-2.4, -10.2 + up, 2.6, 3.1)
+              .fill(0xcfbf98)
+              .stroke({ width: 0.35, color: 0x8a7a5a });
           if (woman) {
-            // Skirt swaying with the stride, feet showing under the hem.
-            const sw = phase * 0.5;
-            g.ellipse(-1 - phase, -0.2, 0.9, 0.5).fill(0x3a2a1a);
-            g.ellipse(1 + phase, -0.2, 0.9, 0.5).fill(0x3a2a1a);
-            g.poly([-2.6 + sw, -0.6 + up, 2.6 + sw, -0.6 + up, 1.6, -5 + up, -1.6, -5 + up]).fill(
-              n % 2 ? 0x5a4a6a : 0x6a5038,
-            );
-            g.moveTo(-1.6 + sw, -0.7 + up)
-              .lineTo(1.6 + sw, -0.7 + up)
-              .stroke({ width: 0.6, color: dark, alpha: 0.5 });
+            // Feet stepping under the hem.
+            g.roundRect(swing * 2 - 0.8, -1.2, 2, 1.2, 0.5).fill(0x241a12);
+          } else leg(-swing, true);
+          if (sack) arm(-1.4, -12.6 + up, true);
+          else arm(...swingHand(swing), true);
+          if (woman) {
+            g.roundRect(-swing * 2 - 0.8, -1.2, 2, 1.2, 0.5).fill(0x3a2a1a);
+            // Long skirt swaying with the stride, an apron over it.
+            const sw = swing * 0.5;
+            const skirt = n % 2 ? 0x5a4a6a : 0x6a5038;
+            g.poly([-2.1, hipY - 0.4, 2.1, hipY - 0.4, 3 + sw, -0.9, -3 + sw, -0.9]).fill(skirt);
+            g.poly([0.3, hipY - 0.4, 2.1, hipY - 0.4, 3 + sw, -0.9, 0.6 + sw, -0.9]).fill({
+              color: 0x000000,
+              alpha: 0.15,
+            });
+            g.poly([-0.8, hipY - 0.2, 1.6, hipY - 0.2, 2.2 + sw, -2, -0.6 + sw, -2]).fill(0xe6dcc4);
+          } else leg(swing, false);
+          // Body: shoulders broader than the waist, shaded away from the sun, a belt.
+          const top = -11.8 + up;
+          g.poly([-2.2, top, 2.2, top, 1.8, hipY + 0.6, -1.8, hipY + 0.6]).fill(woman ? shade(tunic, 0.9) : tunic);
+          g.poly([0.5, top, 2.2, top, 1.8, hipY + 0.6, 0.4, hipY + 0.6]).fill({ color: 0x000000, alpha: 0.18 });
+          if (!woman) g.rect(-1.8, hipY - 0.3, 3.6, 0.8).fill(dark);
+          // Neck and head: face to the front, nose, ear, hair at the back.
+          g.rect(-0.5, top - 1, 1, 1.2).fill(shade(skin, 0.85));
+          const hx = 0.3;
+          const hy = top - 2.6;
+          g.circle(hx, hy, 2).fill(skin);
+          g.circle(hx + 2, hy + 0.3, 0.5).fill(skin);
+          g.circle(hx + 1, hy - 0.4, 0.28).fill(dark);
+          g.circle(hx - 0.3, hy + 0.2, 0.45).fill(shade(skin, 0.8));
+          if (woman) {
+            // Kerchief over the hair, knotted at the back.
+            const kc = n % 2 ? 0xe8e0c8 : 0xb84a3a;
+            g.poly([
+              hx - 2.2,
+              hy + 0.6,
+              hx - 1.6,
+              hy - 1.9,
+              hx + 1.4,
+              hy - 2.2,
+              hx + 1.6,
+              hy - 0.8,
+              hx - 0.6,
+              hy - 0.6,
+              hx - 1.6,
+              hy + 1.4,
+            ]).fill(kc);
+            g.poly([hx - 2.1, hy + 0.5, hx - 3.3, hy + 1.8, hx - 2.2, hy + 1.6]).fill(kc);
           } else {
-            g.moveTo(-0.8, -4.5 + up)
-              .lineTo(-0.8 - 1.5 * phase, 0)
-              .moveTo(0.8, -4.5 + up)
-              .lineTo(0.8 + 1.5 * phase, 0);
-            g.stroke({ width: 1.3, color: 0x4a3a28, cap: 'round' });
+            g.poly([
+              hx - 2.1,
+              hy + 0.9,
+              hx - 1.8,
+              hy - 1.6,
+              hx + 0.6,
+              hy - 2.1,
+              hx + 1.6,
+              hy - 1.2,
+              hx - 0.8,
+              hy - 0.8,
+              hx - 1.4,
+              hy + 1.2,
+            ]).fill(hair);
+            if (n % 2) {
+              g.ellipse(hx, hy - 1.5, 3.6, 0.9).fill(0xd8c080);
+              g.ellipse(hx, hy - 2.1, 1.9, 1.1).fill(0xc8b070);
+              g.rect(hx - 1.9, hy - 1.8, 3.8, 0.4).fill(0x8a5a2a);
+            } else if (n % 3 === 0) g.ellipse(hx - 0.2, hy - 1.6, 2.2, 1.1).fill(0x4a3020);
           }
-          // Body: tunic shaded on the side away from the sun, a belt, swinging arms.
-          g.roundRect(-2.2, -9.6 + up, 4.4, 5.6, 1.4)
-            .fill(tunic)
-            .stroke({ width: 0.35, color: dark, alpha: 0.5 });
-          g.rect(0.6, -9.2 + up, 1.6, 5).fill({ color: 0x000000, alpha: 0.18 });
-          g.rect(-2.2, -5.6 + up, 4.4, 0.8).fill({ color: dark, alpha: 0.6 });
-          const job = n % 3;
-          // A load over the shoulder keeps that arm up; the other swings.
-          const carries = !woman && job < 2;
-          g.moveTo(-2, -8.8 + up).lineTo(-2.6 + 1.3 * phase, -5.2 + up);
-          if (!carries) g.moveTo(2, -8.8 + up).lineTo(2.6 - 1.3 * phase, -5.2 + up);
-          g.stroke({ width: 1.1, color: tunic, cap: 'round' });
-          g.circle(-2.6 + 1.3 * phase, -5.1 + up, 0.6).fill(skin);
-          if (!carries) g.circle(2.6 - 1.3 * phase, -5.1 + up, 0.6).fill(skin);
-          g.circle(0, -11.2 + up, 1.9)
-            .fill(skin)
-            .stroke({ width: 0.3, color: dark, alpha: 0.4 });
-          if (carries && job === 0) {
-            // Woodcutter: an axe over the shoulder.
-            g.moveTo(2.2, -6.5 + up)
-              .lineTo(4.6, -13.5 + up)
-              .stroke({ width: 0.7, color: 0x7a5530, cap: 'round' });
-            g.poly([4, -13.8 + up, 6.4, -14.6 + up, 6.2, -12.2 + up, 4.6, -12.4 + up]).fill(0x8a8e94);
-          } else if (carries) {
-            // A sack slung over the shoulder.
-            g.ellipse(2.6, -10 + up, 2.2, 2.8)
-              .fill(0xd8c8a0)
-              .stroke({ width: 0.3, color: 0x8a7a5a });
+          // Near arm last, with whatever it carries.
+          if (axe) {
+            arm(1.6, -10.4 + up, false);
+            g.moveTo(-1.2, -6.6 + up)
+              .lineTo(3.6, -14.6 + up)
+              .stroke({ width: 0.7, color: 0x8a6038, cap: 'round' });
+            g.poly([2.9, -15 + up, 5.6, -15.9 + up, 5.4, -13.2 + up, 3.6, -13.4 + up])
+              .fill(0x9aa0a8)
+              .stroke({ width: 0.3, color: 0x4a4f57 });
           } else if (woman && job === 0) {
-            g.ellipse(2.8, -5.6 + up, 1.8, 1.2)
+            arm(1.6, -6.4 + up, false);
+            g.ellipse(2.6, -6 + up, 2, 1.4)
               .fill(0xa0783e)
               .stroke({ width: 0.3, color: 0x5a3e22 });
-            g.moveTo(1.4, -6.2 + up)
-              .quadraticCurveTo(2.8, -8.4 + up, 4.2, -6.2 + up)
+            g.moveTo(1.1, -6.6 + up)
+              .quadraticCurveTo(2.6, -9 + up, 4.1, -6.6 + up)
               .stroke({ width: 0.35, color: 0x5a3e22 });
           } else if (woman && job === 1) {
-            // A wooden bucket swinging from the hand.
-            const bx = 2.6 - 1.3 * phase;
-            g.moveTo(bx - 1.2, -4.4 + up)
-              .quadraticCurveTo(bx, -6 + up, bx + 1.2, -4.4 + up)
+            const [bx, by] = swingHand(-swing);
+            arm(bx, by, false);
+            g.moveTo(bx - 1.2, by + 0.6)
+              .quadraticCurveTo(bx, by - 0.8, bx + 1.2, by + 0.6)
               .stroke({ width: 0.3, color: 0x3a3a3a });
-            g.poly([bx - 1.3, -4.4 + up, bx + 1.3, -4.4 + up, bx + 1, -2 + up, bx - 1, -2 + up]).fill(0x8a6038);
-          }
-          if (woman)
-            g.poly([-2.1, -11 + up, 0, -13.6 + up, 2.1, -11 + up, 1.4, -10.2 + up, -1.4, -10.2 + up]).fill(
-              n % 2 ? 0xe8e0c8 : 0xb84a3a,
-            );
-          else if (n % 2) {
-            g.ellipse(0, -12.4 + up, 3.2, 0.9).fill(0xd8c080);
-            g.ellipse(0, -13 + up, 1.6, 1).fill(0xc8b070);
-          } else g.ellipse(0, -12.6 + up, 2, 1.1).fill(0x4a3020);
+            g.poly([bx - 1.3, by + 0.6, bx + 1.3, by + 0.6, bx + 1, by + 3, bx - 1, by + 3]).fill(0x8a6038);
+          } else arm(...swingHand(-swing), false);
         });
       });
     }),
   );
 type Load = 'crates' | 'sacks' | 'logs' | 'barrels';
+/**
+ * A horse in profile facing right, at trot frame `f` of ROLL: legs jointed at the knee and hock,
+ * moving in diagonal pairs; barrel body, arched neck, a head with muzzle and ear, mane and tail.
+ */
+function horse(g: Graphics, f: number) {
+  const ph = (f / ROLL) * Math.PI * 2;
+  const coat = 0x6a4428;
+  const far = 0x4e3018;
+  const bob = -0.4 * Math.abs(Math.sin(ph));
+  // A leg from the shoulder or hip: upper part, knee, cannon to the hoof.
+  const leg = (x: number, s: number, c: number, hind: boolean) => {
+    const footX = x + s * 2;
+    const lift = Math.max(0, s) * 1.1;
+    const kneeX = (x + footX) / 2 + (hind ? -0.6 : 0.5);
+    g.moveTo(x, -7.5 + bob)
+      .lineTo(kneeX, -3.6 - lift * 0.6)
+      .lineTo(footX, -0.6 - lift)
+      .stroke({ width: 1.3, color: c, cap: 'round', join: 'round' });
+    g.rect(footX - 0.6, -0.9 - lift, 1.3, 0.8).fill(0x2a1a10);
+  };
+  const s = Math.sin(ph);
+  // Far pair first, in shade.
+  leg(8.4, -s, far, true);
+  leg(14.2, s, far, false);
+  // Tail, body, belly in shade, the near legs.
+  g.moveTo(6.4, -10 + bob)
+    .quadraticCurveTo(4.6, -8.5 + bob, 5.2, -4.8 + bob)
+    .stroke({ width: 1.3, color: 0x2e1c10, cap: 'round' });
+  g.ellipse(11, -9.2 + bob, 5.4, 2.9).fill(coat);
+  g.ellipse(11.3, -7.6 + bob, 4.4, 1.2).fill({ color: 0x000000, alpha: 0.18 });
+  g.ellipse(10.2, -10.6 + bob, 3.8, 1).fill({ color: 0xffffff, alpha: 0.12 });
+  leg(9.2, s, coat, true);
+  leg(13.6, -s, coat, false);
+  // Neck rising in an arch to the head; ear, eye, nostril; the mane along the crest.
+  const nod = Math.abs(s) * 0.7;
+  g.poly([14, -11.2 + bob, 16.6, -16 + nod, 18.4, -15.6 + nod, 16.4, -9 + bob]).fill(coat);
+  g.poly([16.6, -16.4 + nod, 18.8, -16.2 + nod, 21.6, -13 + nod, 20.6, -12 + nod, 17.6, -13.6 + nod]).fill(coat);
+  g.ellipse(21, -12.7 + nod, 1, 0.8).fill(shade(coat, 0.8));
+  g.poly([17.2, -16.2 + nod, 17.6, -18 + nod, 18.3, -16.3 + nod]).fill(shade(coat, 0.85));
+  g.circle(18.6, -15 + nod, 0.3).fill(0x1a120a);
+  g.moveTo(14.2, -11.8 + bob)
+    .quadraticCurveTo(15, -15 + nod, 16.9, -16.6 + nod)
+    .stroke({ width: 1.1, color: 0x2e1c10, cap: 'round' });
+  // Bridle.
+  g.moveTo(17.8, -14 + nod)
+    .lineTo(20.4, -12.4 + nod)
+    .stroke({ width: 0.35, color: 0x2a1a10 });
+}
+
 /** Frames of a cart on the move: wheel turning, the horse stepping and nodding. */
 const ROLL = 4;
 /** Horse-drawn cart with a load and a driver, facing right; frame `f` of ROLL. */
 const cartArt = (r: Renderer, load: Load, f: number) =>
   bake(r, (g) => {
-    const step = Math.sin((f / ROLL) * Math.PI * 2);
-    const nod = Math.abs(step) * 0.8;
     g.ellipse(-2, -0.5, 14, 2.6).fill({ color: 0x000000, alpha: 0.15 });
     // Cart bed, load and driver.
     g.roundRect(-13, -10, 15, 5.5, 1).fill(0x7a5230);
@@ -176,25 +294,8 @@ const cartArt = (r: Renderer, load: Load, f: number) =>
     g.stroke({ width: 0.5, color: 0x5a4028 });
     g.circle(-8, -3.4, 0.8).fill(0x3a2a1a);
     // Shafts and harness to the horse.
-    g.moveTo(2, -7).lineTo(8, -8.5).stroke({ width: 0.9, color: 0x4a3420 });
-    // Horse: body, legs, neck and head, mane and tail.
-    g.moveTo(7.5, -6.5)
-      .lineTo(7 + step * 1.2, 0)
-      .moveTo(9, -6.5)
-      .lineTo(9.6 - step * 1.2, 0)
-      .moveTo(13, -6.5)
-      .lineTo(12.5 - step * 1.2, 0)
-      .moveTo(14.4, -6.5)
-      .lineTo(15 + step * 1.2, 0);
-    g.stroke({ width: 1.2, color: 0x4a2e18, cap: 'round' });
-    g.ellipse(11, -8.6, 5, 2.8).fill(0x6a4428);
-    g.ellipse(10, -9.6, 3.5, 1.2).fill({ color: 0x8a5a34, alpha: 0.8 });
-    g.poly([14.2, -10, 17.2, -15 + nod, 19.4, -13.8 + nod, 16, -9]).fill(0x6a4428);
-    g.ellipse(19.2, -13.6 + nod, 2.3, 1.3).fill(0x6a4428);
-    g.moveTo(14.6, -10.6)
-      .lineTo(17.2, -15.4 + nod)
-      .stroke({ width: 1, color: 0x2e1c10 });
-    g.moveTo(6.2, -9).quadraticCurveTo(4.6, -7.5, 5, -4.5).stroke({ width: 1.1, color: 0x2e1c10 });
+    g.moveTo(2, -7).lineTo(9, -9).stroke({ width: 0.9, color: 0x4a3420 });
+    horse(g, f);
   });
 
 /** A screen-space drawing of a vessel heading at angle `a` (tile space), origin on the waterline. */

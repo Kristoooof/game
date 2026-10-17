@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "src/render/life.ts": {
-    "mtime": 1792235395.2508855,
-    "seen": 1792235907.5700915,
-    "ast_hash": "0461627fe2eed53ccd8321a068c7cd6b",
+    "mtime": 1792236370.6831038,
+    "seen": 1792236543.5052254,
+    "ast_hash": "6a9a16a5df557ace4fec361a209b3a9b",
     "semantic_hash": ""
   },
   "src/render/sculpt.ts": {
