@@ -323,7 +323,12 @@ export function createTerrain(world: World, renderer: Renderer) {
           bottom - top + 32 + MAX_LEVEL * LEVEL_H,
         ),
         // Mountains rise up to TOP above their (raised) ground.
-        objects: new Rectangle(left - 80, top - TOP - 70, right - left + 160, bottom - top + TOP + 94),
+        objects: new Rectangle(
+          left - 80,
+          top - TOP - 30 - MAX_LEVEL * LEVEL_H,
+          right - left + 160,
+          bottom - top + TOP + 54 + MAX_LEVEL * LEVEL_H,
+        ),
         groundMesh: diamondMesh(
           x0,
           y0,

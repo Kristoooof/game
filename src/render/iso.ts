@@ -1,7 +1,7 @@
 export const TILE_W = 64;
 export const TILE_H = 32;
 /** Height in pixels of one terrace level. */
-export const LEVEL_H = 20;
+export const LEVEL_H = 30;
 export const MAX_LEVEL = 2;
 
 /** Tile (x, y) to screen position of the tile's top corner, at sea level. */

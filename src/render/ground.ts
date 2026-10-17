@@ -96,7 +96,7 @@ float landAt(vec2 p) {
  * waves rolling in and surf. Kept to ~10 texture reads; deep water skips the shore work.
  */
 // Live every frame: a coarser terrace search is enough under the baked land.
-const waterFragment = /* glsl */ `#define SURFACE_STEPS 8
+const waterFragment = /* glsl */ `#define SURFACE_STEPS 12
 ${common}
 void main() {
   vec2 p = tileCoord();
@@ -290,7 +290,7 @@ void main() {
     float shade = 0.82 + 0.28 * (nrm.y - nrm.x) * 0.5;
     // Rock face of blocks split by cracks: columns of blocks staggered against each other, so no
     // joint runs on as a stripe; each block lit at its top edge, darker below.
-    vec2 bq = vec2(vPos.x / 13.0, sf.w * 2.2) + (vec2(noise(vPos * 0.11), noise(vPos * 0.11 + 7.0)) - 0.5) * 0.9;
+    vec2 bq = vec2(vPos.x / 13.0, sf.w * 3.0) + (vec2(noise(vPos * 0.11), noise(vPos * 0.11 + 7.0)) - 0.5) * 0.9;
     bq.y += hash(vec2(floor(bq.x), 3.0)) * 0.8;
     vec2 bi = floor(bq), bf = fract(bq);
     float joint = min(min(bf.x, 1.0 - bf.x) * 13.0, min(bf.y, 1.0 - bf.y) * 9.0) + noise(vPos * 0.4) * 1.2;
@@ -299,12 +299,15 @@ void main() {
     c *= 1.1 - 0.22 * bf.y;
     c *= 1.0 - 0.3 * (1.0 - smoothstep(0.4, 1.4, joint));
     c *= mix(1.05, 0.68, sf.w);
+    // Deep fissures running down the face, wandering a little.
+    float fiss = smoothstep(0.03, 0.0, abs(noise(vec2(vPos.x * 0.05, sf.w * 0.4)) - 0.5));
+    c *= 1.0 - 0.35 * fiss;
     // Moss trickling down from the grassy top.
     float moss = smoothstep(0.55, 0.8, noise(vec2(vPos.x * 0.3, vPos.y * 0.035))) * smoothstep(0.75, 0.1, sf.w);
     c = mix(c, vec3(0.3, 0.42, 0.2), moss * 0.55);
     // Sunlit lip of the top edge, and a fringe of grass hanging over it in uneven tufts.
     float lip = 0.1 + 0.12 * noise(vec2(vPos.x * 0.25, 1.0));
-    c *= 1.0 + 0.35 * smoothstep(lip + 0.1, lip + 0.02, sf.w);
+    c *= 1.0 + 0.45 * smoothstep(lip + 0.16, lip + 0.02, sf.w);
     c = mix(c, vec3(0.3, 0.47, 0.2), smoothstep(lip, lip - 0.06, sf.w) * 0.9);
     c *= shade;
     // At the edge of the opening the rock is wet and lost in spray, not smeared into the fall.
@@ -418,8 +421,11 @@ void main() {
   for (int k = 0; k < 4; k++) {
     vec2 d = vec2(k == 0 ? 1.0 : k == 1 ? -1.0 : 0.0, k == 2 ? 1.0 : k == 3 ? -1.0 : 0.0) * 0.3;
     foot = max(foot, smoothstep(-0.1, 0.3, levelAt(p + d) - sf.z - 0.5));
+    foot = max(foot, 0.5 * smoothstep(-0.1, 0.3, levelAt(p + d * 3.0) - sf.z - 0.5));
   }
-  col *= (1.0 - 0.42 * min(fall, 1.0)) * (1.0 - 0.18 * foot);
+  col *= (1.0 - 0.42 * min(fall, 1.0)) * (1.0 - 0.28 * foot);
+  // Higher terraces a touch brighter: the step reads as a step even from far off.
+  col *= 1.0 + 0.06 * sf.z;
   // The mountain ranges' shadow, falling away from the sun over the land beside them.
   float peakShade = 0.0;
   for (int k = 1; k <= 16; k++) {
