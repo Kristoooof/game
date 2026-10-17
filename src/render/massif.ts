@@ -5,6 +5,8 @@ import { fbm2, hexRGB, mix, noise2, type RGB, smooth } from './sculpt';
 
 /** Facets per tile side. */
 const R = 3;
+/** Ranges that never rise this high (px) are left flat. */
+const MIN_RANGE = 30;
 /** Height of the tallest summits, px. */
 export const TOP = 130;
 /** Ground pixels per tile, to weigh heights against distances when lighting a facet. */
@@ -105,8 +107,7 @@ export function createMassif(map: GameMap) {
         const s = tileToScreen(gx, gy);
         return { gx, gy, h, sx: s.x, sy: s.y - lift - h };
       });
-      // A tile that barely rises (a lone mountain tile) is left to the ground shader's scree.
-      if (vs.some((v) => v.h > 8)) {
+      if (vs.some((v) => v.h > 3)) {
         ctx = new GraphicsContext();
         const tri = (p: (typeof vs)[0], q: (typeof vs)[0], r: (typeof vs)[0]) => {
           const avg = (p.h + q.h + r.h) / 3;
@@ -169,6 +170,24 @@ export function createMassif(map: GameMap) {
         for (let b = 0; b <= R; b++) for (let a = 0; a <= R; a++) top = Math.max(top, height(x + a / R, y + b / R));
         peaks[y * W + x] = top;
       }
+  // A patch of mountain tiles too small to rise to a real range stays flat, scree and boulders.
+  const seen = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    if (tiles[i] !== 'mountain' || seen[i]) continue;
+    const patch = [i];
+    seen[i] = 1;
+    for (let q = 0; q < patch.length; q++)
+      for (const j of [patch[q] - 1, patch[q] + 1, patch[q] - W, patch[q] + W])
+        if (j >= 0 && j < W * H && tiles[j] === 'mountain' && !seen[j]) {
+          seen[j] = 1;
+          patch.push(j);
+        }
+    if (Math.max(...patch.map((j) => peaks[j])) >= MIN_RANGE) continue;
+    for (const j of patch) {
+      peaks[j] = 0;
+      pieces.set(j, null);
+    }
+  }
 
   return { piece, peaks };
 }

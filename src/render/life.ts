@@ -20,58 +20,104 @@ const spriteOf = (b: Baked) =>
 
 const TUNICS = [0x8a3a2a, 0x3f5f8a, 0x5a7a3a, 0x9a7a3a, 0x6a4a7a, 0x7a6a5a];
 const SKIN = [0xe8c09a, 0xd8a880, 0xc08a64];
+/** Frames in a walk cycle: legs and arms swing through a full stride. */
+const STRIDE = 6;
 /**
- * Villagers in two walking frames (legs and arms swinging opposite ways): men in breeches with
- * a straw hat or cap, women in long skirts and a kerchief.
+ * Villagers in a six-frame walk (legs and arms swinging opposite ways, the body rising as a leg
+ * passes under it): men in breeches with a straw hat or cap, women in long skirts and a kerchief.
+ * Some carry the tools of their trade: an axe or a sack over the shoulder, a basket, a bucket.
  */
 const walkerArt = (r: Renderer) =>
   TUNICS.flatMap((tunic, n) =>
     [false, true].map((woman) => {
       const skin = SKIN[n % SKIN.length];
-      return [1, -1].map((phase) =>
-        bake(r, (g) => {
+      return Array.from({ length: STRIDE }, (_, k) => {
+        const phase = Math.cos((k / STRIDE) * Math.PI * 2);
+        const up = -0.5 * (1 - Math.abs(phase));
+        return bake(r, (g) => {
           const dark = 0x2e2418;
           g.ellipse(0, 0, 3.2, 1.1).fill({ color: 0x000000, alpha: 0.22 });
           if (woman) {
-            g.poly([-2.6, -0.2, 2.6, -0.2, 1.6, -5, -1.6, -5]).fill(n % 2 ? 0x5a4a6a : 0x6a5038);
-            g.moveTo(-1.6, -0.3).lineTo(1.6, -0.3).stroke({ width: 0.6, color: dark, alpha: 0.5 });
+            // Skirt swaying with the stride, feet showing under the hem.
+            const sw = phase * 0.5;
+            g.ellipse(-1 - phase, -0.2, 0.9, 0.5).fill(0x3a2a1a);
+            g.ellipse(1 + phase, -0.2, 0.9, 0.5).fill(0x3a2a1a);
+            g.poly([-2.6 + sw, -0.6 + up, 2.6 + sw, -0.6 + up, 1.6, -5 + up, -1.6, -5 + up]).fill(
+              n % 2 ? 0x5a4a6a : 0x6a5038,
+            );
+            g.moveTo(-1.6 + sw, -0.7 + up)
+              .lineTo(1.6 + sw, -0.7 + up)
+              .stroke({ width: 0.6, color: dark, alpha: 0.5 });
           } else {
-            g.moveTo(-0.8, -4.5)
-              .lineTo(-0.8 - 1.4 * phase, 0)
-              .moveTo(0.8, -4.5)
-              .lineTo(0.8 + 1.4 * phase, 0);
+            g.moveTo(-0.8, -4.5 + up)
+              .lineTo(-0.8 - 1.5 * phase, 0)
+              .moveTo(0.8, -4.5 + up)
+              .lineTo(0.8 + 1.5 * phase, 0);
             g.stroke({ width: 1.3, color: 0x4a3a28, cap: 'round' });
           }
           // Body: tunic shaded on the side away from the sun, a belt, swinging arms.
-          g.roundRect(-2.2, -9.6, 4.4, 5.6, 1.4).fill(tunic).stroke({ width: 0.35, color: dark, alpha: 0.5 });
-          g.rect(0.6, -9.2, 1.6, 5).fill({ color: 0x000000, alpha: 0.18 });
-          g.rect(-2.2, -5.6, 4.4, 0.8).fill({ color: dark, alpha: 0.6 });
-          g.moveTo(-2, -8.8)
-            .lineTo(-2.6 + 1.2 * phase, -5.2)
-            .moveTo(2, -8.8)
-            .lineTo(2.6 + 1.2 * phase, -5.2);
+          g.roundRect(-2.2, -9.6 + up, 4.4, 5.6, 1.4)
+            .fill(tunic)
+            .stroke({ width: 0.35, color: dark, alpha: 0.5 });
+          g.rect(0.6, -9.2 + up, 1.6, 5).fill({ color: 0x000000, alpha: 0.18 });
+          g.rect(-2.2, -5.6 + up, 4.4, 0.8).fill({ color: dark, alpha: 0.6 });
+          const job = n % 3;
+          // A load over the shoulder keeps that arm up; the other swings.
+          const carries = !woman && job < 2;
+          g.moveTo(-2, -8.8 + up).lineTo(-2.6 + 1.3 * phase, -5.2 + up);
+          if (!carries) g.moveTo(2, -8.8 + up).lineTo(2.6 - 1.3 * phase, -5.2 + up);
           g.stroke({ width: 1.1, color: tunic, cap: 'round' });
-          g.circle(-2.6 + 1.2 * phase, -5.1, 0.6).fill(skin);
-          g.circle(2.6 + 1.2 * phase, -5.1, 0.6).fill(skin);
-          g.circle(0, -11.2, 1.9).fill(skin).stroke({ width: 0.3, color: dark, alpha: 0.4 });
-          // Some carry a basket on the hip.
-          if (woman && n % 3 === 0) {
-            g.ellipse(2.8, -5.6, 1.8, 1.2).fill(0xa0783e).stroke({ width: 0.3, color: 0x5a3e22 });
-            g.moveTo(1.4, -6.2).quadraticCurveTo(2.8, -8.4, 4.2, -6.2).stroke({ width: 0.35, color: 0x5a3e22 });
+          g.circle(-2.6 + 1.3 * phase, -5.1 + up, 0.6).fill(skin);
+          if (!carries) g.circle(2.6 - 1.3 * phase, -5.1 + up, 0.6).fill(skin);
+          g.circle(0, -11.2 + up, 1.9)
+            .fill(skin)
+            .stroke({ width: 0.3, color: dark, alpha: 0.4 });
+          if (carries && job === 0) {
+            // Woodcutter: an axe over the shoulder.
+            g.moveTo(2.2, -6.5 + up)
+              .lineTo(4.6, -13.5 + up)
+              .stroke({ width: 0.7, color: 0x7a5530, cap: 'round' });
+            g.poly([4, -13.8 + up, 6.4, -14.6 + up, 6.2, -12.2 + up, 4.6, -12.4 + up]).fill(0x8a8e94);
+          } else if (carries) {
+            // A sack slung over the shoulder.
+            g.ellipse(2.6, -10 + up, 2.2, 2.8)
+              .fill(0xd8c8a0)
+              .stroke({ width: 0.3, color: 0x8a7a5a });
+          } else if (woman && job === 0) {
+            g.ellipse(2.8, -5.6 + up, 1.8, 1.2)
+              .fill(0xa0783e)
+              .stroke({ width: 0.3, color: 0x5a3e22 });
+            g.moveTo(1.4, -6.2 + up)
+              .quadraticCurveTo(2.8, -8.4 + up, 4.2, -6.2 + up)
+              .stroke({ width: 0.35, color: 0x5a3e22 });
+          } else if (woman && job === 1) {
+            // A wooden bucket swinging from the hand.
+            const bx = 2.6 - 1.3 * phase;
+            g.moveTo(bx - 1.2, -4.4 + up)
+              .quadraticCurveTo(bx, -6 + up, bx + 1.2, -4.4 + up)
+              .stroke({ width: 0.3, color: 0x3a3a3a });
+            g.poly([bx - 1.3, -4.4 + up, bx + 1.3, -4.4 + up, bx + 1, -2 + up, bx - 1, -2 + up]).fill(0x8a6038);
           }
-          if (woman) g.poly([-2.1, -11, 0, -13.6, 2.1, -11, 1.4, -10.2, -1.4, -10.2]).fill(n % 2 ? 0xe8e0c8 : 0xb84a3a);
+          if (woman)
+            g.poly([-2.1, -11 + up, 0, -13.6 + up, 2.1, -11 + up, 1.4, -10.2 + up, -1.4, -10.2 + up]).fill(
+              n % 2 ? 0xe8e0c8 : 0xb84a3a,
+            );
           else if (n % 2) {
-            g.ellipse(0, -12.4, 3.2, 0.9).fill(0xd8c080);
-            g.ellipse(0, -13, 1.6, 1).fill(0xc8b070);
-          } else g.ellipse(0, -12.6, 2, 1.1).fill(0x4a3020);
-        }),
-      );
+            g.ellipse(0, -12.4 + up, 3.2, 0.9).fill(0xd8c080);
+            g.ellipse(0, -13 + up, 1.6, 1).fill(0xc8b070);
+          } else g.ellipse(0, -12.6 + up, 2, 1.1).fill(0x4a3020);
+        });
+      });
     }),
   );
 type Load = 'crates' | 'sacks' | 'logs' | 'barrels';
-/** Horse-drawn cart with a load and a driver, facing right. */
-const cartArt = (r: Renderer, load: Load) =>
+/** Frames of a cart on the move: wheel turning, the horse stepping and nodding. */
+const ROLL = 4;
+/** Horse-drawn cart with a load and a driver, facing right; frame `f` of ROLL. */
+const cartArt = (r: Renderer, load: Load, f: number) =>
   bake(r, (g) => {
+    const step = Math.sin((f / ROLL) * Math.PI * 2);
+    const nod = Math.abs(step) * 0.8;
     g.ellipse(-2, -0.5, 14, 2.6).fill({ color: 0x000000, alpha: 0.15 });
     // Cart bed, load and driver.
     g.roundRect(-13, -10, 15, 5.5, 1).fill(0x7a5230);
@@ -124,7 +170,7 @@ const cartArt = (r: Renderer, load: Load) =>
     // Wheel with spokes.
     g.circle(-8, -3.4, 3.4).stroke({ width: 1, color: 0x3a2a1a });
     for (let k = 0; k < 4; k++) {
-      const a = (k * Math.PI) / 4;
+      const a = (k * Math.PI) / 4 + (f / ROLL) * (Math.PI / 4);
       g.moveTo(-8 - Math.cos(a) * 3, -3.4 - Math.sin(a) * 3).lineTo(-8 + Math.cos(a) * 3, -3.4 + Math.sin(a) * 3);
     }
     g.stroke({ width: 0.5, color: 0x5a4028 });
@@ -133,19 +179,21 @@ const cartArt = (r: Renderer, load: Load) =>
     g.moveTo(2, -7).lineTo(8, -8.5).stroke({ width: 0.9, color: 0x4a3420 });
     // Horse: body, legs, neck and head, mane and tail.
     g.moveTo(7.5, -6.5)
-      .lineTo(7, 0)
+      .lineTo(7 + step * 1.2, 0)
       .moveTo(9, -6.5)
-      .lineTo(9.6, 0)
+      .lineTo(9.6 - step * 1.2, 0)
       .moveTo(13, -6.5)
-      .lineTo(12.5, 0)
+      .lineTo(12.5 - step * 1.2, 0)
       .moveTo(14.4, -6.5)
-      .lineTo(15, 0);
+      .lineTo(15 + step * 1.2, 0);
     g.stroke({ width: 1.2, color: 0x4a2e18, cap: 'round' });
     g.ellipse(11, -8.6, 5, 2.8).fill(0x6a4428);
     g.ellipse(10, -9.6, 3.5, 1.2).fill({ color: 0x8a5a34, alpha: 0.8 });
-    g.poly([14.2, -10, 17.2, -15, 19.4, -13.8, 16, -9]).fill(0x6a4428);
-    g.ellipse(19.2, -13.6, 2.3, 1.3).fill(0x6a4428);
-    g.moveTo(14.6, -10.6).lineTo(17.2, -15.4).stroke({ width: 1, color: 0x2e1c10 });
+    g.poly([14.2, -10, 17.2, -15 + nod, 19.4, -13.8 + nod, 16, -9]).fill(0x6a4428);
+    g.ellipse(19.2, -13.6 + nod, 2.3, 1.3).fill(0x6a4428);
+    g.moveTo(14.6, -10.6)
+      .lineTo(17.2, -15.4 + nod)
+      .stroke({ width: 1, color: 0x2e1c10 });
     g.moveTo(6.2, -9).quadraticCurveTo(4.6, -7.5, 5, -4.5).stroke({ width: 1.1, color: 0x2e1c10 });
   });
 
@@ -261,6 +309,7 @@ interface Walker {
 }
 interface Cart {
   s: Sprite;
+  frames: Baked[];
   route: number[];
   /** Position along the route in tiles; the cart turns round at either end after a pause. */
   pos: number;
@@ -305,7 +354,9 @@ export function createLife(
   const mirrors = new Container({ eventMode: 'none', alpha: 0.28 });
   const water = new Container({ children: [wakes, mirrors], eventMode: 'none' });
   const walkerFrames = walkerArt(renderer);
-  const cartArts = (['crates', 'sacks', 'logs', 'barrels'] as const).map((l) => cartArt(renderer, l));
+  const cartArts = (['crates', 'sacks', 'logs', 'barrels'] as const).map((l) =>
+    Array.from({ length: ROLL }, (_, f) => cartArt(renderer, l, f)),
+  );
 
   const center = (i: number) => groundToScreen((i % W) + 0.5, Math.floor(i / W) + 0.5);
   /** Tile x + y of a point a fraction t from tile i's centre to tile j's (matches the scene's zIndex). */
@@ -443,9 +494,10 @@ export function createLife(
             ? roadRoute(world, home, targets[Math.floor(Math.random() * targets.length)])
             : null;
         if (!route || route.length < 2) continue;
-        const s = spriteOf(cartArts[b.id % cartArts.length]);
+        const frames = cartArts[b.id % cartArts.length];
+        const s = spriteOf(frames[0]);
         front.addChild(s);
-        carts.push({ s, route, pos: 0, dir: 1, wait: 1, home });
+        carts.push({ s, frames, route, pos: 0, dir: 1, wait: 1, home });
       }
       piers = [...world.buildings.values()].flatMap((b) =>
         b.type === 'harbor' || b.type === 'fisher' ? (pierBox(map, b.x, b.y, BUILDINGS[b.type].size) ?? []) : [],
@@ -494,10 +546,12 @@ export function createLife(
         if (!w.s.visible) continue;
         // Depth among buildings and trees: tile x + y of where it stands.
         w.s.zIndex = depth(w.from, w.to, w.t);
-        w.step = (w.step + dt * 4) % 1;
-        w.s.texture = w.frames[w.step < 0.5 ? 0 : 1].texture as Texture;
-        w.s.position.set(x, y - Math.abs(Math.sin(w.step * Math.PI * 2)) * 0.6);
-        w.s.scale.x = dx < 0 ? -1 : 1;
+        w.step = (w.step + dt * 1.6) % 1;
+        const fr = w.frames[Math.floor(w.step * STRIDE)];
+        w.s.texture = fr.texture as Texture;
+        w.s.anchor.set(fr.ax, fr.ay);
+        w.s.position.set(x, y);
+        w.s.scale.set(dx < 0 ? -1.3 : 1.3, 1.3);
       }
 
       for (const c of carts) {
@@ -521,6 +575,10 @@ export function createLife(
         c.s.zIndex = depth(c.route[i], c.route[i + 1], t);
         c.s.position.set(x, y);
         c.s.scale.x = (b.x - a.x) * c.dir < 0 ? -1 : 1;
+        // Wheel and hooves keep pace with the ground covered; still while it waits.
+        const fr = c.frames[Math.floor(c.pos * ROLL * 3) % ROLL];
+        c.s.texture = fr.texture as Texture;
+        c.s.anchor.set(fr.ax, fr.ay);
       }
 
       const all = [...ships, ...boats];
