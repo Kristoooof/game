@@ -65,7 +65,7 @@ void main() {
   float fall = vnoise(vec2(vPos.x * 0.45, vPos.y * 0.035 + vGround.x * 3.0));
   col *= 1.0 - 0.16 * smoothstep(0.6, 0.85, fall) * smoothstep(0.85, 0.45, up);
   // Snow above a ragged line, where the slope is gentle enough to hold it.
-  float line = ${(TOP * 0.45).toFixed(1)} + (vnoise(vGround * 0.8) - 0.5) * 44.0;
+  float line = ${(TOP * 0.6).toFixed(1)} + (vnoise(vGround * 0.8) - 0.5) * 44.0;
   float snow = smoothstep(line - 4.0, line + 4.0, vH) * smoothstep(0.32, 0.5, up + (paint - 0.5) * 0.2);
   col = mix(col, mix(vec3(0.68, 0.74, 0.86), vec3(0.96, 0.97, 0.98), smoothstep(0.3, 0.5, band)), snow);
   // Ink where the surface turns away from the eye.
@@ -124,11 +124,12 @@ export function createMassif(map: GameMap) {
     const e = depthAt(gx, gy) - 0.8 + (noise2(gx * 0.9, gy * 0.9, 76) - 0.5) * 0.9;
     if (e <= 0) return 0;
     const env = smooth(0, 2.2, e) ** 1.6 * 0.3 + (1 - Math.exp(-e / 3.2)) * 0.7;
-    // Ridged noise, sharpened: knife-edge crests and deep gullies between them.
-    const ridge = 1 - Math.abs(fbm2(gx * 0.3, gy * 0.3, 77) * 2 - 1);
+    // Ridged noise, sharpened: crests with gullies between them.
+    const ridge = 1 - Math.abs(fbm2(gx * 0.25, gy * 0.25, 77) * 2 - 1);
     // Broad swells: some stretches of a range carry its great summits, others only lower ridges.
     const swell = 0.6 + 0.6 * fbm2(gx * 0.1, gy * 0.1, 79);
-    const h = TOP * env * swell * (0.2 + 0.95 * ridge ** 2.2) + 6 * env * noise2(gx * 1.4, gy * 1.4, 78);
+    // Gullies filled to a third of the crests: one massif, not needles beside pits.
+    const h = TOP * env * swell * (0.34 + 0.72 * ridge ** 1.8) + 6 * env * noise2(gx * 1.4, gy * 1.4, 78);
     return Math.min(TOP, h);
   };
 
