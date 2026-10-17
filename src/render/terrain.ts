@@ -387,7 +387,8 @@ export function createTerrain(world: World, renderer: Renderer) {
   function bake(c: Chunk, tier: number, far: boolean, key: string) {
     const g = new Container();
     // Bake a little past the diamond so its edge texels are fully covered: no seams.
-    const land = ground.landMesh(c.x0 - 0.25, c.y0 - 0.25, c.x1 + 0.25, c.y1 + 0.25, far ? 1 : 0);
+    // The finest ground detail only where it is baked sharp enough to show.
+    const land = ground.landMesh(c.x0 - 0.25, c.y0 - 0.25, c.x1 + 0.25, c.y1 + 0.25, far ? 1 : 0, tier >= 2 ? 1 : 0);
     const roads = new Graphics();
     drawRoads(roads, world, c.x0, c.y0, c.x1, c.y1);
     g.addChild(land, roads);

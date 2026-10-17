@@ -31,6 +31,8 @@ uniform sampler2D uNoise;
 uniform vec2 uSize;
 uniform float uTime;
 uniform float uFar;
+// 1 when the land is baked for a close view: the finest detail (blades, grit) is worth drawing.
+uniform float uDetail;
 uniform vec3 uAmbient;
 uniform vec3 uSun;
 uniform vec3 uMoon;
@@ -343,6 +345,13 @@ void main() {
   grass *= 0.88 + 0.24 * n;
   // Brush dabs of lighter and darker green: the ground looks painted, not printed.
   grass *= 1.0 + 0.09 * dabs(g * 5.0) * (1.0 - uFar);
+  // Close up: blades a few pixels tall, leaning this way and that, lighter and darker.
+  vec2 bc = vg / vec2(2.6, 4.5), bi = floor(bc), bfr = fract(bc);
+  float bx = bfr.x - 0.5 - (hash(bi + 41.0) - 0.5) * 0.8 * (1.0 - bfr.y);
+  float bladeLine = (1.0 - smoothstep(0.1, 0.22, abs(bx))) * smoothstep(0.0, 0.35, bfr.y);
+  grass *= 1.0 + bladeLine * (hash(bi + 43.0) - 0.45) * 0.32 * uDetail;
+  // Grit: single specks of lighter and darker ground, for the bare places below.
+  float grit = (hash(floor(vg * 0.7)) - 0.5) * 0.14 * uDetail;
   float fine = noise(g * 8.0) * 0.6 + noise(g * 19.0) * 0.4;
   grass *= 0.9 + 0.2 * fine;
   // Blade streaks: thin vertical grain on screen, bent by noise; darker clumps of long grass.
@@ -362,7 +371,7 @@ void main() {
   // Coloured, never white: white specks read as noise.
   vec3 flower = fh < 0.25 ? vec3(0.88, 0.2, 0.15) : fh < 0.5 ? vec3(0.98, 0.85, 0.25) : fh < 0.75 ? vec3(0.55, 0.45, 0.9) : vec3(0.95, 0.55, 0.75);
   flower = mix(mix(vec3(0.95, 0.85, 0.4), vec3(0.9, 0.55, 0.7), fh), flower, meadow);
-  float bloom = step(mix(0.97, 0.55, meadow), hash(iff + 3.0)) * max(step(0.6, noise(p * 0.7)), meadow);
+  float bloom = step(mix(0.985, 0.6, meadow), hash(iff + 3.0)) * max(step(0.6, noise(p * 0.7)), meadow);
   grass = mix(grass, flower, dot * bloom * (1.0 - uFar));
   vec3 col = grass;
   // Sedge in tufts along the damp banks.
@@ -370,14 +379,31 @@ void main() {
 
   vec3 floorCol = vec3(0.23, 0.38, 0.16) * (0.85 + 0.3 * fine);
   float bumps = noise(p * 4.0) * 0.6 + noise(p * 9.0) * 0.4;
-  vec3 canopy = mix(vec3(0.12, 0.27, 0.13), vec3(0.3, 0.48, 0.2), bumps);
+  // From afar the wood is a roof of crowns: round clumps lit on their upper left, dark between,
+  // some stretches turned to autumn gold.
+  vec2 cp = p * 2.4, ci = floor(cp), off = vec2(0.0);
+  float best = 9.0, tone = 0.0;
+  for (int j = -1; j <= 1; j++)
+    for (int i = -1; i <= 1; i++) {
+      vec2 cc = ci + vec2(float(i), float(j));
+      vec2 o = cc + 0.5 + (vec2(hash(cc + 5.0), hash(cc + 9.0)) - 0.5) * 0.7 - cp;
+      float d = length(o);
+      if (d < best) { best = d; off = o; tone = hash(cc + 13.0); }
+    }
+  float crown = 1.0 - smoothstep(0.38, 0.62, best);
+  float litSide = clamp(0.5 + (off.x + 0.25 * off.y) * 1.2, 0.0, 1.0);
+  vec3 canopy = mix(vec3(0.1, 0.23, 0.12), vec3(0.34, 0.52, 0.22), clamp(0.15 + 0.6 * litSide + 0.25 * tone, 0.0, 1.0));
+  canopy = mix(canopy, canopy * vec3(1.9, 1.35, 0.6), step(0.82, tone) * smoothstep(0.55, 0.7, fbm(p * 0.09 + 21.0)));
+  canopy *= mix(0.45, 1.0, crown) * (0.9 + 0.2 * bumps);
   float wood = smp(uDist, pf).b;
+  // The roof of crowns stands up from the land: lit along its sunward edge, shaded on the far one.
+  canopy *= 1.0 + 0.35 * clamp((smp(uDist, pf + vec2(0.7)).b - smp(uDist, pf - vec2(0.7)).b) * 1.5, -1.0, 1.0);
   col = mix(col, mix(floorCol, canopy, uFar), smoothstep(0.3, 0.7, wood));
   // Shade spilling out of the wood onto the grass beside it.
   col *= 1.0 - 0.22 * smoothstep(0.0, 0.35, wood) * (1.0 - smoothstep(0.35, 0.7, wood));
   // Ground worn bare round the houses and along the roads, in patches.
   float worn = smp(uMarks, p).g * (0.55 + 0.9 * noise(p * 2.3 + 17.0));
-  vec3 dirt = vec3(0.55, 0.47, 0.34) * (0.88 + 0.24 * noise(g * 6.0));
+  vec3 dirt = vec3(0.55, 0.47, 0.34) * (0.88 + 0.24 * noise(g * 6.0) + grit);
   col = mix(col, dirt, smoothstep(0.25, 0.7, worn) * 0.85);
 
   // Rock: ridged noise gives crevices and ledges; scree and moss where it meets the grass.
@@ -393,12 +419,12 @@ void main() {
   vec2 gb = g * 26.0, gi = floor(gb);
   float pebble = (1.0 - smoothstep(0.1, 0.22, length(fract(gb) - 0.5 - 0.3 * vec2(hash(gi), hash(gi + 7.0))))) * step(0.55, hash(gi + 3.0));
   stone = mix(stone, stone * 0.8 + vec3(0.14), pebble * 0.5);
-  stone *= 0.92 + 0.12 * noise(g * 7.0);
+  stone *= 0.92 + 0.12 * noise(g * 7.0) + grit;
   vec3 scrub = mix(vec3(0.42, 0.52, 0.24), vec3(0.5, 0.58, 0.3), noise(g * 5.0));
   col = mix(col, scrub, rockFringe * 0.7);
   col = mix(col, stone, rockMask);
 
-  vec3 sandCol = vec3(0.9, 0.81, 0.58) * (0.94 + 0.12 * noise(g * 10.0));
+  vec3 sandCol = vec3(0.9, 0.81, 0.58) * (0.94 + 0.12 * noise(g * 10.0) + grit * 0.7);
   sandCol -= 0.03 * sin((p.x + p.y) * 9.0 + noise(p * 2.0) * 4.0);
   // Low threshold: a one-tile beach only reaches ~0.375 after the mask blur.
   // Sand edge: wobbles a little, but stays a wide band so grass never breaks into the beach.
@@ -726,6 +752,7 @@ export function createGround(map: GameMap, peaks: Float32Array) {
       uSize: { value: new Float32Array([W, H]), type: 'vec2<f32>' },
       uTime: { value: 0, type: 'f32' },
       uFar: { value: 0, type: 'f32' },
+      uDetail: { value: 0, type: 'f32' },
       uAmbient: { value: new Float32Array([1, 1, 1]), type: 'vec3<f32>' },
       uSun: { value: new Float32Array([1, 0.95, 0.8]), type: 'vec3<f32>' },
       uMoon: { value: new Float32Array([0, 1, 0]), type: 'vec3<f32>' },
@@ -768,8 +795,9 @@ export function createGround(map: GameMap, peaks: Float32Array) {
       wu.uWeather.set(weather);
     },
     /** A mesh covering tiles [x0, x1) × [y0, y1), to render that chunk's land once. */
-    landMesh(x0: number, y0: number, x1: number, y1: number, far: number) {
+    landMesh(x0: number, y0: number, x1: number, y1: number, far: number, detail: number) {
       landShader.resources.land.uniforms.uFar = far;
+      landShader.resources.land.uniforms.uDetail = detail;
       const pt = (x: number, y: number) => [((x - y) * TILE_W) / 2, ((x + y) * TILE_H) / 2];
       const geometry = new Geometry({
         attributes: { aPosition: [...pt(x0, y0), ...pt(x1, y0), ...pt(x1, y1), ...pt(x0, y1)] },
