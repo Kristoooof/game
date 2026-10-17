@@ -208,6 +208,25 @@ function walls(g: Graphics, b: Box, h0: number, h1: number, color: number, top =
   speckle(g, left, shade(color, 0.7), n, 0.35);
   speckle(g, left, shade(color, 1.1), n / 2, 0.3);
   speckle(g, right, shade(color, 0.55), n, 0.35);
+  if (h0 === 0 && h1 > 8 && b.x1 - b.x0 > 0.6) {
+    // Plaster flaked off here and there, the stonework showing through in a ragged patch.
+    for (const [side, k] of [
+      [onLeft, 1],
+      [onRight, 0.8],
+    ] as const) {
+      if (rnd() < 0.35) continue;
+      const t = 0.12 + rnd() * 0.6;
+      const v = 3 + rnd() * (h1 - 9);
+      const stone = shade(0xa89a84, k);
+      side(g, b, t, t + 0.12, v, v + 3.2, stone);
+      side(g, b, t + 0.03, t + 0.17, v + 1.2, v + 4.6, stone);
+      side(g, b, t + 0.02, t + 0.15, v + 2.2, v + 2.5, shade(stone, 0.7));
+      side(g, b, t + 0.08, t + 0.085, v + 2.5, v + 4.4, shade(stone, 0.7));
+    }
+    // Moss creeping up the wall from the plinth, thicker on the shaded face.
+    speckle(g, [P(b.x0, b.y1, 2.2), P(b.x1, b.y1, 2.2), P(b.x1, b.y1, 4.2), P(b.x0, b.y1, 4.2)], 0x4a6a2a, 10, 0.35);
+    speckle(g, [P(b.x1, b.y1, 2.2), P(b.x1, b.y0, 2.2), P(b.x1, b.y0, 5), P(b.x1, b.y1, 5)], 0x3e5e26, 18, 0.45);
+  }
   if (h0 === 0 && h1 > 8) {
     // Stone plinth with a darker contact line where the wall meets the ground.
     onLeft(g, b, 0, 1, 0, 2.2, 0x8c867a);
@@ -252,8 +271,9 @@ function gabled(g: Graphics, b: Box, wall: number, roof: number, wallColor: numb
   fill(g, [P(x1, y0, wall), P(x1, y1, wall), P(x1, yc, top)], shade(wallColor, 0.72));
   const north = [P(x0 - o, y0 - o, wall - 1), P(x1 + o, y0 - o, wall - 1), P(x1 + o, yc, top), P(x0 - o, yc, top)];
   const south = [P(x0 - o, y1 + o, wall - 1), P(x1 + o, y1 + o, wall - 1), P(x1 + o, yc, top), P(x0 - o, yc, top)];
-  fill(g, north, shade(roofColor, 0.75));
-  fill(g, south, roofColor);
+  // Sunlit slope warm and bright, the far one well in shade.
+  fill(g, north, shade(roofColor, 0.64));
+  fill(g, south, shade(roofColor, 1.08));
   // Roof covering laid along each slope, eave to ridge.
   const cover = thatch ? surface().thatch : surface().tiles;
   overlayQuad(g, south, cover, 0.42);
@@ -363,9 +383,9 @@ function hipped(g: Graphics, b: Box, wall: number, roof: number, wallColor: numb
   const ne = P(x1 + o, y0 - o, wall - 1);
   const se = P(x1 + o, y1 + o, wall - 1);
   const sw = P(x0 - o, y1 + o, wall - 1);
-  fill(g, [nw, ne, B, A], shade(roofColor, 0.75));
-  fill(g, [sw, se, B, A], roofColor);
-  fill(g, [nw, sw, A], shade(roofColor, 0.6));
+  fill(g, [nw, ne, B, A], shade(roofColor, 0.64));
+  fill(g, [sw, se, B, A], shade(roofColor, 1.08));
+  fill(g, [nw, sw, A], shade(roofColor, 0.55));
   fill(g, [ne, se, B], shade(roofColor, 0.85));
   // Tiles on all four slopes, rows running along each eave.
   const tiles = surface().tiles;
