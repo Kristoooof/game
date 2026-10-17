@@ -25,6 +25,7 @@ import { createLife } from './render/life';
 import { daylight } from './render/daylight';
 import { createFpsCounter, createSettingsPanel, loadSettings, resolutionOf } from './ui/settings';
 import { createFxaa } from './render/fxaa';
+import { createWind } from './render/wind';
 
 const MAPS: Record<string, string> = { pelda };
 const TERRAIN_NAMES: Record<Terrain, string> = {
@@ -182,6 +183,8 @@ fitVignette();
 app.stage.addChild(atmosphere.screen, vignette, sunlight);
 
 const fxaa = createFxaa();
+const wind = createWind();
+let windTime = 0;
 // A fixed filter area: measuring the huge sea mesh for bounds every frame is wasted work.
 app.stage.filterArea = app.screen;
 const applySettings = () => {
@@ -244,6 +247,15 @@ app.ticker.add((t) => {
   terrain.front.visible = cam.scale >= FAR_SCALE;
   // The target keeps CSS-pixel units; its own resolution does the downscaling.
   waterTransform.set(cam.scale, 0, 0, cam.scale, cam.x, cam.y);
+  // Wind in the leaves while trees are drawn (not at the far zoom's canopy), unless switched off.
+  const windy = settings.wind && cam.scale >= FAR_SCALE;
+  terrain.objects.filters = windy ? [wind] : [];
+  if (windy) {
+    windTime += dt;
+    const u = wind.resources.wind.uniforms;
+    u.uTime = windTime;
+    u.uView.set([view.x, view.y, cam.scale, app.renderer.resolution]);
+  }
   app.renderer.render({ container: waterScene, target: waterTexture, transform: waterTransform, clear: true });
   effects.update(dt, view, cam.scale < FAR_SCALE);
   const { width, height } = app.canvas;

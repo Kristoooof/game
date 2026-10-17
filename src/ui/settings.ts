@@ -12,6 +12,8 @@ export interface Settings {
   dayCycle: boolean;
   /** Weather changes (cloud, rain, fog); off keeps the sky clear. */
   weather: boolean;
+  /** Leaves stir in the wind (one extra full-screen pass). */
+  wind: boolean;
   fps: boolean;
 }
 
@@ -24,6 +26,7 @@ const DEFAULTS: Settings = {
   waterPixel: false,
   dayCycle: true,
   weather: true,
+  wind: true,
   fps: false,
 };
 
@@ -67,6 +70,10 @@ const DAY_CYCLE: [boolean, string][] = [
 const WEATHER: [boolean, string][] = [
   [true, 'Változó (felhő, eső, köd)'],
   [false, 'Mindig derült'],
+];
+const WIND: [boolean, string][] = [
+  [true, 'Be'],
+  [false, 'Ki'],
 ];
 const ANTIALIAS: [Antialias, string][] = [
   ['off', 'Ki'],
@@ -118,6 +125,7 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
     select('Víz megjelenése', LOOKS, s.waterPixel, (waterPixel) => update({ waterPixel })),
     select('Napszak', DAY_CYCLE, s.dayCycle, (dayCycle) => update({ dayCycle })),
     select('Időjárás', WEATHER, s.weather, (weather) => update({ weather })),
+    select('Szél a fákban', WIND, s.wind, (wind) => update({ wind })),
     select('Élsimítás', ANTIALIAS, s.antialias, (antialias) => update({ antialias })),
     fps,
     note,

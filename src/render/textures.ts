@@ -105,59 +105,121 @@ const conifer = (seed: number, palette: string[], tiers: number) => {
   });
 };
 
-const broadleaf = (seed: number, palette: string[], size = 1) => {
+type Kind = 'oak' | 'birch' | 'willow' | 'fruit';
+/** Crown and trunk of each kind: crown centre height, half width and height, clumps, trunk top. */
+const KINDS: Record<Kind, { cy: number; rx: number; ry: number; n: number; rad: number; top: number; bark: string[] }> =
+  {
+    // Round, spreading; a stout grey-brown trunk.
+    oak: { cy: 23, rx: 13, ry: 10.4, n: 26, rad: 4.2, top: 32, bark: ['#7d6a56', '#45382c'] },
+    // Tall and narrow, small clumps; a pale trunk marked with dark flecks.
+    birch: { cy: 19, rx: 6.5, ry: 15, n: 26, rad: 3.1, top: 30, bark: ['#e6e2d6', '#b4ae9e'] },
+    // A dome with curtains of twigs hanging down its sides.
+    willow: { cy: 21, rx: 14, ry: 8, n: 22, rad: 3.8, top: 28, bark: ['#6e6050', '#3e342a'] },
+    // Low and wide, on a short trunk; a few fruits among the leaves.
+    fruit: { cy: 30, rx: 15, ry: 6.5, n: 24, rad: 3.6, top: 38, bark: ['#7a5e44', '#44342a'] },
+  };
+
+/**
+ * A broadleaf of one of four kinds. Trunk flaring into roots and forking into boughs; the crown a
+ * cluster of lit clumps in the kind's shape, with a dark gap or two low down where a bough shows.
+ */
+const broadleaf = (seed: number, palette: string[], kind: Kind = 'oak') => {
   const r = mulberry32(seed);
+  const k = KINDS[kind];
   return paint(44, 56, 22, 51, (c) => {
-    shadow(c, 26, 50, 15, 5);
-    // Trunk flaring into roots at the foot, bark streaks, and two boughs forking into the crown.
-    const trunk = c.createLinearGradient(19, 0, 25, 0);
-    // A stout grey-brown trunk: a thin red stick under a small crown reads as a toy.
-    trunk.addColorStop(0, '#7d6a56');
-    trunk.addColorStop(1, '#45382c');
+    shadow(c, 26, 50, kind === 'birch' ? 10 : 15, 5);
+    const w = kind === 'birch' ? 1.2 : 1.6;
+    const trunk = c.createLinearGradient(22 - w * 1.5, 0, 22 + w * 1.5, 0);
+    trunk.addColorStop(0, k.bark[0]);
+    trunk.addColorStop(1, k.bark[1]);
     c.fillStyle = trunk;
     c.beginPath();
-    c.moveTo(16.2, 51.5);
-    c.quadraticCurveTo(19.4, 49, 19.9, 44);
-    c.lineTo(20.4, 32);
-    c.lineTo(23.6, 32);
-    c.lineTo(24.1, 44);
-    c.quadraticCurveTo(24.6, 49, 27.8, 51.5);
+    c.moveTo(22 - w * 3.6, 51.5);
+    c.quadraticCurveTo(22 - w * 1.6, 49, 22 - w * 1.3, 44);
+    c.lineTo(22 - w, k.top);
+    c.lineTo(22 + w, k.top);
+    c.lineTo(22 + w * 1.3, 44);
+    c.quadraticCurveTo(22 + w * 1.6, 49, 22 + w * 3.6, 51.5);
     c.closePath();
     c.fill();
-    c.strokeStyle = 'rgba(40,26,14,0.55)';
-    c.lineWidth = 0.35;
-    for (let k = 0; k < 5; k++) {
-      const x = 20.6 + r() * 2.8;
+    // Bark: streaks down an oak's trunk, dark flecks across a birch's.
+    c.strokeStyle = kind === 'birch' ? 'rgba(30,26,22,0.8)' : 'rgba(40,26,14,0.55)';
+    for (let i = 0; i < 6; i++) {
+      const y = 50 - r() * (50 - k.top);
+      c.lineWidth = kind === 'birch' ? 0.7 : 0.35;
       c.beginPath();
-      c.moveTo(x, 50 - r() * 3);
-      c.lineTo(x + (r() - 0.5) * 0.6, 34 + r() * 6);
+      if (kind === 'birch') {
+        const x = 22 - w + r() * w;
+        c.moveTo(x, y);
+        c.lineTo(x + 0.8 + r() * 0.8, y + 0.2);
+      } else {
+        const x = 22 - w + r() * w * 2;
+        c.moveTo(x, y);
+        c.lineTo(x + (r() - 0.5) * 0.6, y - 6 - r() * 6);
+      }
       c.stroke();
     }
-    c.strokeStyle = '#5e4028';
+    // Boughs forking from the top of the trunk into the crown.
+    c.strokeStyle = k.bark[1];
     c.lineCap = 'round';
-    for (const [dx, h] of [
-      [-7, 22],
-      [6, 20],
-    ]) {
-      c.lineWidth = 2.2;
+    const boughs = [
+      [-k.rx * 0.55, k.cy],
+      [k.rx * 0.5, k.cy - 2],
+      [-k.rx * 0.1, k.cy - k.ry * 0.5],
+    ];
+    for (const [dx, h] of boughs) {
+      c.lineWidth = kind === 'birch' ? 1.2 : 2;
       c.beginPath();
-      c.moveTo(22, 36);
-      c.quadraticCurveTo(22 + dx * 0.3, 30, 22 + dx, h + 3);
+      c.moveTo(22, k.top + 4);
+      c.quadraticCurveTo(22 + dx * 0.3, k.top - 2, 22 + dx, h + 3);
       c.stroke();
     }
-    // Crown in three layers: dark balls at the back, mid, then lit ones in front; a few gaps
-    // let the boughs show through.
+    // Crown: clumps spread over the kind's ellipse; the willow's also hang in chains at the sides.
     const balls: number[][] = [];
-    for (let i = 0; i < 26; i++) {
+    for (let i = 0; i < k.n; i++) {
       const a = r() * Math.PI * 2;
-      const d = Math.sqrt(r()) * 12.5 * size;
-      balls.push([22 + Math.cos(a) * d, 23 + Math.sin(a) * d * 0.8, (4.2 + r() * 3.6) * size]);
+      const d = Math.sqrt(r());
+      balls.push([22 + Math.cos(a) * d * k.rx, k.cy + Math.sin(a) * d * k.ry, k.rad + r() * k.rad * 0.85]);
     }
-    // Depth for each ball: the crown is round towards the viewer too; a few left out are gaps.
+    if (kind === 'willow')
+      for (let i = 0; i < 8; i++) {
+        let x = 22 + (i / 7 - 0.5) * k.rx * 2.1;
+        for (let j = 0; j < 4; j++) {
+          x += (r() - 0.5) * 0.8;
+          balls.push([x, k.cy + k.ry * 0.5 + j * 3.4, 2.4 - j * 0.3]);
+        }
+      }
     const crown = balls
-      .filter((_, k) => k % 7 !== 3)
-      .map(([x, y, rad]) => [x, y, rad, (1 - Math.hypot(x - 22, y - 23) / 15) * 9]);
+      .filter((_, i) => i % 7 !== 3)
+      .map(([x, y, rad]) => [x, y, rad, (1 - Math.hypot((x - 22) / k.rx, (y - k.cy) / k.ry) * 0.7) * 9]);
     litCrown(c, S, crown, palette, seed);
+    // A gap low in the crown, off to one side (two side by side read as eyes): dark inside, a
+    // bough crossing it.
+    if (kind !== 'birch')
+      for (let i = 0; i < 1; i++) {
+        const hx = 22 + (r() < 0.5 ? -1 : 1) * (0.3 + r() * 0.3) * k.rx;
+        const hy = k.cy + k.ry * (0.25 + r() * 0.3);
+        c.save();
+        c.beginPath();
+        c.ellipse(hx, hy, 1.6 + r() * 0.8, 1.1 + r() * 0.4, 0, 0, Math.PI * 2);
+        c.clip();
+        c.fillStyle = 'rgba(14,26,10,0.55)';
+        c.fillRect(hx - 4, hy - 3, 8, 6);
+        c.strokeStyle = k.bark[1];
+        c.lineWidth = 1;
+        c.beginPath();
+        c.moveTo(hx - 3, hy + 2);
+        c.lineTo(hx + 3, hy - 1.5);
+        c.stroke();
+        c.restore();
+      }
+    if (kind === 'fruit')
+      for (let i = 0; i < 9; i++) {
+        c.fillStyle = r() < 0.6 ? '#c0392b' : '#e0a030';
+        c.beginPath();
+        c.arc(22 + (r() - 0.5) * k.rx * 1.6, k.cy + (r() - 0.2) * k.ry, 0.75, 0, Math.PI * 2);
+        c.fill();
+      }
   });
 };
 const bush = (seed: number, palette: string[]) => {
@@ -474,6 +536,9 @@ const DARK_GREEN = ['#1f4a24', '#2f6a33', '#5f9a4a'];
 const LEAF_GREEN = ['#2f5e1f', '#4f8a2e', '#9cc65a'];
 const OLIVE = ['#4a5a1c', '#7a8a2a', '#c4c45a'];
 const AUTUMN = ['#6a4a1a', '#a8742a', '#e0b048'];
+const GOLD = ['#7a6a1a', '#c8a830', '#f0d860'];
+const BIRCH = ['#3e6a22', '#76a83a', '#c4e070'];
+const WILLOW = ['#3a5a2e', '#6a8a48', '#b0c888'];
 
 /** Rock standing in the sea: faceted stone with a dark wet band at the waterline and a foam lip. */
 const seaRock = (seed: number, tall: boolean) => {
@@ -525,12 +590,18 @@ export function makeArt() {
       conifer(3, ['#1d3f1f', '#2e5f2c', '#55864a'], 3),
     ],
     broadleaves: [
-      broadleaf(4, LEAF_GREEN),
-      broadleaf(5, DARK_GREEN, 1.1),
-      broadleaf(6, OLIVE, 0.9),
-      broadleaf(7, AUTUMN),
+      broadleaf(4, LEAF_GREEN, 'oak'),
+      broadleaf(5, DARK_GREEN, 'oak'),
+      broadleaf(6, BIRCH, 'birch'),
+      broadleaf(12, BIRCH, 'birch'),
+      broadleaf(7, WILLOW, 'willow'),
+      broadleaf(13, LEAF_GREEN, 'fruit'),
+      broadleaf(14, OLIVE, 'oak'),
     ],
-    bushes: [bush(8, LEAF_GREEN), bush(9, DARK_GREEN)],
+    /** Autumn colour: an oak turned bronze, a birch gone gold. */
+    autumn: [broadleaf(10, AUTUMN, 'oak'), broadleaf(11, GOLD, 'birch')],
+    /** One in three bears berries. */
+    bushes: [bush(8, LEAF_GREEN), bush(9, DARK_GREEN), bush(17, LEAF_GREEN)],
     palms: [palm(41), palm(42), palm(43)],
     driftwood: [driftwood(51), driftwood(52)],
     pebbles: [pebbles(61), pebbles(62)],

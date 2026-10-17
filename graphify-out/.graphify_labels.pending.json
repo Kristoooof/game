@@ -18,12 +18,13 @@
   "16": ".claude/CLAUDE.md",
   "17": "camera.ts",
   "18": "showPreview",
-  "19": "map.ts",
+  "19": "applySettings",
   "20": "settings.ts",
-  "21": "textures.ts",
+  "21": "fxaa.ts",
   "22": "refresh",
   "23": "atmosphere.ts",
   "24": "life.ts",
   "25": "daylight.ts",
-  "26": "world.ts"
+  "26": "life.ts",
+  "27": "wind.ts"
 }

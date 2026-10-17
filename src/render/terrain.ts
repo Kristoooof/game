@@ -67,8 +67,11 @@ export function createTerrain(world: World, renderer: Renderer) {
   const { map } = world;
   const art = makeArt();
   /** A broadleaf for tile (x, y): autumn comes to whole stretches of woodland, not tree by tree. */
-  const leaf = (k: number, x: number, y: number) =>
-    art.broadleaves[k < (noise2(x * 0.09, y * 0.09, 5) > 0.6 ? 0.65 : 0.015) ? 3 : Math.floor(k * 3) % 3];
+  const leaf = (k: number, x: number, y: number) => {
+    const fall = noise2(x * 0.09, y * 0.09, 5) > 0.6 ? 0.65 : 0.015;
+    if (k < fall) return art.autumn[Math.floor((k / fall) * art.autumn.length)];
+    return art.broadleaves[Math.floor(((k - fall) / (1 - fall)) * art.broadleaves.length)];
+  };
   const massif = createMassif(map);
   const ground = createGround(map, massif.peaks);
   const { width: W, height: H } = map;
@@ -223,7 +226,7 @@ export function createTerrain(world: World, renderer: Renderer) {
           const bush = d === 0 ? 0.75 : 0.93;
           if (k < 0.55) put(art.conifers[Math.floor(r() * 3)], u, v, (0.75 + r() * 0.45) * grow, true, dark);
           else if (k < bush) put(leaf(r(), x, y), u, v, (0.7 + r() * 0.4) * grow, true, dark);
-          else put(art.bushes[Math.floor(r() * 2)], u, v, 0.8 + r() * 0.4);
+          else put(art.bushes[Math.floor(r() * art.bushes.length)], u, v, 0.8 + r() * 0.4);
         }
       } else if (t === 'mountain') {
         // The range itself (see massif.ts), and boulders in screes on the low ground at its edge.
@@ -265,13 +268,13 @@ export function createTerrain(world: World, renderer: Renderer) {
           const edge = woodNear[y * W + x];
           const [u, v] = [0.2 + r() * 0.6, 0.2 + r() * 0.6];
           if ((edge === 1 && p < 0.45) || (edge === 2 && p < 0.2)) {
-            if (r() < 0.55) put(art.bushes[Math.floor(r() * 2)], u, v, 0.7 + r() * 0.5);
+            if (r() < 0.55) put(art.bushes[Math.floor(r() * art.bushes.length)], u, v, 0.7 + r() * 0.5);
             else if (r() < 0.5) put(art.conifers[Math.floor(r() * 3)], u, v, 0.5 + r() * 0.25, true);
             else put(leaf(r(), x, y), u, v, 0.5 + r() * 0.25, true);
           } else if (noise2(x * 0.13, y * 0.13, 6) > 0.64 && p < 0.35)
             put(leaf(r(), x, y), u, v, 0.75 + r() * 0.4, true);
           else if (p < 0.006) put(leaf(r(), x, y), u, v, 1.15 + r() * 0.25, true);
-          else if (p < 0.05) put(art.bushes[Math.floor(r() * 2)], u, v, 0.7 + r() * 0.5);
+          else if (p < 0.05) put(art.bushes[Math.floor(r() * art.bushes.length)], u, v, 0.7 + r() * 0.5);
           else if (p < 0.065) put(art.boulder, u, v, 0.6 + r() * 0.5);
         }
       }
