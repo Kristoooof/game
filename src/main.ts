@@ -157,9 +157,9 @@ const waterTransform = new Matrix();
 // window at full screen resolution every frame, whatever the game's own resolution.
 const vignetteCanvas = Object.assign(document.createElement('canvas'), { width: 256, height: 256 });
 const vctx = vignetteCanvas.getContext('2d')!;
-const vg = vctx.createRadialGradient(128, 128, 70, 128, 128, 181);
+const vg = vctx.createRadialGradient(128, 128, 100, 128, 128, 181);
 vg.addColorStop(0, 'rgba(5,15,30,0)');
-vg.addColorStop(1, 'rgba(5,15,30,0.45)');
+vg.addColorStop(1, 'rgba(5,15,30,0.2)');
 vctx.fillStyle = vg;
 vctx.fillRect(0, 0, 256, 256);
 const vignette = new Sprite({ texture: Texture.from(vignetteCanvas), eventMode: 'none' });
@@ -228,7 +228,8 @@ app.ticker.add((t) => {
   terrain.lights.visible = day.night > 0.01;
   terrain.setSun(day.step);
   sunlight.tint = hex(day.sun);
-  sunlight.alpha = day.sunStrength;
+  // A low sun rakes in stronger and warmer from the upper left.
+  sunlight.alpha = day.sunStrength * (1 + 1.4 * ((0.8 - day.sun[2]) / 0.45));
   sunlight.visible = day.sunStrength > 0.01;
   // The moon's glitter column stays at a fixed place on screen, like the real one as you move.
   terrain.light(

@@ -397,7 +397,7 @@ export function createTerrain(world: World, renderer: Renderer) {
 
     const o = new Container({ sortableChildren: true });
     const refl = new Container({ sortableChildren: true });
-    const lights = new Graphics();
+    const lights = new Container({ children: [new Graphics()] });
     setSun(shade);
     addNature(chunkTiles(c), o, refl, far);
     for (const b of world.buildings.values()) {
@@ -437,7 +437,7 @@ export function createTerrain(world: World, renderer: Renderer) {
     const lit = renderTrimmed(new Container({ children: [lights] }), tier);
     o.destroy({ children: true });
     refl.destroy({ children: true });
-    lights.destroy();
+    lights.destroy({ children: true });
 
     swap(c.groundMesh, groundTex);
     swap(c.objectSprite, obj.texture, obj.rect);

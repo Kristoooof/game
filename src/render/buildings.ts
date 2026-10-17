@@ -1,4 +1,4 @@
-import { Graphics, Matrix, Texture } from 'pixi.js';
+import { type Container, Graphics, Matrix, Sprite, Texture } from 'pixi.js';
 import { BUILDINGS, type BuildingId } from '../data/buildings';
 import { type GameMap, terrainAt } from '../sim/map';
 import type { World } from '../sim/world';
@@ -124,9 +124,43 @@ const overlayQuad = (g: Graphics, q: number[][], tex: Texture, texel: number) =>
 /** Random seeded per building, so the same building always looks the same. */
 let rnd: () => number = Math.random;
 
-/** Night lights (lit window glass, lanterns) are also drawn here when set; shown additively after dark. */
+/**
+ * Night lights (lit window glass, lanterns) also go here when set, shown additively after dark:
+ * shapes into its first child, a Graphics, and soft pools of light as sprites beside it.
+ */
+let glowLayer: Container | null = null;
 let glow: Graphics | null = null;
-export const setGlow = (g: Graphics | null) => (glow = g);
+export const setGlow = (c: Container | null) => {
+  glowLayer = c;
+  glow = c ? (c.children[0] as Graphics) : null;
+};
+/** A soft round falloff, white: tinted and stretched into each pool of light. Painted once. */
+let poolTexture: Texture | null = null;
+/** A smooth pool of light centred on (x, y), rx × ry: no rings, unlike stacked shapes. */
+function pool(x: number, y: number, rx: number, ry: number, color: number, alpha: number) {
+  if (!glowLayer) return;
+  if (!poolTexture) {
+    const c = Object.assign(document.createElement('canvas'), { width: 128, height: 128 });
+    const ctx = c.getContext('2d')!;
+    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    for (const [t, a] of [
+      [0, 1],
+      [0.2, 0.78],
+      [0.4, 0.45],
+      [0.6, 0.2],
+      [0.8, 0.06],
+      [1, 0],
+    ])
+      g.addColorStop(t, `rgba(255,255,255,${a})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    poolTexture = Texture.from(c);
+  }
+  const s = new Sprite({ texture: poolTexture, anchor: 0.5, tint: color, alpha });
+  s.position.set(x, y);
+  s.setSize(rx * 2, ry * 2);
+  glowLayer.addChild(s);
+}
 /** Sun for cast shadows: screen offset per pixel of height, and opacity (see daylight.ts). */
 let sun = { dx: 0.4, dy: 0.17, alpha: 1 };
 export const setSun = (s: typeof sun) => (sun = s);
@@ -137,21 +171,19 @@ function lit(pts: number[][]) {
   const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length;
   const cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
   if (Math.abs(Math.floor(cx * 7 + cy * 13)) % 5 === 0) return;
-  // A soft halo in rings, and light spilling onto the ground below the window.
-  for (let k = 1; k <= 6; k++) glow.ellipse(cx, cy + 15, 4 * k, 1.7 * k).fill({ color: 0xff9a30, alpha: 0.03 });
-  glow.circle(cx, cy, 16).fill({ color: 0xff9a30, alpha: 0.05 });
-  glow.circle(cx, cy, 10).fill({ color: 0xff9a30, alpha: 0.08 });
-  glow.circle(cx, cy, 5.5).fill({ color: 0xffb040, alpha: 0.16 });
+  // A soft halo, and light spilling onto the ground below the window.
+  pool(cx, cy + 15, 26, 10, 0xff9a30, 0.32);
+  pool(cx, cy, 18, 18, 0xff9a30, 0.3);
+  pool(cx, cy, 7, 7, 0xffb040, 0.35);
   glow.poly(pts.flat()).fill(0xffc45a);
 }
 /** Small lantern at screen point (x, y): iron housing by day, a warm light with a pool on the ground by night. */
 function lantern(g: Graphics, x: number, y: number, ground: number) {
   g.rect(x - 1, y - 1.6, 2, 3).fill(0x2a2420);
   if (!glow) return;
-  for (let k = 1; k <= 7; k++) glow.ellipse(x, ground, 4.5 * k, 1.8 * k).fill({ color: 0xffa040, alpha: 0.035 });
-  glow.circle(x, y, 14).fill({ color: 0xff9a30, alpha: 0.06 });
-  glow.circle(x, y, 8).fill({ color: 0xff9a30, alpha: 0.14 });
-  glow.circle(x, y, 3.5).fill({ color: 0xffc860, alpha: 0.35 });
+  pool(x, ground, 34, 13, 0xffa040, 0.42);
+  pool(x, y, 15, 15, 0xff9a30, 0.4);
+  pool(x, y, 5, 5, 0xffc860, 0.6);
   glow.rect(x - 0.7, y - 1.1, 1.4, 2).fill(0xffe0a0);
 }
 
