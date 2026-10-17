@@ -419,8 +419,8 @@ void main() {
   col *= (1.0 - 0.42 * min(fall, 1.0)) * (1.0 - 0.18 * foot);
   // The mountain ranges' shadow, falling away from the sun over the land beside them.
   float peakShade = 0.0;
-  for (int k = 1; k <= 12; k++) {
-    float t = float(k) * 0.5;
+  for (int k = 1; k <= 16; k++) {
+    float t = float(k) * 0.6;
     float ph = smp(uMarks, p - vec2(t, t * 0.25)).r * ${TOP.toFixed(1)};
     peakShade = max(peakShade, smoothstep(0.0, 14.0, ph - t * 24.0));
   }

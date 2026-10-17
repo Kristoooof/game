@@ -18,7 +18,7 @@ import type { World } from '../sim/world';
 import { drawBuilding, drawLampPost, drawPier, drawRoads, lampPosts, pierBox, setGlow, setSun } from './buildings';
 import { sunShadow } from './daylight';
 import { createGround } from './ground';
-import { createMassif } from './massif';
+import { createMassif, TOP } from './massif';
 import { groundToScreen, LEVEL_H, MAX_LEVEL, tileToScreen } from './iso';
 import { type Art, makeArt, sprite } from './textures';
 
@@ -225,7 +225,7 @@ export function createTerrain(world: World, renderer: Renderer) {
         // The range itself (see massif.ts), and boulders in screes on the low ground at its edge.
         const g = massif.piece(x, y);
         if (g) {
-          const m = new Graphics(g);
+          const m = new Mesh({ geometry: g, shader: massif.shader });
           m.zIndex = depthBeside(x + 0.5, y + 0.5, x + y + 1);
           into.addChild(m);
         }
@@ -318,7 +318,8 @@ export function createTerrain(world: World, renderer: Renderer) {
           right - left + 32,
           bottom - top + 32 + MAX_LEVEL * LEVEL_H,
         ),
-        objects: new Rectangle(left - 80, top - 180, right - left + 160, bottom - top + 204),
+        // Mountains rise up to TOP above their (raised) ground.
+        objects: new Rectangle(left - 80, top - TOP - 70, right - left + 160, bottom - top + TOP + 94),
         groundMesh: diamondMesh(
           x0,
           y0,

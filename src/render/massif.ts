@@ -1,37 +1,85 @@
-import { GraphicsContext } from 'pixi.js';
+import { Geometry, Shader } from 'pixi.js';
 import { type GameMap, levelAt } from '../sim/map';
 import { LEVEL_H, tileToScreen } from './iso';
-import { fbm2, hexRGB, mix, noise2, type RGB, smooth } from './sculpt';
+import { fbm2, noise2, smooth } from './sculpt';
 
-/** Facets per tile side. */
-const R = 3;
+/** Mesh cells per tile side. */
+const R = 4;
 /** Ranges that never rise this high (px) are left flat. */
-const MIN_RANGE = 30;
+const MIN_RANGE = 45;
 /** Height of the tallest summits, px. */
-export const TOP = 130;
-/** Ground pixels per tile, to weigh heights against distances when lighting a facet. */
+export const TOP = 230;
+/** Ground pixels per tile, to weigh heights against distances for the slope. */
 const RUN = 45;
-/** Sun from the upper left and above, in ground space (tile x, tile y, up). */
-const SUN = (() => {
-  const v = [-0.72, -0.2, 0.66];
-  const l = Math.hypot(...v);
-  return v.map((k) => k / l);
-})();
 
-/** Rock from deep shade to full sun, then snow in shade and sun, and the scree of the highland floor. */
-const RAMP = ['#646371', '#8a8a97', '#ad9f85', '#d6c8ab', '#ece2c8'].map(hexRGB);
-const SNOW = [hexRGB('#b9c4da'), hexRGB('#f4f6f8')];
-const SCREE = hexRGB('#aaa18c');
-const ramp = (t: number): RGB => {
-  const k = Math.min(RAMP.length - 1.001, Math.max(0, t * (RAMP.length - 1)));
-  const i = Math.floor(k);
-  return mix(RAMP[i], RAMP[i + 1], k - i);
-};
-const hex = ([r, g, b]: RGB) => (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
+const vertex = /* glsl */ `
+in vec2 aPosition;
+in vec2 aGround;
+in vec3 aNormal;
+in float aHeight;
+out vec2 vPos;
+out vec2 vGround;
+out vec3 vNormal;
+out float vH;
+uniform mat3 uProjectionMatrix;
+uniform mat3 uWorldTransformMatrix;
+uniform mat3 uTransformMatrix;
+void main() {
+  mat3 mvp = uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix;
+  gl_Position = vec4((mvp * vec3(aPosition, 1.0)).xy, 0.0, 1.0);
+  vPos = aPosition;
+  vGround = aGround;
+  vNormal = aNormal;
+  vH = aHeight;
+}`;
+
+/*
+ * Painted rock: the light falls into four tones with soft brushed edges between them (no smooth
+ * render, no facets), stone mottled at two scales, strokes running down the steep faces, snow
+ * where the slope is high and gentle enough to hold it, and a dark line where the surface turns
+ * away from the eye: the ridges and the silhouette are inked.
+ */
+const fragment = /* glsl */ `
+in vec2 vPos;
+in vec2 vGround;
+in vec3 vNormal;
+in float vH;
+out vec4 finalColor;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0)), f.x), f.y);
+}
+void main() {
+  vec3 n = normalize(vNormal);
+  float up = n.z;
+  float paint = vnoise(vGround * 2.3) * 0.6 + vnoise(vGround * 5.1) * 0.4;
+  float l = (dot(n, normalize(vec3(-0.72, -0.2, 0.66))) + 0.12) * 1.3 + (paint - 0.5) * 0.2;
+  float t = clamp(l, 0.0, 0.999) * 3.0;
+  float band = (floor(t) + smoothstep(0.8, 1.0, fract(t))) / 3.0;
+  vec3 c0 = vec3(0.38, 0.37, 0.43), c1 = vec3(0.55, 0.52, 0.54), c2 = vec3(0.74, 0.66, 0.53), c3 = vec3(0.9, 0.83, 0.68);
+  vec3 col = band < 0.334 ? mix(c0, c1, band * 3.0) : band < 0.667 ? mix(c1, c2, band * 3.0 - 1.0) : mix(c2, c3, band * 3.0 - 2.0);
+  col *= 0.92 + 0.16 * paint;
+  // Strokes down the fall line of the steep faces: gullies and scree runs.
+  float fall = vnoise(vec2(vPos.x * 0.45, vPos.y * 0.035 + vGround.x * 3.0));
+  col *= 1.0 - 0.16 * smoothstep(0.6, 0.85, fall) * smoothstep(0.85, 0.45, up);
+  // Snow above a ragged line, where the slope is gentle enough to hold it.
+  float line = ${(TOP * 0.45).toFixed(1)} + (vnoise(vGround * 0.8) - 0.5) * 44.0;
+  float snow = smoothstep(line - 4.0, line + 4.0, vH) * smoothstep(0.32, 0.5, up + (paint - 0.5) * 0.2);
+  col = mix(col, mix(vec3(0.68, 0.74, 0.86), vec3(0.96, 0.97, 0.98), smoothstep(0.3, 0.5, band)), snow);
+  // Ink where the surface turns away from the eye.
+  float face = dot(n, normalize(vec3(45.0, 45.0, 32.0)));
+  col = mix(col, c0 * 0.55, (1.0 - smoothstep(0.03, 0.2, face)) * 0.75);
+  // Scree at the foot, fading into the ground.
+  col = mix(vec3(0.667, 0.631, 0.549), col, smoothstep(1.0, 20.0, vH));
+  float a = smoothstep(0.5, 7.0, vH);
+  finalColor = vec4(col * a, a);
+}`;
 
 /**
  * Mountain ranges as one landscape each: a height field over all the mountain tiles, rising from
- * the edge of the range to ridges and summits inside, painted as flat-lit facets. Cut up per tile
+ * the edge of the range to ridges and summits inside, painted by the shader above. Cut up per tile
  * so each piece sorts in depth with the trees and people around it.
  */
 export function createMassif(map: GameMap) {
@@ -75,92 +123,76 @@ export function createMassif(map: GameMap) {
     // The foot wanders off the tile grid, and the first tiles rise gently: foothills, not a wall.
     const e = depthAt(gx, gy) - 0.8 + (noise2(gx * 0.9, gy * 0.9, 76) - 0.5) * 0.9;
     if (e <= 0) return 0;
-    const env = smooth(0, 1.8, e) ** 1.4 * 0.35 + (1 - Math.exp(-e / 2.6)) * 0.65;
-    const ridge = 1 - Math.abs(fbm2(gx * 0.32, gy * 0.32, 77) * 2 - 1);
+    const env = smooth(0, 2.2, e) ** 1.6 * 0.3 + (1 - Math.exp(-e / 3.2)) * 0.7;
+    // Ridged noise, sharpened: knife-edge crests and deep gullies between them.
+    const ridge = 1 - Math.abs(fbm2(gx * 0.3, gy * 0.3, 77) * 2 - 1);
     // Broad swells: some stretches of a range carry its great summits, others only lower ridges.
-    const swell = 0.7 + 0.55 * fbm2(gx * 0.11, gy * 0.11, 79);
-    const h = TOP * env * swell * (0.35 + 0.75 * ridge ** 1.6) + 5 * env * noise2(gx * 1.4, gy * 1.4, 78);
+    const swell = 0.6 + 0.6 * fbm2(gx * 0.1, gy * 0.1, 79);
+    const h = TOP * env * swell * (0.2 + 0.95 * ridge ** 2.2) + 6 * env * noise2(gx * 1.4, gy * 1.4, 78);
     return Math.min(TOP, h);
   };
 
   /** Highest point of each tile, px: for the shadow the ranges cast on the land. */
   const peaks = new Float32Array(W * H);
-  const pieces = new Map<number, GraphicsContext | null>();
+  const pieces = new Map<number, Geometry | null>();
+  const shader = Shader.from({ gl: { vertex, fragment, name: 'massif' }, resources: {} });
 
-  /** The facets of the range standing on tile (x, y), or null if none rises there. */
+  /** The mesh of the range standing on tile (x, y), or null if none rises there. */
   function piece(x: number, y: number) {
     const i = y * W + x;
     if (pieces.has(i)) return pieces.get(i)!;
-    let ctx: GraphicsContext | null = null;
+    let mesh: Geometry | null = null;
     if (tiles[i] === 'mountain') {
       const lift = levelAt(map, x, y) * LEVEL_H;
       const N = R + 1;
-      const vs = Array.from({ length: N * N }, (_, k) => {
-        // Corners shifted a little off the grid (the same shift seen from every tile sharing them),
-        // so the facets do not line up in rows.
+      const pos: number[] = [];
+      const ground: number[] = [];
+      const normal: number[] = [];
+      const heights: number[] = [];
+      for (let k = 0; k < N * N; k++) {
+        // Corners shifted a little off the grid (the same shift seen from every tile sharing them).
         const [a, b] = [x * R + (k % N), y * R + Math.floor(k / N)];
         const [gx, gy] = [
-          (a + (noise2(a * 7.3, b * 3.1, 82) - 0.5) * 0.5) / R,
-          (b + (noise2(a * 3.7, b * 7.9, 83) - 0.5) * 0.5) / R,
+          (a + (noise2(a * 7.3, b * 3.1, 82) - 0.5) * 0.3) / R,
+          (b + (noise2(a * 3.7, b * 7.9, 83) - 0.5) * 0.3) / R,
         ];
         const h = height(gx, gy);
         const s = tileToScreen(gx, gy);
-        return { gx, gy, h, sx: s.x, sy: s.y - lift - h };
-      });
-      if (vs.some((v) => v.h > 3)) {
-        ctx = new GraphicsContext();
-        const tri = (p: (typeof vs)[0], q: (typeof vs)[0], r: (typeof vs)[0]) => {
-          const avg = (p.h + q.h + r.h) / 3;
-          if (Math.max(p.h, q.h, r.h) < 0.5) return;
-          const a = [(q.gx - p.gx) * RUN, (q.gy - p.gy) * RUN, q.h - p.h];
-          const b = [(r.gx - p.gx) * RUN, (r.gy - p.gy) * RUN, r.h - p.h];
-          let n = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-          if (n[2] < 0) n = n.map((k) => -k);
-          const l = Math.hypot(n[0], n[1], n[2]);
-          const up = n[2] / l;
-          const sun = Math.max(0, (n[0] * SUN[0] + n[1] * SUN[1] + n[2] * SUN[2]) / l);
-          const [cx, cy] = [(p.gx + q.gx + r.gx) / 3, (p.gy + q.gy + r.gy) / 3];
-          // A touch of unevenness, as if each facet were a separate brush stroke.
-          // Light in a few flat tones, like paint laid on in planes, not a smooth render.
-          const raw = (sun - 0.12) * 1.35 + (noise2(cx * 1.3, cy * 1.3, 81) - 0.5) * 0.1;
-          const light = Math.min(1, Math.max(0, Math.round(raw * 6) / 6));
-          let rgb = ramp(light);
-          const snowLine = TOP * 0.7 + 18 * (noise2(cx * 0.6, cy * 0.6, 80) - 0.5);
-          if (avg > snowLine && up > 0.5) rgb = mix(SNOW[0], SNOW[1], light > 0.5 ? 1 : 0.15);
-          rgb = mix(SCREE, rgb, smooth(1, 20, avg));
-          const c = hex(rgb);
-          // Stroked in its own colour too, so no hairline gaps open between facets.
-          // The lowest facets fade into the ground; the rest are stroked in their own colour too, so
-          // no hairline gaps open between them.
-          const fade = smooth(0.5, 6, avg);
-          ctx!.poly([p.sx, p.sy, q.sx, q.sy, r.sx, r.sy]).fill({ color: c, alpha: fade });
-          if (fade >= 1) ctx!.stroke({ width: 0.6, color: c });
-          // A brush stroke down the slope, a shade darker (snow: a shade bluer): gullies and scree runs.
-          if (avg > 8 && up < 0.9 && noise2(cx * 5.3, cy * 5.3, 84) > 0.45) {
-            const low = [p, q, r].reduce((m, v) => (v.h < m.h ? v : m));
-            const [mx, my] = [(p.sx + q.sx + r.sx) / 3, (p.sy + q.sy + r.sy) / 3];
-            const tone = hex(mix(rgb, [70, 72, 92], 0.22));
-            ctx!
-              .moveTo(mx + (mx - low.sx) * 0.3, my + (my - low.sy) * 0.3)
-              .lineTo(mx + (low.sx - mx) * 0.75, my + (low.sy - my) * 0.75)
-              .stroke({ width: 0.9, color: tone, cap: 'round' });
-          }
-        };
+        // A smooth normal from the height field around the corner, shared by its neighbours.
+        const e = 0.5 / R;
+        const nx = -(height(gx + e, gy) - height(gx - e, gy)) / (2 * e * RUN);
+        const ny = -(height(gx, gy + e) - height(gx, gy - e)) / (2 * e * RUN);
+        pos.push(s.x, s.y - lift - h);
+        ground.push(gx, gy);
+        normal.push(nx, ny, 1);
+        heights.push(h);
+      }
+      if (heights.some((h) => h > 3)) {
         // Back to front: cells by depth, the back triangle of each before the front one.
+        const index: number[] = [];
         for (let s = 0; s <= 2 * (R - 1); s++)
           for (let a = Math.max(0, s - R + 1); a <= Math.min(s, R - 1); a++) {
-            const bb = s - a;
-            const A = vs[bb * N + a];
-            const B = vs[bb * N + a + 1];
-            const C = vs[(bb + 1) * N + a + 1];
-            const Dv = vs[(bb + 1) * N + a];
-            tri(A, B, Dv);
-            tri(B, C, Dv);
+            const b = s - a;
+            const [A, B, C, D] = [b * N + a, b * N + a + 1, (b + 1) * N + a + 1, (b + 1) * N + a];
+            for (const tri of [
+              [A, B, D],
+              [B, C, D],
+            ])
+              if (Math.max(...tri.map((v) => heights[v])) > 0.5) index.push(...tri);
           }
+        mesh = new Geometry({
+          attributes: {
+            aPosition: { buffer: new Float32Array(pos), format: 'float32x2' },
+            aGround: { buffer: new Float32Array(ground), format: 'float32x2' },
+            aNormal: { buffer: new Float32Array(normal), format: 'float32x3' },
+            aHeight: { buffer: new Float32Array(heights), format: 'float32' },
+          },
+          indexBuffer: new Uint32Array(index),
+        });
       }
     }
-    pieces.set(i, ctx);
-    return ctx;
+    pieces.set(i, mesh);
+    return mesh;
   }
 
   for (let y = 0; y < H; y++)
@@ -189,5 +221,5 @@ export function createMassif(map: GameMap) {
     }
   }
 
-  return { piece, peaks };
+  return { piece, peaks, shader };
 }
