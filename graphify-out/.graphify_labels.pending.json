@@ -22,9 +22,8 @@
   "20": "settings.ts",
   "21": "textures.ts",
   "22": "showPreview",
-  "23": "atmosphere.ts",
-  "24": "say",
+  "23": "life.ts",
+  "24": "data/buildings.ts",
   "25": "daylight.ts",
-  "26": "refresh",
-  "27": "applySettings"
+  "26": "refresh"
 }

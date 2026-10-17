@@ -137,7 +137,10 @@ function lit(pts: number[][]) {
   const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length;
   const cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
   if (Math.abs(Math.floor(cx * 7 + cy * 13)) % 5 === 0) return;
-  glow.circle(cx, cy, 10).fill({ color: 0xff9a30, alpha: 0.1 });
+  // A soft halo in rings, and light spilling onto the ground below the window.
+  for (let k = 1; k <= 6; k++) glow.ellipse(cx, cy + 15, 4 * k, 1.7 * k).fill({ color: 0xff9a30, alpha: 0.03 });
+  glow.circle(cx, cy, 16).fill({ color: 0xff9a30, alpha: 0.05 });
+  glow.circle(cx, cy, 10).fill({ color: 0xff9a30, alpha: 0.08 });
   glow.circle(cx, cy, 5.5).fill({ color: 0xffb040, alpha: 0.16 });
   glow.poly(pts.flat()).fill(0xffc45a);
 }
@@ -145,7 +148,8 @@ function lit(pts: number[][]) {
 function lantern(g: Graphics, x: number, y: number, ground: number) {
   g.rect(x - 1, y - 1.6, 2, 3).fill(0x2a2420);
   if (!glow) return;
-  glow.ellipse(x, ground, 9, 4).fill({ color: 0xffa040, alpha: 0.12 });
+  for (let k = 1; k <= 7; k++) glow.ellipse(x, ground, 4.5 * k, 1.8 * k).fill({ color: 0xffa040, alpha: 0.035 });
+  glow.circle(x, y, 14).fill({ color: 0xff9a30, alpha: 0.06 });
   glow.circle(x, y, 8).fill({ color: 0xff9a30, alpha: 0.14 });
   glow.circle(x, y, 3.5).fill({ color: 0xffc860, alpha: 0.35 });
   glow.rect(x - 0.7, y - 1.1, 1.4, 2).fill(0xffe0a0);
@@ -329,6 +333,16 @@ function shadow(g: Graphics, x: number, y: number, size: number, height = 26) {
     hull([...foot, ...foot.map(([px, py]) => [px + sun.dx * height * k, py + sun.dy * height * k])]);
   g.poly(swept(1).flat()).fill({ color: 0x0a1a10, alpha: 0.1 * sun.alpha });
   g.poly(swept(0.6).flat()).fill({ color: 0x0a1a10, alpha: 0.12 * sun.alpha });
+  // Contact shade: the ground darkens right against the walls, whatever the sun.
+  for (const e of [0.22, 0.14, 0.07]) {
+    const q = [
+      P(x - e, y - e, 0),
+      P(x + size + e, y - e, 0),
+      P(x + size + e, y + size + e, 0),
+      P(x - e, y + size + e, 0),
+    ];
+    g.poly(q.flat()).fill({ color: 0x0a1a10, alpha: 0.07 });
+  }
 }
 
 const WALL_COLORS = [0xece0c4, 0xd9b38c, 0xa9c4c9, 0xc9d6b0, 0xe6d5b8, 0xd8c0c8];
@@ -917,6 +931,30 @@ export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.widt
       });
     }
   }
+}
+
+/** Road tiles in [x0, x1) × [y0, y1) with a lamp post on the verge: every few, never on a bridge. */
+export function lampPosts(w: World, x0: number, y0: number, x1: number, y1: number) {
+  const posts: [number, number][] = [];
+  for (let y = y0; y < y1; y++)
+    for (let x = x0; x < x1; x++) {
+      const i = y * w.map.width + x;
+      if (w.buildings.get(w.occupied[i])?.type === 'road' && (x * 73 + y * 151) % 5 === 0 && w.map.tiles[i] !== 'river')
+        posts.push([x, y]);
+    }
+  return posts;
+}
+
+/** Lamp post on the verge of road tile (x, y), its lantern lit after dark. */
+export function drawLampPost(g: Graphics, x: number, y: number) {
+  const f = groundToScreen(x + 0.85, y + 0.15);
+  g.moveTo(f.x, f.y)
+    .lineTo(f.x, f.y - 15)
+    .stroke({ width: 1.3, color: 0x2a2420 });
+  g.moveTo(f.x, f.y - 15)
+    .lineTo(f.x + 2.5, f.y - 15)
+    .stroke({ width: 0.9, color: 0x2a2420 });
+  lantern(g, f.x + 2.5, f.y - 13.5, f.y);
 }
 
 /** Light grid over the land the player may build on. */

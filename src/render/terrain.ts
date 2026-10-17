@@ -15,7 +15,7 @@ import { levelAt, terrainAt } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
 import { noise2 } from './sculpt';
 import type { World } from '../sim/world';
-import { drawBuilding, drawPier, drawRoads, pierBox, setGlow, setSun } from './buildings';
+import { drawBuilding, drawLampPost, drawPier, drawRoads, lampPosts, pierBox, setGlow, setSun } from './buildings';
 import { sunShadow } from './daylight';
 import { createGround } from './ground';
 import { createMassif } from './massif';
@@ -415,6 +415,13 @@ export function createTerrain(world: World, renderer: Renderer) {
       refl.addChild(draw(true));
       if (pier) refl.addChild(drawP(true));
     }
+    setGlow(lights);
+    for (const [x, y] of lampPosts(world, c.x0, c.y0, c.x1, c.y1)) {
+      const pg = new Graphics({ zIndex: x + y + 1 });
+      drawLampPost(pg, x, y);
+      o.addChild(pg);
+    }
+    setGlow(null);
     const obj = renderTrimmed(o, tier);
     const mir = renderTrimmed(refl, tier);
     const lit = renderTrimmed(new Container({ children: [lights] }), tier);
