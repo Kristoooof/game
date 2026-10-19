@@ -1,7 +1,7 @@
-# Graph Report - game  (2026-10-17)
+# Graph Report - game  (2026-10-19)
 
 ## Corpus Check
-- 48 files · ~52,216 words
+- 48 files · ~52,506 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `9db17e10`
+- Built from commit: `4c6183d6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 

@@ -197,8 +197,11 @@ export function createTerrain(world: World, renderer: Renderer) {
         if (!reflections) return;
         // Cast shadow: the silhouette laid flat along the sun's direction.
         const sh = sprite(a, s.x, s.y, scale);
+        sh.texture = a.bare;
         const k = sh.scale.x;
-        sh.setFromMatrix(new Matrix(k, 0, -shade.dx * k, -shade.dy * k, s.x, s.y));
+        // Never laid so flat that it thins into a line.
+        const dy = Math.sign(shade.dy || 1) * Math.max(Math.abs(shade.dy), 0.28);
+        sh.setFromMatrix(new Matrix(k, 0, -shade.dx * k, -dy * k, s.x, s.y));
         sh.tint = 0x0a1a10;
         sh.alpha = 0.22 * shade.alpha;
         sh.zIndex = sp.zIndex - 0.5;

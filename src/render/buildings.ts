@@ -381,10 +381,11 @@ function hull(pts: number[][]) {
 /** Soft cast shadow of a footprint `height` px tall: the footprint swept along the sun's direction. */
 function shadow(g: Graphics, x: number, y: number, size: number, height = 26) {
   const foot = [P(x, y, 0), P(x + size, y, 0), P(x + size, y + size, 0), P(x, y + size, 0)];
+  // A long low-sun shadow is kept within reach, and its edge is soft: four ever shorter sweeps.
+  const reach = Math.min(1, 1.1 / Math.hypot(sun.dx, sun.dy));
   const swept = (k: number) =>
-    hull([...foot, ...foot.map(([px, py]) => [px + sun.dx * height * k, py + sun.dy * height * k])]);
-  g.poly(swept(1).flat()).fill({ color: 0x0a1a10, alpha: 0.1 * sun.alpha });
-  g.poly(swept(0.6).flat()).fill({ color: 0x0a1a10, alpha: 0.12 * sun.alpha });
+    hull([...foot, ...foot.map(([px, py]) => [px + sun.dx * height * k * reach, py + sun.dy * height * k * reach])]);
+  for (const k of [1, 0.8, 0.6, 0.4]) g.poly(swept(k).flat()).fill({ color: 0x0a1a10, alpha: 0.055 * sun.alpha });
   // Contact shade: the ground darkens right against the walls, whatever the sun.
   for (const e of [0.22, 0.14, 0.07]) {
     const q = [

@@ -7,6 +7,8 @@ const S = 4;
 
 export interface Art {
   texture: Texture;
+  /** The same without the contact shadow painted under it: what a cast shadow is made from. */
+  bare: Texture;
   ax: number;
   ay: number;
 }
@@ -15,13 +17,21 @@ type Ctx = CanvasRenderingContext2D;
 
 /** Paint a w×h world-pixel texture whose anchor (origin in the world) is at (ax, ay). */
 function paint(w: number, h: number, ax: number, ay: number, draw: (c: Ctx) => void): Art {
-  const canvas = document.createElement('canvas');
-  canvas.width = w * S;
-  canvas.height = h * S;
-  const c = canvas.getContext('2d')!;
-  c.scale(S, S);
-  draw(c);
-  return { texture: Texture.from(canvas), ax: ax / w, ay: ay / h };
+  const layer = () => {
+    const canvas = Object.assign(document.createElement('canvas'), { width: w * S, height: h * S });
+    const c = canvas.getContext('2d')!;
+    c.scale(S, S);
+    return { canvas, c };
+  };
+  // Contact shadows go on a layer of their own underneath, so a bare copy can leave them out.
+  const body = layer();
+  const ground = layer();
+  under = ground.c;
+  draw(body.c);
+  under = null;
+  ground.c.setTransform(1, 0, 0, 1, 0, 0);
+  ground.c.drawImage(body.canvas, 0, 0);
+  return { texture: Texture.from(ground.canvas), bare: Texture.from(body.canvas), ax: ax / w, ay: ay / h };
 }
 
 export function sprite(art: Art, x: number, y: number, scale = 1) {
@@ -33,7 +43,10 @@ export function sprite(art: Art, x: number, y: number, scale = 1) {
 }
 
 /** Soft contact shadow, cast towards the lower right (the sun is upper left, as in buildings.ts). */
-const shadow = (c: Ctx, x: number, y: number, rx: number, ry: number) => {
+/** Where `shadow` paints while `paint` runs: the layer under the body. */
+let under: Ctx | null = null;
+const shadow = (body: Ctx, x: number, y: number, rx: number, ry: number) => {
+  const c = under ?? body;
   const cx = x + rx * 0.3;
   for (const [k, alpha] of [
     [1, 0.07],
@@ -181,37 +194,46 @@ const broadleaf = (seed: number, palette: string[], kind: Kind = 'oak') => {
       const d = Math.sqrt(r());
       balls.push([22 + Math.cos(a) * d * k.rx, k.cy + Math.sin(a) * d * k.ry, k.rad + r() * k.rad * 0.85]);
     }
-    if (kind === 'willow')
-      for (let i = 0; i < 8; i++) {
-        let x = 22 + (i / 7 - 0.5) * k.rx * 2.1;
-        for (let j = 0; j < 4; j++) {
-          x += (r() - 0.5) * 0.8;
-          balls.push([x, k.cy + k.ry * 0.5 + j * 3.4, 2.4 - j * 0.3]);
-        }
-      }
     const crown = balls
       .filter((_, i) => i % 7 !== 3)
       .map(([x, y, rad]) => [x, y, rad, (1 - Math.hypot((x - 22) / k.rx, (y - k.cy) / k.ry) * 0.7) * 9]);
     litCrown(c, S, crown, palette, seed);
-    // A gap low in the crown, off to one side (two side by side read as eyes): dark inside, a
-    // bough crossing it.
-    if (kind !== 'birch')
-      for (let i = 0; i < 1; i++) {
-        const hx = 22 + (r() < 0.5 ? -1 : 1) * (0.3 + r() * 0.3) * k.rx;
-        const hy = k.cy + k.ry * (0.25 + r() * 0.3);
-        c.save();
-        c.beginPath();
-        c.ellipse(hx, hy, 1.6 + r() * 0.8, 1.1 + r() * 0.4, 0, 0, Math.PI * 2);
-        c.clip();
-        c.fillStyle = 'rgba(14,26,10,0.55)';
-        c.fillRect(hx - 4, hy - 3, 8, 6);
-        c.strokeStyle = k.bark[1];
-        c.lineWidth = 1;
-        c.beginPath();
-        c.moveTo(hx - 3, hy + 2);
-        c.lineTo(hx + 3, hy - 1.5);
-        c.stroke();
-        c.restore();
+    // Now and then a bite out of the crown's lower rim, open to the air, a bough across it.
+    if (kind !== 'birch' && r() < 0.3) {
+      const hx = 22 + (r() < 0.5 ? -1 : 1) * (0.25 + r() * 0.35) * k.rx;
+      const hy = k.cy + k.ry * 0.85;
+      const [ex, ey] = [2.2 + r(), 1.6 + r() * 0.6];
+      c.save();
+      c.globalCompositeOperation = 'destination-out';
+      c.beginPath();
+      c.ellipse(hx, hy, ex, ey, 0, 0, Math.PI * 2);
+      c.fill();
+      c.restore();
+      c.strokeStyle = k.bark[1];
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(hx - ex * 0.8, hy + ey * 0.4);
+      c.lineTo(hx + ex * 0.8, hy - ey * 0.5);
+      c.stroke();
+    }
+    // A willow's curtains: switches hanging from the crown's rim, thinning to their tips.
+    if (kind === 'willow')
+      for (let i = 0; i < 9; i++) {
+        const x = 22 + (i / 8 - 0.5) * k.rx * 2;
+        const y = k.cy + k.ry * (0.55 - Math.abs(i / 8 - 0.5) * 0.5);
+        const len = 9 + r() * 6;
+        const bend = (i / 8 - 0.5) * 3;
+        for (const [width, color, dx] of [
+          [1.8, palette[0], 0],
+          [0.9, palette[2], -0.4],
+        ] as const) {
+          c.strokeStyle = color;
+          c.lineWidth = width;
+          c.beginPath();
+          c.moveTo(x + dx, y);
+          c.quadraticCurveTo(x + bend + dx, y + len * 0.5, x + bend * 1.4 + dx, y + len);
+          c.stroke();
+        }
       }
     if (kind === 'fruit')
       for (let i = 0; i < 9; i++) {

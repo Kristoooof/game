@@ -60,7 +60,7 @@ void main() {
   // Crisp edges between the tones, softened just enough not to step: sharp paint, not a blur.
   float band = (floor(t) + smoothstep(0.93, 1.0, fract(t))) / 3.0;
   // Cold granite; warmth only where the sun strikes full.
-  vec3 c0 = vec3(0.3, 0.31, 0.37), c1 = vec3(0.48, 0.48, 0.52), c2 = vec3(0.66, 0.63, 0.58), c3 = vec3(0.86, 0.82, 0.74);
+  vec3 c0 = vec3(0.3, 0.31, 0.37), c1 = vec3(0.48, 0.48, 0.52), c2 = vec3(0.6, 0.61, 0.63), c3 = vec3(0.8, 0.79, 0.76);
   vec3 col = band < 0.334 ? mix(c0, c1, band * 3.0) : band < 0.667 ? mix(c1, c2, band * 3.0 - 1.0) : mix(c2, c3, band * 3.0 - 2.0);
   col *= 0.92 + 0.16 * paint;
   // Strokes down the fall line of the steep faces: gullies and scree runs.
@@ -71,7 +71,7 @@ void main() {
   col *= 1.0 - (0.16 * smoothstep(0.6, 0.85, fall) + 0.08 * smoothstep(0.65, 0.9, fine)) * steep;
   // Snow above a ragged line, where the slope is gentle enough to hold it.
   float line = ${(TOP * 0.6).toFixed(1)} + (vnoise(vGround * 0.8) - 0.5) * 44.0;
-  float snow = smoothstep(line - 4.0, line + 4.0, vH) * smoothstep(0.32, 0.5, up + (paint - 0.5) * 0.2);
+  float snow = smoothstep(line - 4.0, line + 4.0, vH) * smoothstep(0.42, 0.55, up + (paint - 0.5) * 0.15);
   col = mix(col, mix(vec3(0.68, 0.74, 0.86), vec3(0.96, 0.97, 0.98), smoothstep(0.3, 0.5, band)), snow);
   // Ink where the surface turns away from the eye.
   float face = dot(n, normalize(vec3(45.0, 45.0, 32.0)));

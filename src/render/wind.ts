@@ -15,7 +15,15 @@ uniform highp vec4 uOutputFrame;
 uniform highp vec4 uView;
 uniform float uTime;
 
-float leafy(vec4 c) { return c.a * smoothstep(0.02, 0.08, c.g - max(c.r, c.b * 1.1)); }
+// Leaves: green and blue-green (broadleaves, pines), or autumn gold and bronze (strongly coloured,
+// green well over half the red: roofs, timber and crates fall short of one or the other).
+float leafy(vec4 c) {
+  vec3 k = c.rgb / max(c.a, 0.001);
+  float hi = max(k.r, max(k.g, k.b)), sat = (hi - min(k.r, min(k.g, k.b))) / max(hi, 0.001);
+  float green = smoothstep(0.02, 0.07, k.g - max(k.r, k.b * 0.95)) * step(0.15, sat);
+  float gold = step(k.g, k.r) * step(0.66, k.g / max(k.r, 0.001)) * step(k.b, k.g) * step(0.6, sat);
+  return c.a * max(green, gold);
+}
 
 void main() {
   vec4 here = texture(uTexture, vTextureCoord);
