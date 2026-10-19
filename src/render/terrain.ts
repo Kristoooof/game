@@ -15,7 +15,17 @@ import { levelAt, terrainAt } from '../sim/map';
 import { mulberry32 } from '../sim/rng';
 import { noise2 } from './sculpt';
 import type { World } from '../sim/world';
-import { drawBuilding, drawLampPost, drawPier, drawRoads, lampPosts, pierBox, setGlow, setSun } from './buildings';
+import {
+  drawBuilding,
+  drawLampPost,
+  drawPier,
+  drawRoads,
+  lampPosts,
+  pierBox,
+  setGlow,
+  setSun,
+  setWet,
+} from './buildings';
 import { sunShadow } from './daylight';
 import { createGround } from './ground';
 import { createMassif, TOP } from './massif';
@@ -228,7 +238,8 @@ export function createTerrain(world: World, renderer: Renderer) {
           const v = 0.1 + r() * 0.8;
           const k = r();
           const bush = d === 0 ? 0.75 : 0.93;
-          if (k < 0.55) put(art.conifers[Math.floor(r() * 3)], u, v, (0.75 + r() * 0.45) * grow, true, dark);
+          if (k < 0.55)
+            put(art.conifers[Math.floor(r() * art.conifers.length)], u, v, (0.75 + r() * 0.45) * grow, true, dark);
           else if (k < bush) put(leaf(r(), x, y), u, v, (0.7 + r() * 0.4) * grow, true, dark);
           else put(art.bushes[Math.floor(r() * art.bushes.length)], u, v, 0.8 + r() * 0.4);
         }
@@ -273,7 +284,7 @@ export function createTerrain(world: World, renderer: Renderer) {
           const [u, v] = [0.2 + r() * 0.6, 0.2 + r() * 0.6];
           if ((edge === 1 && p < 0.45) || (edge === 2 && p < 0.2)) {
             if (r() < 0.55) put(art.bushes[Math.floor(r() * art.bushes.length)], u, v, 0.7 + r() * 0.5);
-            else if (r() < 0.5) put(art.conifers[Math.floor(r() * 3)], u, v, 0.5 + r() * 0.25, true);
+            else if (r() < 0.5) put(art.conifers[Math.floor(r() * art.conifers.length)], u, v, 0.5 + r() * 0.25, true);
             else put(leaf(r(), x, y), u, v, 0.5 + r() * 0.25, true);
           } else if (noise2(x * 0.13, y * 0.13, 6) > 0.64 && p < 0.35)
             put(leaf(r(), x, y), u, v, 0.75 + r() * 0.4, true);
@@ -415,6 +426,7 @@ export function createTerrain(world: World, renderer: Renderer) {
     const refl = new Container({ sortableChildren: true });
     const lights = new Container({ children: [new Graphics()] });
     setSun(shade);
+    setWet(wet);
     addNature(chunkTiles(c), o, refl, far);
     for (const b of world.buildings.values()) {
       if (b.type === 'road' || hidden.has(b.id) || b.x < c.x0 || b.x >= c.x1 || b.y < c.y0 || b.y >= c.y1) continue;

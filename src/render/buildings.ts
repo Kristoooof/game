@@ -164,6 +164,13 @@ function pool(x: number, y: number, rx: number, ry: number, color: number, alpha
 /** Sun for cast shadows: screen offset per pixel of height, and opacity (see daylight.ts). */
 let sun = { dx: 0.4, dy: 0.17, alpha: 1 };
 export const setSun = (s: typeof sun) => (sun = s);
+/** How wet roofs are after rain, 0..1: darker, with a gleam along the ridge. */
+let wet = 0;
+export const setWet = (w: number) => (wet = w);
+/** Rain on a roof face: darkened, wetter towards the eaves. */
+const wetRoof = (g: Graphics, face: number[][]) => {
+  if (wet > 0) g.poly(face.flat()).fill({ color: 0x101820, alpha: 0.22 * wet });
+};
 
 /** Lights quad `pts` warmly at night; about one window in five stays dark (stable per position). */
 function lit(pts: number[][]) {
@@ -306,15 +313,29 @@ function gabled(g: Graphics, b: Box, wall: number, roof: number, wallColor: numb
   // Sunlit slope warm and bright, the far one well in shade.
   fill(g, north, shade(roofColor, 0.64));
   fill(g, south, shade(roofColor, 1.08));
+  // Boarding up the gable end, plank by plank.
+  for (let k = 1; k < 6; k++) {
+    const y = y0 + ((y1 - y0) * k) / 6;
+    const h = wall + roof * (1 - Math.abs(y - yc) / (yc - y0));
+    const [a, b] = [P(x1, y, wall), P(x1, y, h)];
+    g.moveTo(a[0], a[1]).lineTo(b[0], b[1]);
+  }
+  g.stroke({ width: 0.5, color: shade(wallColor, 0.5), alpha: 0.6 });
   // Roof covering laid along each slope, eave to ridge.
   const cover = thatch ? surface().thatch : surface().tiles;
   overlayQuad(g, south, cover, 0.42);
   overlayQuad(g, north, cover, 0.42);
+  wetRoof(g, south);
+  wetRoof(g, north);
   const r0 = P(x0 - o, yc, top);
   const r1 = P(x1 + o, yc, top);
   g.moveTo(r0[0], r0[1])
     .lineTo(r1[0], r1[1])
     .stroke({ width: 2, color: shade(roofColor, 0.55) });
+  if (wet > 0)
+    g.moveTo(r0[0], r0[1] + 1.2)
+      .lineTo(r1[0], r1[1] + 1.2)
+      .stroke({ width: 0.8, color: 0xdde8f0, alpha: 0.35 * wet });
   edge(g, south, shade(roofColor, 0.45), 1);
 }
 
@@ -349,7 +370,9 @@ function windowRight(g: Graphics, b: Box, t: number, w: number, h0: number, h1: 
 function door(g: Graphics, b: Box, t: number, w: number, h: number, color: number) {
   onLeft(g, b, t - 0.015, t + w + 0.015, 0, h + 1, 0x6e6658);
   onLeft(g, b, t, t + w, 0, h, color);
-  onLeft(g, b, t + w * 0.5 - 0.004, t + w * 0.5 + 0.004, 0, h, shade(color, 0.6));
+  // Planks, and a lintel beam over the frame.
+  for (const k of [0.25, 0.5, 0.75]) onLeft(g, b, t + w * k - 0.004, t + w * k + 0.004, 0, h, shade(color, 0.65));
+  onLeft(g, b, t - 0.03, t + w + 0.03, h + 1, h + 2.2, 0x5b3b24);
   // Iron hinges, a ring handle and a worn step.
   for (const hh of [h * 0.25, h * 0.75]) onLeft(g, b, t, t + w * 0.35, hh - 0.35, hh + 0.35, 0x2a2622);
   const [kx, ky] = P(b.x0 + (t + w * 0.8) * (b.x1 - b.x0), b.y1, h * 0.45);
@@ -442,6 +465,17 @@ function hipped(g: Graphics, b: Box, wall: number, roof: number, wallColor: numb
     tiles,
     0.42,
   );
+  for (const face of [
+    [sw, se, B, A],
+    [nw, ne, B, A],
+    [nw, sw, A],
+    [ne, se, B],
+  ])
+    wetRoof(g, face);
+  if (wet > 0)
+    g.moveTo(A[0], A[1] + 1)
+      .lineTo(B[0], B[1] + 1)
+      .stroke({ width: 0.8, color: 0xdde8f0, alpha: 0.35 * wet });
   edge(g, [sw, se, B, A], shade(roofColor, 0.45), 1);
 }
 

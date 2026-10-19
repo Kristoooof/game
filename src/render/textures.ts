@@ -79,12 +79,17 @@ const conifer = (seed: number, palette: string[], tiers: number) => {
     c.fillRect(15.9, 46, 0.6, 9);
     // Painted tiers, bottom first: each a skirt of drooping boughs with a scalloped hem, lit
     // from the left, the top of every lower tier in the shade of the one above.
+    // Each tree its own: broader or slimmer, tiers a little uneven, one maybe stunted, the top
+    // leaning off true.
     const r = mulberry32(seed);
+    const girth = 0.8 + r() * 0.35;
+    const lean = (r() - 0.5) * 2.4;
+    const stunted = r() < 0.5 ? Math.floor(r() * tiers) : -1;
     for (let i = 0; i < tiers; i++) {
       const by = 49 - i * (32 / tiers);
-      const hw = 14 - i * (10 / tiers);
+      const hw = (14 - i * (10 / tiers)) * girth * (0.88 + r() * 0.24) * (i === stunted ? 0.72 : 1);
       const ty = by - 17;
-      const cx = 17;
+      const cx = 17 + lean * (i / tiers);
       const n = 4 + Math.round(hw / 4);
       c.beginPath();
       c.moveTo(cx, ty);
@@ -103,6 +108,15 @@ const conifer = (seed: number, palette: string[], tiers: number) => {
       g.addColorStop(1, palette[0]);
       c.fillStyle = g;
       c.fill();
+      // The sunlit hem a touch yellower.
+      c.save();
+      c.clip();
+      const hem = c.createLinearGradient(cx - hw, by - 3, cx, by);
+      hem.addColorStop(0, 'rgba(200,210,110,0.28)');
+      hem.addColorStop(1, 'rgba(200,210,110,0)');
+      c.fillStyle = hem;
+      c.fillRect(cx - hw, by - 4, hw, 5);
+      c.restore();
       // Shade cast by the tier above onto the top of this one.
       if (i < tiers - 1) {
         c.save();
@@ -606,11 +620,18 @@ const seaRock = (seed: number, tall: boolean) => {
 /** All object art, built once (needs a DOM canvas). */
 export function makeArt() {
   return {
-    conifers: [
-      conifer(1, ['#163c22', '#245a32', '#3f7d48'], 4),
-      conifer(2, ['#1b4232', '#2a634a', '#4a8a66'], 5),
-      conifer(3, ['#1d3f1f', '#2e5f2c', '#55864a'], 3),
-    ],
+    /** Nine pines: three greens, three to six tiers, each shaped by its seed. */
+    conifers: [1, 2, 3, 31, 32, 33, 34, 35, 36].map((seed, i) =>
+      conifer(
+        seed,
+        [
+          ['#163c22', '#245a32', '#3f7d48'],
+          ['#1b4232', '#2a634a', '#4a8a66'],
+          ['#1d3f1f', '#2e5f2c', '#55864a'],
+        ][i % 3],
+        3 + (i % 4),
+      ),
+    ),
     broadleaves: [
       broadleaf(4, LEAF_GREEN, 'oak'),
       broadleaf(5, DARK_GREEN, 'oak'),

@@ -87,25 +87,41 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
   const panel = document.createElement('div');
   panel.className = 'panel';
   panel.hidden = true;
-  /** `onPick` returns false to refuse the choice, which puts the previous option back. */
+  /** Wood dropdown: a plate showing the choice, a list under it. `onPick` returns false to refuse the choice. */
   const select = <T>(label: string, options: [T, string][], value: T, onPick: (v: T) => boolean) => {
-    const l = document.createElement('label');
-    l.textContent = label;
-    const el = document.createElement('select');
-    options.forEach(([v, text], i) => el.add(new Option(text, String(i), false, v === value)));
-    let current = el.selectedIndex;
-    el.addEventListener('change', () => {
-      if (onPick(options[el.selectedIndex][0])) current = el.selectedIndex;
-      else el.selectedIndex = current;
+    const row = Object.assign(document.createElement('div'), { className: 'row' });
+    const plate = Object.assign(document.createElement('button'), { className: 'pick' });
+    const list = Object.assign(document.createElement('div'), { className: 'list', hidden: true });
+    const show = (v: T) => (plate.textContent = options.find(([o]) => o === v)?.[1] ?? '');
+    show(value);
+    for (const [v, text] of options) {
+      const item = Object.assign(document.createElement('button'), { textContent: text });
+      item.addEventListener('click', () => {
+        list.hidden = true;
+        if (onPick(v)) show(v);
+      });
+      list.append(item);
+    }
+    plate.addEventListener('click', () => {
+      const open = list.hidden;
+      panel.querySelectorAll<HTMLElement>('.list').forEach((l) => (l.hidden = true));
+      list.hidden = !open;
     });
-    l.append(el);
-    return l;
+    const wrap = Object.assign(document.createElement('div'), { className: 'drop' });
+    wrap.append(plate, list);
+    row.append(Object.assign(document.createElement('span'), { textContent: label }), wrap);
+    return row;
   };
   const note = document.createElement('small');
-  const fps = document.createElement('label');
-  const box = Object.assign(document.createElement('input'), { type: 'checkbox', checked: s.fps });
-  fps.append(box, ' FPS számláló');
-  box.addEventListener('change', () => update({ fps: box.checked }));
+  const fps = Object.assign(document.createElement('div'), { className: 'row' });
+  const box = Object.assign(document.createElement('button'), { className: 'toggle' });
+  const showFps = () => box.setAttribute('aria-pressed', String(s.fps));
+  showFps();
+  fps.append(Object.assign(document.createElement('span'), { textContent: 'FPS számláló' }), box);
+  box.addEventListener('click', () => {
+    update({ fps: !s.fps });
+    showFps();
+  });
 
   const update = (change: Partial<Settings>) => {
     const msaaChanged = change.antialias !== undefined && (change.antialias === 'msaa') !== (s.antialias === 'msaa');
@@ -119,7 +135,15 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
     return true;
   };
 
+  const head = Object.assign(document.createElement('div'), { className: 'head' });
+  const close = Object.assign(document.createElement('button'), {
+    className: 'close',
+    title: 'Bezárás',
+    textContent: '×',
+  });
+  head.append(Object.assign(document.createElement('h2'), { textContent: 'Beállítások' }), close);
   panel.append(
+    head,
     select('Renderelési szélesség', widthOptions(), s.width, (width) => update({ width })),
     select('Megjelenés', LOOKS, s.pixel, (pixel) => update({ pixel })),
     select('Víz megjelenése', LOOKS, s.waterPixel, (waterPixel) => update({ waterPixel })),
@@ -138,9 +162,16 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
     textContent: '⚙',
   });
   gear.setAttribute('aria-expanded', 'false');
-  gear.addEventListener('click', () => {
-    panel.hidden = !panel.hidden;
-    gear.setAttribute('aria-expanded', String(!panel.hidden));
+  const toggle = (open: boolean) => {
+    panel.hidden = !open;
+    gear.setAttribute('aria-expanded', String(open));
+  };
+  gear.addEventListener('click', () => toggle(panel.hidden === true));
+  close.addEventListener('click', () => toggle(false));
+  // A click anywhere outside an open list closes it.
+  addEventListener('pointerdown', (e) => {
+    if (!(e.target as Element).closest?.('.drop'))
+      panel.querySelectorAll<HTMLElement>('.list').forEach((l) => (l.hidden = true));
   });
   root.append(gear, panel);
 }

@@ -242,10 +242,17 @@ export function createEffects(map: GameMap) {
           [l.x, l.age],
           [l.x + l.dir * 14, r],
         ])
-          if (d > 0 && d < 1.2)
+          if (d > 0 && d < 1.2) {
+            // A soft band of ripple, thinning and fading as it spreads; a splash first.
+            const [rx, ry, band] = [2 + d * 10, 1 + d * 4, 1.6 * (1 - d / 1.2) + 0.4];
+            const fade = 1 - d / 1.2;
             l.ring
-              .ellipse(x, l.y, 2 + d * 10, 1 + d * 4)
-              .stroke({ width: 1, color: 0xe8f2f2, alpha: 0.7 * (1 - d / 1.2) });
+              .ellipse(x, l.y, rx + band, ry + band * 0.45)
+              .fill({ color: 0xe8f2f2, alpha: 0.28 * fade })
+              .ellipse(x, l.y, rx, ry)
+              .cut();
+            if (d < 0.25) l.ring.ellipse(x, l.y - 1, 2.2, 1.6).fill({ color: 0xf4fafa, alpha: 0.5 * (1 - d / 0.25) });
+          }
         if (l.age > 1.8) {
           l.fish.destroy();
           l.ring.destroy();

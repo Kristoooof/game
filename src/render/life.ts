@@ -98,7 +98,7 @@ const walkerArt = (r: Renderer) =>
               color: 0x000000,
               alpha: 0.15,
             });
-            g.poly([-0.8, hipY - 0.2, 1.6, hipY - 0.2, 2.2 + sw, -2, -0.6 + sw, -2]).fill(0xe6dcc4);
+            g.poly([-0.8, hipY - 0.2, 1.6, hipY - 0.2, 2.2 + sw, -2, -0.6 + sw, -2]).fill(0xcfc3a8);
           } else leg(swing, false);
           // Body: shoulders broader than the waist, shaded away from the sun, a belt.
           const top = -11.8 + up;
@@ -159,7 +159,7 @@ const walkerArt = (r: Renderer) =>
               .lineTo(3.6, -14.6 + up)
               .stroke({ width: 0.7, color: 0x8a6038, cap: 'round' });
             g.poly([2.9, -15 + up, 5.6, -15.9 + up, 5.4, -13.2 + up, 3.6, -13.4 + up])
-              .fill(0x9aa0a8)
+              .fill(0x8c8c88)
               .stroke({ width: 0.3, color: 0x4a4f57 });
           } else if (woman && job === 0) {
             arm(1.6, -6.4 + up, false);
@@ -282,9 +282,14 @@ const cartArt = (r: Renderer, load: Load, f: number) =>
           .stroke({ width: 0.4, color: 0x333333 });
         g.ellipse(x, -16, 2.2, 0.8).fill(0x9a6e40);
       }
-    g.roundRect(-2.6, -15, 3.4, 5, 1).fill(0x3f5f8a);
-    g.circle(-0.9, -16.6, 1.6).fill(0xe0b08a);
-    g.ellipse(-0.9, -17.8, 2.6, 0.8).fill(0xd8c080);
+    // The driver on his bench at the front of the cart, legs down, reins to the horse.
+    g.rect(-3.4, -11.2, 5.4, 1.2).fill(0x5a3e22);
+    g.moveTo(-0.6, -10.4).lineTo(0.6, -7.4).stroke({ width: 1.1, color: 0x4a3a28, cap: 'round' });
+    g.roundRect(-2.6, -15.4, 3.4, 4.6, 1).fill(0x3f5f8a);
+    g.moveTo(0.4, -13).lineTo(1.6, -11.6).stroke({ width: 0.9, color: 0x3f5f8a, cap: 'round' });
+    g.moveTo(1.6, -11.6).quadraticCurveTo(9, -12, 15.6, -13.2).stroke({ width: 0.35, color: 0x2a1a10 });
+    g.circle(-0.9, -17, 1.6).fill(0xe0b08a);
+    g.ellipse(-0.9, -18.2, 2.6, 0.8).fill(0xd8c080);
     // Wheel with spokes.
     g.circle(-8, -3.4, 3.4).stroke({ width: 1, color: 0x3a2a1a });
     for (let k = 0; k < 4; k++) {
@@ -409,6 +414,9 @@ interface Walker {
   to: number;
   t: number;
   step: number;
+  /** Own pace and own distance from the road's middle, so a crowd spreads out. */
+  pace: number;
+  lane: number;
 }
 interface Cart {
   s: Sprite;
@@ -594,7 +602,16 @@ export function createLife(
         const frames = walkerFrames[Math.floor(Math.random() * walkerFrames.length)];
         const s = spriteOf(frames[0]);
         front.addChild(s);
-        walkers.push({ s, frames, from, to: roadNeighbours(from)[0] ?? from, t: Math.random(), step: Math.random() });
+        walkers.push({
+          s,
+          frames,
+          from,
+          to: roadNeighbours(from)[0] ?? from,
+          t: Math.random(),
+          step: Math.random(),
+          pace: 0.8 + Math.random() * 0.45,
+          lane: 3 + Math.random() * 4.5,
+        });
       }
       // Carts: one per warehouse or harbour, to houses it can reach by road.
       for (const c of carts) c.s.destroy();
@@ -641,7 +658,11 @@ export function createLife(
         x > view.x - m && x < view.x + view.width + m && y > view.y - m && y < view.y + view.height + m;
 
       for (const w of walkers) {
-        w.t += dt * WALK_SPEED;
+        // Slow up behind someone just ahead going the same way, rather than walk through them.
+        const blocked = walkers.some(
+          (o) => o !== w && o.from === w.from && o.to === w.to && o.t > w.t && o.t - w.t < 0.3,
+        );
+        w.t += dt * WALK_SPEED * w.pace * (blocked ? 0.2 : 1);
         if (w.t >= 1) {
           // At the next tile: carry on, turning at random; back only at a dead end.
           const options = roadNeighbours(w.to).filter((j) => j !== w.from);
@@ -654,13 +675,13 @@ export function createLife(
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const len = Math.hypot(dx, dy) || 1;
-        const x = a.x + dx * w.t - (dy / len) * 5;
-        const y = a.y + dy * w.t + (dx / len) * 2.5;
+        const x = a.x + dx * w.t - (dy / len) * w.lane;
+        const y = a.y + dy * w.t + (dx / len) * w.lane * 0.5;
         w.s.visible = inView(x, y);
         if (!w.s.visible) continue;
         // Depth among buildings and trees: tile x + y of where it stands.
         w.s.zIndex = depth(w.from, w.to, w.t);
-        w.step = (w.step + dt * 1.6) % 1;
+        w.step = (w.step + dt * 1.6 * w.pace * (blocked ? 0.2 : 1)) % 1;
         const fr = w.frames[Math.floor(w.step * STRIDE)];
         w.s.texture = fr.texture as Texture;
         w.s.anchor.set(fr.ax, fr.ay);
