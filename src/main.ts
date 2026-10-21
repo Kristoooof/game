@@ -19,6 +19,8 @@ import { createTerrain, FAR_SCALE } from './render/terrain';
 import { type GameMap, type Terrain, generateMap, levelAt, parseMap, terrainAt } from './sim/map';
 import { buildingAt, createWorld, demolish, islandOf, place, placementError, roadPath } from './sim/world';
 import { CAP, tick, TICK, trouble } from './sim/economy';
+import { balance, unmet } from './sim/population';
+import { LEVELS, NEED_NAMES } from './data/population';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
 import { createAtmosphere, type Weather } from './render/atmosphere';
 import { createConstruction } from './render/construction';
@@ -56,7 +58,9 @@ const say = (msg = '') => {
   hud.hidden = !msg;
 };
 say();
-const ICONS: Record<'gold' | Good, string> = {
+const ICONS: Record<'gold' | 'people' | Good, string> = {
+  people:
+    '<circle cx="9" cy="7" r="3" fill="#e0b08a" stroke="#6a4a2a"/><path d="M3.5 20c0-5 2.5-8 5.5-8s5.5 3 5.5 8z" fill="#3f5f8a" stroke="#22344e"/><circle cx="16.5" cy="8.5" r="2.5" fill="#e0b08a" stroke="#6a4a2a"/><path d="M12.5 20c0-4 1.8-6.5 4-6.5s4 2.5 4 6.5z" fill="#8a3a2a" stroke="#4a1a10"/>',
   gold: '<circle cx="12" cy="12" r="9" fill="#e8c34a" stroke="#8a6a1a" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="#b8922a" stroke-width="1.5"/>',
   wood: '<rect x="3" y="9" width="18" height="7" rx="3.5" fill="#9b6b3d" stroke="#5b3b1d" stroke-width="1.5"/><ellipse cx="19" cy="12.5" rx="2.5" ry="3.5" fill="#e0bf86" stroke="#5b3b1d"/>',
   tools:
@@ -68,6 +72,8 @@ const ICONS: Record<'gold' | Good, string> = {
   cloth:
     '<path d="M4 7h13l3 3v8H7l-3-3z" fill="#4a6a9a" stroke="#22344e" stroke-width="1.2"/><path d="M4 7v8l3 3v-8zM7 10h13" fill="#3a5680" stroke="#22344e"/><path d="M10 10v8M14 10v8" stroke="#6a8aba" stroke-width="0.8"/>',
 };
+const costOf = (c: Partial<Record<Good, number>>) =>
+  (Object.keys(c) as Good[]).map((g) => `${c[g]} ${GOOD_NAMES[g].toLowerCase()}`).join(', ');
 const icon = (k: keyof typeof ICONS) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
 /** The island whose goods the bar shows: the one in the middle of the screen, or the last looked at. */
 let shownIsland = 0;
@@ -75,8 +81,11 @@ let shownHtml = '';
 const showResources = () => {
   const stock = world.stocks.get(shownIsland) ?? world.stocks.get(0)!;
   const where = world.stocks.has(shownIsland) && shownIsland ? `${shownIsland}. sziget` : 'Hajó';
+  const { income, upkeep, people } = balance(world);
+  const net = Math.round(income - upkeep);
   const html = [
-    `<span title="Arany">${icon('gold')}${world.gold}</span>`,
+    `<span title="Arany · bevétel ${Math.round(income)}, fenntartás ${upkeep} percenként">${icon('gold')}${Math.floor(world.gold)} <small class="${net < 0 ? 'loss' : 'gain'}">${net < 0 ? '' : '+'}${net}/p</small></span>`,
+    `<span title="Lakosság">${icon('people')}${people}</span>`,
     `<span class="where" title="Kinek a készlete">${where}</span>`,
     ...(Object.keys(GOOD_NAMES) as Good[]).map((g) => `<span title="${GOOD_NAMES[g]}">${icon(g)}${stock[g]}</span>`),
   ].join('');
@@ -265,6 +274,15 @@ app.ticker.add((t) => {
     tick(world, TICK);
     simTime -= TICK;
   }
+  // Houses that rose a level are redrawn.
+  if (world.changed.length) {
+    const tiles = world.changed.flatMap((id) => {
+      const b = world.buildings.get(id);
+      return b ? footprint(b.x, b.y, BUILDINGS[b.type].size) : [];
+    });
+    world.changed.length = 0;
+    refresh(tiles);
+  }
   const centre = tileAt(app.screen.width / 2, app.screen.height / 2);
   const here = centre && islandOf(world, centre.x, centre.y);
   if (here && world.stocks.has(here)) shownIsland = here;
@@ -331,7 +349,7 @@ const refresh = (tiles: [number, number][] = []) => {
   terrain.changed(tiles);
   terrain.refreshFront();
   life.refresh();
-  effects.setChimneys([...world.buildings.values()].flatMap((b) => chimneyAt(b.type, b.x, b.y) ?? []));
+  effects.setChimneys([...world.buildings.values()].flatMap((b) => chimneyAt(b.type, b.x, b.y, b.level) ?? []));
   drawTerritory(territory, world);
   showResources();
 };
@@ -459,8 +477,23 @@ attachCameraControls(app.canvas, cam, {
     outline(selection, t.x, t.y, 0.9);
     const where = `(${t.x}, ${t.y}) ${TERRAIN_NAMES[terrainAt(map, t.x, t.y)!]}`;
     const p = b && BUILDINGS[b.type].production;
+    if (b && world.stocks.has(islandOf(world, b.x, b.y))) shownIsland = islandOf(world, b.x, b.y);
+    if (b?.type === 'house') {
+      // A house: its people, how content they are and what they lack.
+      info = () => {
+        if (!world.buildings.has(b.id)) return (info = null);
+        const lv = LEVELS[b.level!];
+        const lack = unmet(world, b).map((n) => NEED_NAMES[n]);
+        const next = lv.upgrade && b.residents! >= lv.max && !lack.length ? ' · bővítéshez: ' + costOf(lv.upgrade) : '';
+        say(
+          `${lv.house} · ${b.residents}/${lv.max} ${lv.name.toLowerCase()} · elégedettség ${Math.round(b.happy! * 100)}%` +
+            (lack.length ? ` · hiányzik: ${lack.join(', ')}` : '') +
+            next,
+        );
+      };
+      return info();
+    }
     if (!b || !p) return say(`${where}${b ? ` · ${BUILDINGS[b.type].name}` : ''}`);
-    if (world.stocks.has(islandOf(world, b.x, b.y))) shownIsland = islandOf(world, b.x, b.y);
     // A producer: how well it works and why not better, kept up to date while selected.
     info = () => {
       if (!world.buildings.has(b.id)) return (info = null);

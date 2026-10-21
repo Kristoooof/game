@@ -26,5 +26,7 @@
   "24": "textures.ts",
   "25": "daylight.ts",
   "26": "life.ts",
-  "27": "setSpeed"
+  "27": "setSpeed",
+  "28": "data/buildings.ts",
+  "29": "pixi.js"
 }

@@ -632,8 +632,12 @@ export function createLife(
     refresh() {
       const roads = [...world.buildings.values()].filter((b) => b.type === 'road').map((b) => b.y * W + b.x);
       const houses = [...world.buildings.values()].filter((b) => b.type === 'house');
-      // Walkers: about three per house, as the roads allow.
-      const want = Math.min(60, Math.floor(roads.length / 2), houses.length * 3);
+      // Walkers: about one in three of the people, as the roads allow.
+      const want = Math.min(
+        60,
+        Math.floor(roads.length / 2),
+        Math.ceil(houses.reduce((n, h) => n + h.residents!, 0) / 3),
+      );
       walkers = walkers.filter((w) => {
         const keep = isRoad(w.from) && isRoad(w.to);
         if (!keep) w.s.destroy();

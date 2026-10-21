@@ -554,17 +554,27 @@ function garden(g: Graphics, x: number, y: number, flower: number) {
 }
 
 /** A house with one or two floors, a gable or hip roof, a painted wall and a coloured door and awning. */
-function house(g: Graphics, x: number, y: number, variant: number) {
+/**
+ * A home by the level of its people: peasants a single storey under thatch, burghers two storeys
+ * under tiles, merchants a broad stone house under a hipped roof.
+ */
+function house(g: Graphics, x: number, y: number, variant: number, level: number) {
   const pick = (n: number) => Math.floor(rnd() * n);
   // The garden first: the fence behind the house must sit under the roof.
   if (!flip) garden(g, x, y, [0xd04a5a, 0xe07aa8, 0x7a5ad0][variant % 3]);
-  const wallColor = WALL_COLORS[pick(WALL_COLORS.length)];
-  const roof = ROOFS[pick(ROOFS.length)];
-  const floors = rnd() < 0.4 ? 2 : 1;
+  const wallColor = level === 2 ? 0xe4dccb : WALL_COLORS[pick(WALL_COLORS.length)];
+  const roof = level === 2 ? 0x7a2a22 : ROOFS[pick(ROOFS.length)];
+  const floors = level ? 2 : 1;
   const wallH = floors === 2 ? 22 : 13;
-  const b: Box = { x0: x + 0.2, y0: y + 0.25, x1: x + 1.8, y1: y + 1.75 };
-  if (rnd() < 0.5) gabled(g, b, wallH, 11, wallColor, roof);
-  else hipped(g, b, wallH, 11, wallColor, roof);
+  const b: Box =
+    level === 2
+      ? { x0: x + 0.12, y0: y + 0.18, x1: x + 1.88, y1: y + 1.78 }
+      : { x0: x + 0.2, y0: y + 0.25, x1: x + 1.8, y1: y + 1.75 };
+  if (level === 0) gabled(g, b, wallH, 12, wallColor, 0x9a8650, true);
+  else if (level === 1 && rnd() < 0.5) gabled(g, b, wallH, 11, wallColor, roof);
+  else hipped(g, b, wallH, level === 2 ? 13 : 11, wallColor, roof);
+  // Merchants' houses stand on a dressed stone plinth.
+  if (level === 2) walls(g, b, 0, 3, 0xa89e8a, false);
   if (wallColor === WALL_COLORS[0]) timber(g, b, wallH);
   const door_ = DOOR_COLORS[pick(DOOR_COLORS.length)];
   door(g, b, 0.43, 0.14, 8, door_);
@@ -729,6 +739,8 @@ export function drawBuilding(
   variant = 0,
   mirrored = false,
   shadowed = true,
+  /** A house's level (see data/population.ts). */
+  level = 0,
 ) {
   const size = BUILDINGS[type].size;
   rnd = mulberry32(variant * 7919 + x * 131 + y * 31 + type.length);
@@ -738,7 +750,7 @@ export function drawBuilding(
   const box = (a: number, b: number, c: number, d: number): Box => ({ x0: x + a, y0: y + b, x1: x + c, y1: y + d });
   switch (type) {
     case 'house':
-      house(g, x, y, variant);
+      house(g, x, y, variant, level);
       break;
     case 'harbor': {
       // Harbour office: stone ground floor, timber gable, flag on the ridge.
@@ -1076,10 +1088,10 @@ export function drawBuilding(
 }
 
 /** World point where smoke leaves a building's chimney, if it has one. */
-export function chimneyAt(type: BuildingId, x: number, y: number) {
+export function chimneyAt(type: BuildingId, x: number, y: number, level = 0) {
   lift = liftAt(x, y);
-  // The forge and the kiln smoke too.
-  const at = { house: [0.535, 29], smithy: [0.485, 30], brickworks: [0.57, 31] }[type as string];
+  // The forge and the kiln smoke too; a house's chimney rises with its storeys.
+  const at = { house: [0.535, level ? 38 : 29], smithy: [0.485, 30], brickworks: [0.57, 31] }[type as string];
   if (!at) return null;
   const [px, py] = P(x + at[0], y + at[0], at[1]);
   return { x: px, y: py };

@@ -57,10 +57,10 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Termelés hatékonyság kijelzése (koppintásra: hatékonyság, készlet, ok: nincs út, megtelt, nincs alapanyag, kevés erdő)
 
 ### 4. Lakosság
-- [ ] Lakóházak, lakossági szintek (Paraszt → Polgár → Kereskedő)
-- [ ] Igények (élelem, ruha, hit, …) és elégedettség
-- [ ] Ház szintlépés, ha igények teljesülnek
-- [ ] Adóbevétel, épület-fenntartási költség, pénzmérleg
+- [x] Lakóházak, lakossági szintek (Paraszt → Polgár → Kereskedő; 8/16/25 lakó); a ház kinézete a szinttel nő (zsúpfedeles kunyhó → kétszintes cserepes ház → kőlábazatos kereskedőház)
+- [x] Igények és elégedettség: hal (mindenkinek), posztó (polgártól), szerszám (kereskedőnek), hit (kápolna 10 mezőn belül); a javak a sziget raktárából fogynak, az elégedettség szerint telik vagy ürül a ház
+- [x] Ház szintlépés, ha tele van és minden igény teljesül (anyagért: 3 fa, illetve 3 tégla + 2 szerszám)
+- [x] Adóbevétel (lakónként és szintenként, elégedettséggel arányos), épület-fenntartási költség; a felső sávban pénzmérleg percenként és lakosság; házra koppintva lakók, elégedettség, hiányzó igények
 
 ### 5. Hajók és szigetek közti kereskedelem
 - [ ] Hajóépítés a kikötőben

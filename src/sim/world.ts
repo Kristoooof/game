@@ -1,4 +1,5 @@
 import { BUILDINGS, GOOD_NAMES, type BuildingId, type Good } from '../data/buildings';
+import type { Need } from '../data/population';
 import { type GameMap, labelIslands, levelAt, terrainAt } from './map';
 
 export interface Building {
@@ -12,6 +13,13 @@ export interface Building {
   input?: number;
   progress?: number;
   busy?: number;
+  /** Houses: level of the people in it (index into LEVELS), how many, how content (0..1);
+   * goods owed (used up but not yet taken from the store) and how well each need is met (0..1). */
+  level?: number;
+  residents?: number;
+  happy?: number;
+  owed?: Partial<Record<Good, number>>;
+  met?: Partial<Record<Need, number>>;
 }
 
 export type Stock = Record<Good, number>;
@@ -47,6 +55,8 @@ export interface World {
   carts: Cart[];
   /** Game time, seconds. */
   time: number;
+  /** Buildings whose look changed (a house rising a level): the renderer redraws and clears them. */
+  changed: number[];
   nextId: number;
 }
 
@@ -80,6 +90,7 @@ export function createWorld(map: GameMap): World {
     stocks: new Map([[0, { ...emptyStock(), wood: 50, tools: 30, bricks: 20 }]]),
     carts: [],
     time: 0,
+    changed: [],
     nextId: 1,
   };
 }
@@ -129,10 +140,11 @@ export function place(w: World, type: BuildingId, x: number, y: number): string 
   const def = BUILDINGS[type];
   const stock = payingStock(w, x, y);
   const id = w.nextId++;
-  w.buildings.set(
-    id,
-    def.production ? { id, type, x, y, output: 0, input: 0, progress: 0, busy: 0 } : { id, type, x, y },
-  );
+  const b: Building = { id, type, x, y };
+  if (def.production) Object.assign(b, { output: 0, input: 0, progress: 0, busy: 0 });
+  // A new house: a couple moves in, hopeful.
+  if (type === 'house') Object.assign(b, { level: 0, residents: 2, happy: 1, owed: {}, met: {} });
+  w.buildings.set(id, b);
   for (const [tx, ty] of footprint(type, x, y)) {
     const i = ty * w.map.width + tx;
     w.occupied[i] = id;

@@ -1,5 +1,6 @@
 import { BUILDINGS, GOOD_NAMES, type Good } from '../data/buildings';
 import { terrainAt } from './map';
+import { populationTick } from './population';
 import { type Building, type Cart, islandOf, roadRoute, roadsBeside, type World } from './world';
 
 /** Simulation step, game seconds: the world advances in these, whatever the frame rate. */
@@ -61,6 +62,7 @@ function depotFor(w: World, b: Building) {
 /** Advance the economy by `dt` game seconds (call with TICK). */
 export function tick(w: World, dt: number) {
   w.time += dt;
+  populationTick(w, dt);
   // Production: a piece at a time while there is room for it and input to make it from.
   for (const b of w.buildings.values()) {
     const p = BUILDINGS[b.type].production;

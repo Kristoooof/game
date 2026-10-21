@@ -464,7 +464,7 @@ export function createTerrain(world: World, renderer: Renderer) {
       const size = BUILDINGS[b.type].size;
       const draw = (mirrored = false) => {
         const bg = new Graphics({ zIndex: b.x + b.y + size });
-        drawBuilding(bg, b.type, b.x, b.y, b.id, mirrored);
+        drawBuilding(bg, b.type, b.x, b.y, b.id, mirrored, true, b.level);
         return bg;
       };
       setGlow(lights);
@@ -544,7 +544,7 @@ export function createTerrain(world: World, renderer: Renderer) {
       for (const b of world.buildings.values()) {
         if (b.type === 'road' || hidden.has(b.id)) continue;
         const g = new Graphics({ zIndex: b.x + b.y + BUILDINGS[b.type].size });
-        drawBuilding(g, b.type, b.x, b.y, b.id, false, false);
+        drawBuilding(g, b.type, b.x, b.y, b.id, false, false, b.level);
         tmp.addChild(g);
       }
       occluders = [...tmp.children] as Container[];
