@@ -186,10 +186,14 @@ void main() {
   // Crest lines: ridged noise, thin and bright, only where the sea is open.
   float ridge = 1.0 - abs(noise(p * 1.3 + warpN(p)) * 2.0 - 1.0);
   col += vec3(0.6, 0.66, 0.68) * smoothstep(0.96, 0.995, ridge) * 0.035 * smoothstep(0.4, 0.7, noise(p * 2.1 + 4.0)) * (1.0 - uFar) * (0.4 + depth * 0.6);
-  // Out on the open sea, now and then a short arc of foam on a swell running parallel to the shore.
+  // Beyond the breakers, now and then a short arc of foam on a swell running parallel to the shore.
+  // Only in the band off the coast, where the swells run close and thin; broken into dashes,
+  // never a long line wandering over the open sea.
   float swellFront = sin(depthRaw * 40.0 - t * 0.8 + noise(p * 0.5) * 3.0);
-  float cap = smoothstep(0.96, 1.0, swellFront) * smoothstep(0.66, 0.8, noise(p * 0.7 + vec2(t * 0.03, 0.0)));
-  col = mix(col, vec3(0.85, 0.92, 0.93), cap * smoothstep(0.12, 0.3, depthRaw) * (1.0 - fade) * (1.0 - uFar) * 0.35);
+  float dash = smoothstep(0.58, 0.72, noise(p * 2.2 + vec2(t * 0.05, 0.0)));
+  float cap = smoothstep(0.985, 1.0, swellFront) * dash * smoothstep(0.6, 0.75, noise(p * 0.7 + vec2(t * 0.03, 0.0)));
+  float offshore = smoothstep(0.08, 0.14, depthRaw) * (1.0 - smoothstep(0.24, 0.36, depthRaw));
+  col = mix(col, vec3(0.85, 0.92, 0.93), cap * offshore * (1.0 - fade) * (1.0 - uFar) * 0.4);
   // Breaking swells: crests roll in towards the shore, bent by the same height field, and whiten.
   // Distance alone makes parallel bands, so the crest lines are bent by noise and only break in patches.
   float bend = (noise(p * 1.1) - 0.5) * 0.3 + (fbm(p * 0.6) - 0.5) * 0.12;

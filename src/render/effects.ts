@@ -17,6 +17,20 @@ function puffTexture() {
   return Texture.from(c);
 }
 
+/** A ripple: a soft band of light round a calm middle, fading to nothing at both edges. */
+function ringTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0.55, 'rgba(232,242,242,0)');
+  g.addColorStop(0.8, 'rgba(232,242,242,0.6)');
+  g.addColorStop(1, 'rgba(232,242,242,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  return Texture.from(c);
+}
+
 interface Puff {
   s: Sprite;
   age: number;
@@ -35,6 +49,7 @@ const MAX_PUFFS = 300;
 export function createEffects(map: GameMap) {
   const layer = new Container();
   const puffTex = puffTexture();
+  const rippleTex = ringTexture();
   const puffs: Puff[] = [];
   let chimneys: { x: number; y: number; next: number }[] = [];
 
@@ -94,7 +109,7 @@ export function createEffects(map: GameMap) {
       .stroke({ width: 1.8, color, alpha, cap: 'round' });
 
   // Fish leaping clear of the water: an arc, then rings where it went back in.
-  type Leap = { fish: Graphics; ring: Graphics; x: number; y: number; dir: number; age: number };
+  type Leap = { fish: Graphics; ring: Container; x: number; y: number; dir: number; age: number };
   const leaps: Leap[] = [];
   let nextLeap = 2;
 
@@ -222,7 +237,7 @@ export function createEffects(map: GameMap) {
         const around = [wet(t.x + 1, t.y), wet(t.x, t.y + 1), wet(t.x - 1, t.y), wet(t.x, t.y - 1)].filter(Boolean);
         if (wet(t.x, t.y) && around.length >= 3) {
           const fish = new Graphics().ellipse(0, 0, 3.2, 1.2).fill(0x8a9aa8).circle(-3.4, 0, 0.9).fill(0x6a7a88);
-          const ring = new Graphics();
+          const ring = new Container({ children: [0, 1].map(() => new Sprite({ texture: rippleTex, anchor: 0.5 })) });
           layer.addChild(ring, fish);
           leaps.push({ fish, ring, x, y, dir: Math.random() < 0.5 ? -1 : 1, age: 0 });
         }
@@ -236,23 +251,15 @@ export function createEffects(map: GameMap) {
         l.fish.position.set(l.x + l.dir * k * 14, l.y - Math.sin(k * Math.PI) * 12);
         l.fish.rotation = l.dir * (k - 0.5) * 2;
         l.fish.scale.x = l.dir;
-        const r = l.age - 0.55;
-        l.ring.clear();
-        for (const [x, d] of [
-          [l.x, l.age],
-          [l.x + l.dir * 14, r],
-        ])
-          if (d > 0 && d < 1.2) {
-            // A soft band of ripple, thinning and fading as it spreads; a splash first.
-            const [rx, ry, band] = [2 + d * 10, 1 + d * 4, 1.6 * (1 - d / 1.2) + 0.4];
-            const fade = 1 - d / 1.2;
-            l.ring
-              .ellipse(x, l.y, rx + band, ry + band * 0.45)
-              .fill({ color: 0xe8f2f2, alpha: 0.28 * fade })
-              .ellipse(x, l.y, rx, ry)
-              .cut();
-            if (d < 0.25) l.ring.ellipse(x, l.y - 1, 2.2, 1.6).fill({ color: 0xf4fafa, alpha: 0.5 * (1 - d / 0.25) });
-          }
+        // Where it went in and where it came back down: a ripple spreading, flattening and fading.
+        [l.age, l.age - 0.55].forEach((d, j) => {
+          const ripple = l.ring.children[j] as Sprite;
+          ripple.visible = d > 0 && d < 1.2;
+          ripple.position.set(l.x + j * l.dir * 14, l.y);
+          ripple.width = 6 + d * 24;
+          ripple.height = 3 + d * 9;
+          ripple.alpha = 0.7 * (1 - d / 1.2);
+        });
         if (l.age > 1.8) {
           l.fish.destroy();
           l.ring.destroy();

@@ -801,7 +801,7 @@ export function createLife(
               vx: px * side,
               vy: py * side,
               age: 0,
-              life: v.small ? 1.6 : 3.5,
+              life: v.small ? 1.1 : 2.8,
               size: k * side,
               trail: v,
             });
@@ -832,9 +832,9 @@ export function createLife(
           .moveTo(prev.x, prev.y)
           .lineTo(w.x, w.y)
           .stroke({
-            width: (1.5 + k * 5) * Math.abs(w.size) + 0.5,
+            width: (1 + k * 2.5) * Math.abs(w.size) + 0.4,
             color: 0xf2fafa,
-            alpha: 0.32 * (1 - k),
+            alpha: 0.3 * (1 - k) ** 1.5,
             cap: 'butt',
           });
       }

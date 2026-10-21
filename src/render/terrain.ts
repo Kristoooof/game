@@ -1,4 +1,5 @@
 import {
+  BlurFilter,
   Container,
   Graphics,
   Matrix,
@@ -373,12 +374,26 @@ export function createTerrain(world: World, renderer: Renderer) {
       chunks.push(c);
     }
 
+  const soften = new BlurFilter({ strength: 2.5, quality: 2 });
   /** Pixel look: chunk textures are sampled nearest, so every texel stays a hard square. */
   let pixel = false;
-  const render = (container: Container, r: Rectangle, tier: number) => {
-    const target = RenderTexture.create({ width: Math.ceil(r.width), height: Math.ceil(r.height), resolution: tier });
+  const render = (container: Container, r: Rectangle, tier: number, multisample = false) => {
+    const size = { width: Math.ceil(r.width), height: Math.ceil(r.height), resolution: tier };
+    const target = RenderTexture.create(size);
     if (pixel) target.source.style.scaleMode = 'nearest';
-    renderer.render({ container, target, clear: true, transform: new Matrix().translate(-r.x, -r.y) });
+    const transform = new Matrix().translate(-r.x, -r.y);
+    if (!multisample || pixel) {
+      renderer.render({ container, target, clear: true, transform });
+      return target;
+    }
+    // Mesh edges (the ranges' inked skylines) come out stepped without multisampling. Rendered
+    // multisampled, then copied into a plain texture so the samples are freed straight away.
+    const ms = RenderTexture.create({ ...size, antialias: true });
+    renderer.render({ container, target: ms, clear: true, transform });
+    const copy = new Sprite(ms);
+    renderer.render({ container: copy, target, clear: true });
+    copy.destroy();
+    ms.destroy(true);
     return target;
   };
   /** Show `texture` (or nothing) on a chunk sprite or mesh and free the texture it replaces. */
@@ -390,7 +405,7 @@ export function createTerrain(world: World, renderer: Renderer) {
   };
 
   /** Render `o` into a texture trimmed to what is actually in it: less transparent overdraw. */
-  const renderTrimmed = (o: Container, tier: number) => {
+  const renderTrimmed = (o: Container, tier: number, multisample = false) => {
     if (!o.children.length) return { texture: null };
     const b = o.getLocalBounds();
     const rect = new Rectangle(
@@ -399,7 +414,7 @@ export function createTerrain(world: World, renderer: Renderer) {
       Math.ceil(b.width) + 4,
       Math.ceil(b.height) + 4,
     );
-    return { texture: render(o, rect, tier), rect };
+    return { texture: render(o, rect, tier, multisample), rect };
   };
 
   function bake(c: Chunk, tier: number, far: boolean, key: string) {
@@ -428,6 +443,16 @@ export function createTerrain(world: World, renderer: Renderer) {
     setSun(shade);
     setWet(wet);
     addNature(chunkTiles(c), o, refl, far);
+    // Under everything, the range's pieces just over the front edges, which the chunks in front
+    // draw over this one: where their edge texels fade, the same rock shows through, not ground.
+    for (let i = c.x0; i <= c.x1; i++)
+      for (const [x, y] of [
+        [i, c.y1],
+        [c.x1, i - c.x0 + c.y0],
+      ]) {
+        const g = x < W && y < H && y <= c.y1 ? massif.piece(x, y) : null;
+        if (g) o.addChild(new Mesh({ geometry: g, shader: massif.shader, zIndex: -1e9 }));
+      }
     for (const b of world.buildings.values()) {
       if (b.type === 'road' || hidden.has(b.id) || b.x < c.x0 || b.x >= c.x1 || b.y < c.y0 || b.y >= c.y1) continue;
       const size = BUILDINGS[b.type].size;
@@ -460,7 +485,13 @@ export function createTerrain(world: World, renderer: Renderer) {
       o.addChild(pg);
     }
     setGlow(null);
-    const obj = renderTrimmed(o, tier);
+    const obj = renderTrimmed(
+      o,
+      tier,
+      o.children.some((m) => m instanceof Mesh),
+    );
+    // Mirror images softened as they are baked: still water never gives a hard edge back.
+    refl.filters = [soften];
     const mir = renderTrimmed(refl, tier);
     const lit = renderTrimmed(new Container({ children: [lights] }), tier);
     o.destroy({ children: true });

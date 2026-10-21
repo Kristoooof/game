@@ -7,7 +7,7 @@ const S = 4;
 
 export interface Art {
   texture: Texture;
-  /** The same without the contact shadow painted under it: what a cast shadow is made from. */
+  /** The silhouette without the contact shadow, joined down to the foot: what a cast shadow is made from. */
   bare: Texture;
   ax: number;
   ay: number;
@@ -31,7 +31,15 @@ function paint(w: number, h: number, ax: number, ay: number, draw: (c: Ctx) => v
   under = null;
   ground.c.setTransform(1, 0, 0, 1, 0, 0);
   ground.c.drawImage(body.canvas, 0, 0);
-  return { texture: Texture.from(ground.canvas), bare: Texture.from(body.canvas), ax: ax / w, ay: ay / h };
+  // The cast silhouette: the body, plus copies shrunk towards the foot, so the shadow is one
+  // shape running from the trunk base out to the crown's shade, never a blob floating apart.
+  const cast = layer();
+  for (let i = 0; i < 12; i++) {
+    const t = i / 12;
+    cast.c.setTransform(S * (1 - 0.8 * t), 0, 0, S * (1 - t), S * ax * 0.8 * t, S * ay * t);
+    cast.c.drawImage(body.canvas, 0, 0, w, h);
+  }
+  return { texture: Texture.from(ground.canvas), bare: Texture.from(cast.canvas), ax: ax / w, ay: ay / h };
 }
 
 export function sprite(art: Art, x: number, y: number, scale = 1) {
@@ -230,23 +238,34 @@ const broadleaf = (seed: number, palette: string[], kind: Kind = 'oak') => {
       c.lineTo(hx + ex * 0.8, hy - ey * 0.5);
       c.stroke();
     }
-    // A willow's curtains: switches hanging from the crown's rim, thinning to their tips.
+    // A willow's curtains: many switches of uneven length, thick at the sides and thin in front so
+    // the trunk still shows, each arching out a little and hanging, leaves alternating along it.
     if (kind === 'willow')
-      for (let i = 0; i < 9; i++) {
-        const x = 22 + (i / 8 - 0.5) * k.rx * 2;
-        const y = k.cy + k.ry * (0.55 - Math.abs(i / 8 - 0.5) * 0.5);
-        const len = 9 + r() * 6;
-        const bend = (i / 8 - 0.5) * 3;
-        for (const [width, color, dx] of [
-          [1.8, palette[0], 0],
-          [0.9, palette[2], -0.4],
-        ] as const) {
-          c.strokeStyle = color;
-          c.lineWidth = width;
+      for (let i = 0; i < 30; i++) {
+        const u = r() * 2 - 1;
+        const x = 22 + u * k.rx * 0.95;
+        const y = k.cy + k.ry * (0.35 + (1 - Math.abs(u)) * 0.4) + (r() - 0.5) * 2;
+        const side = Math.abs(u);
+        const len = (side > 0.45 ? 8 : 3) + r() * (side > 0.45 ? 10 : 5);
+        const bend = u * (1.5 + r() * 2);
+        const dark = r() < 0.5 ? palette[0] : palette[1];
+        const at = (t: number) => [x + bend * (2 * t - t * t), y + len * t * t * 0.4 + len * t * 0.6];
+        c.strokeStyle = dark;
+        c.lineWidth = 0.5;
+        c.beginPath();
+        c.moveTo(x, y);
+        for (let t = 0.1; t <= 1.01; t += 0.1) c.lineTo(...(at(t) as [number, number]));
+        c.stroke();
+        // Narrow leaves, alternating sides, smaller towards the tip; the sunward ones lighter.
+        const n = Math.round(len / 1.6);
+        for (let j = 1; j <= n; j++) {
+          const t = j / n;
+          const [lx, ly] = at(t);
+          const lr = j % 2 ? -1 : 1;
+          c.fillStyle = lr < 0 && u < 0.3 && r() < 0.5 ? palette[2] : dark;
           c.beginPath();
-          c.moveTo(x + dx, y);
-          c.quadraticCurveTo(x + bend + dx, y + len * 0.5, x + bend * 1.4 + dx, y + len);
-          c.stroke();
+          c.ellipse(lx + lr * 0.5, ly, 0.45, 1.3 - t * 0.5, lr * 0.5, 0, Math.PI * 2);
+          c.fill();
         }
       }
     if (kind === 'fruit')
@@ -574,7 +593,7 @@ const OLIVE = ['#4a5a1c', '#7a8a2a', '#c4c45a'];
 const AUTUMN = ['#6a4a1a', '#a8742a', '#e0b048'];
 const GOLD = ['#7a6a1a', '#c8a830', '#f0d860'];
 const BIRCH = ['#3e6a22', '#76a83a', '#c4e070'];
-const WILLOW = ['#3a5a2e', '#6a8a48', '#b0c888'];
+const WILLOW = ['#2e4f24', '#4f7a34', '#8db35c'];
 
 /** Rock standing in the sea: faceted stone with a dark wet band at the waterline and a foam lip. */
 const seaRock = (seed: number, tall: boolean) => {
