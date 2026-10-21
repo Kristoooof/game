@@ -30,7 +30,7 @@ export const LEVELS: Level[] = [
 ];
 
 /** Goods each resident uses up per minute. */
-export const CONSUMPTION: Partial<Record<Good, number>> = { fish: 0.1, cloth: 0.05, tools: 0.03 };
+export const CONSUMPTION: Partial<Record<Good, number>> = { fish: 0.07, cloth: 0.05, tools: 0.03 };
 
 export const NEED_NAMES: Record<Need, string> = {
   faith: 'kápolna',

@@ -11,7 +11,7 @@ import {
 } from 'pixi.js';
 import { BUILDINGS, GOOD_NAMES, type Good } from './data/buildings';
 import pelda from './data/maps/pelda.txt?raw';
-import { chimneyAt, drawBuilding, drawTerritory } from './render/buildings';
+import { chimneyAt, drawBuilding, drawTerritory, forgeAt } from './render/buildings';
 import { createEffects } from './render/effects';
 import { attachCameraControls, screenToWorld, type Camera } from './render/camera';
 import { diamond, groundToScreen, screenToGround, setLevels } from './render/iso';
@@ -49,6 +49,7 @@ import { daylight } from './render/daylight';
 import { createFpsCounter, createSettingsPanel, loadSettings, resolutionOf } from './ui/settings';
 import { createFxaa } from './render/fxaa';
 import { createWind } from './render/wind';
+import { createSound } from './audio/sound';
 
 const MAPS: Record<string, string> = { pelda };
 const TERRAIN_NAMES: Record<Terrain, string> = {
@@ -239,7 +240,11 @@ const wind = createWind();
 let windTime = 0;
 // A fixed filter area: measuring the huge sea mesh for bounds every frame is wasted work.
 app.stage.filterArea = app.screen;
+const sound = createSound();
+// Every button in the interface clicks.
+addEventListener('click', (e) => (e.target as HTMLElement).closest('button') && sound.click());
 const applySettings = () => {
+  sound.setEnabled(settings.sound, settings.music);
   terrain.setPixel(settings.pixel);
   waterTexture.resize(app.screen.width, app.screen.height, waterRes());
   waterSprite.texture.source.style.scaleMode = settings.waterPixel ? 'nearest' : 'linear';
@@ -371,6 +376,8 @@ app.ticker.add((t) => {
   toastLeft -= realDt;
   if (toastLeft <= 0 && news.length) {
     const n = news.shift()!;
+    if (n.warn) sound.warn();
+    else sound.fanfare();
     toast.textContent = n.text;
     toast.classList.toggle('warn', !!n.warn);
     toastLeft = 5;
@@ -420,6 +427,7 @@ app.ticker.add((t) => {
   terrain.lights.visible = day.night > 0.01;
   terrain.setSun(day.step);
   terrain.setWet(rain);
+  sound.update(realDt, rain, day.sunStrength > 0.2);
   sunlight.tint = hex(day.sun);
   // A low sun rakes in stronger and warmer from the upper left.
   sunlight.alpha = day.sunStrength * (1 + 1.4 * ((0.8 - day.sun[2]) / 0.45));
@@ -462,6 +470,12 @@ const refresh = (tiles: [number, number][] = []) => {
   terrain.refreshFront();
   life.refresh();
   effects.setChimneys([...world.buildings.values()].flatMap((b) => chimneyAt(b.type, b.x, b.y, b.level, b.rot) ?? []));
+  effects.setForges(
+    [...world.buildings.values()].flatMap((b) => {
+      const at = forgeAt(b.type, b.x, b.y, b.rot);
+      return at ? [{ ...at, working: () => b.output! < CAP && b.busy! > 0.15 }] : [];
+    }),
+  );
   drawTerritory(territory, world);
   showResources();
   minimap.redraw();
@@ -784,6 +798,7 @@ const showPreview = (t: { x: number; y: number } | undefined) => {
 const demolishAt = (t: { x: number; y: number } | undefined) => {
   const b = t && demolish(world, t.x, t.y);
   if (!b) return;
+  sound.demolish();
   construction.cancel(b.id);
   terrain.hide(b.id, false);
   // A cloud of dust over the footprint.
@@ -852,6 +867,7 @@ attachCameraControls(app.canvas, cam, {
         const path = roadPath(roadStart.x, roadStart.y, t.x, t.y);
         const built = path.filter(([x, y]) => place(world, 'road', x, y) === null).length;
         say(`${built} útszakasz megépült`);
+        if (built) sound.road();
         refresh(path.filter(([x, y]) => buildingAt(world, x, y)?.type === 'road'));
       } else if (t && tool && tool !== 'demolish' && tool !== 'road') {
         const s = BUILDINGS[tool].size;
@@ -863,6 +879,7 @@ attachCameraControls(app.canvas, cam, {
           construction.start(b);
         }
         say(err ?? `Megépült: ${BUILDINGS[tool].name}`);
+        if (!err) sound.build();
         refresh(err ? [] : footprint(a.x, a.y, s));
       }
       roadStart = null;

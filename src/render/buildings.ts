@@ -1112,6 +1112,18 @@ export function chimneyAt(type: BuildingId, x: number, y: number, level = 0, rot
   return { x: px, y: py };
 }
 
+/** World point of a forge's or kiln's glowing mouth, where sparks fly out, if it has one. */
+export function forgeAt(type: BuildingId, x: number, y: number, rot = 0) {
+  const at = { smithy: [0.83, 1.3, 2], brickworks: [0.55, 0.95, 2] }[type as string];
+  if (!at) return null;
+  lift = liftAt(x, y);
+  turned = rot === 1;
+  mid = [x + 1, y + 1];
+  const [px, py] = P(x + at[0], y + at[1], at[2]);
+  turned = false;
+  return { x: px, y: py };
+}
+
 /** Dirt roads on tiles [x0, x1) × [y0, y1): a rounded track joined to every road neighbour. */
 /** `wet`: 0 dry .. 1 after heavy rain, when puddles stand in many more ruts. */
 export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.width, y1 = w.map.height, wet = 0) {

@@ -569,6 +569,8 @@ export function createLife(
 
   let walkers: Walker[] = [];
   const carts = new Map<number, Sprite>();
+  /** A woodcutter at every lumberjack's chopping block, swinging while it works. */
+  let choppers: { s: Sprite; id: number; step: number; face: number }[] = [];
   const ships: Vessel[] = [];
   const fleet = new Map<number, Vessel>();
   let boats: Vessel[] = [];
@@ -668,6 +670,19 @@ export function createLife(
           lane: 3 + Math.random() * 4.5,
         });
       }
+      for (const c of choppers) c.s.destroy();
+      choppers = [...world.buildings.values()]
+        .filter((b) => b.type === 'lumberjack')
+        .map((b) => {
+          // Beside the block (see buildings.ts), mirrored with a turned building.
+          const [u, v] = b.rot ? [1.5, 0.82] : [0.82, 1.5];
+          const p = groundToScreen(b.x + u, b.y + v);
+          const s = spriteOf(walkerFrames[0].stand[0]);
+          s.position.set(p.x, p.y);
+          s.zIndex = b.x + b.y + 2.1;
+          front.addChild(s);
+          return { s, id: b.id, step: Math.random(), face: b.rot ? 1 : -1 };
+        });
       piers = [...world.buildings.values()].flatMap((b) =>
         b.type === 'harbor' || b.type === 'fisher' ? (pierBox(map, b.x, b.y, BUILDINGS[b.type].size) ?? []) : [],
       );
@@ -771,6 +786,20 @@ export function createLife(
         w.s.scale.set(face * w.broad, w.tall);
       }
 
+      for (const c of choppers) {
+        const b = world.buildings.get(c.id);
+        c.s.visible = !!b && inView(c.s.x, c.s.y);
+        if (!c.s.visible) continue;
+        // Chopping while there is room for the wood; resting otherwise.
+        const working = b!.output! < 4 && b!.busy! > 0.1;
+        c.step = (c.step + dt * (working ? 1.3 : 0.4)) % 1;
+        const fr = working
+          ? walkerFrames[0].work[Math.floor(c.step * 4)]
+          : walkerFrames[0].stand[Math.floor(c.step * 2)];
+        c.s.texture = fr.texture as Texture;
+        c.s.anchor.set(fr.ax, fr.ay);
+        c.s.scale.set(c.face * 1.3, 1.3);
+      }
       // Carts: the economy's own, going out to the producers and back with what they carry.
       for (const [id, sp] of carts)
         if (!world.carts.some((c) => c.id === id)) {

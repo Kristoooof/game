@@ -52,6 +52,8 @@ export function createEffects(map: GameMap) {
   const rippleTex = ringTexture();
   const puffs: Puff[] = [];
   let chimneys: { x: number; y: number; next: number }[] = [];
+  let forges: { x: number; y: number; next: number; working: () => boolean }[] = [];
+  const sparks: { s: Sprite; vx: number; vy: number; age: number; life: number }[] = [];
 
   // Gulls circle above the water just off a few random coasts.
   const r = mulberry32(77);
@@ -136,6 +138,10 @@ export function createEffects(map: GameMap) {
     setChimneys(points: { x: number; y: number }[]) {
       chimneys = points.map((p) => ({ ...p, next: Math.random() }));
     },
+    /** Forges and kilns: sparks fly from their mouths while `working` says they are at it. */
+    setForges(points: { x: number; y: number; working: () => boolean }[]) {
+      forges = points.map((p) => ({ ...p, next: Math.random() }));
+    },
     update(dt: number, view: Rectangle, far: boolean) {
       time += dt;
       layer.visible = !far;
@@ -160,6 +166,44 @@ export function createEffects(map: GameMap) {
           size: 0.35,
           alpha: 0.55,
         });
+      }
+      // Sparks: a few at a time, thrown up and out, falling back as they die.
+      for (const f of forges) {
+        f.next -= dt;
+        if (f.next > 0 || !inView(f.x, f.y) || !f.working() || sparks.length > 120) continue;
+        f.next = 0.25 + Math.random() * 0.9;
+        for (let k = 0; k < 3 + Math.floor(Math.random() * 4); k++) {
+          const s = new Sprite({
+            texture: Texture.WHITE,
+            anchor: 0.5,
+            tint: k % 2 ? 0xffc050 : 0xff8a30,
+            blendMode: 'add',
+          });
+          s.setSize(1.6);
+          s.position.set(f.x, f.y);
+          layer.addChild(s);
+          // Out of the mouth towards the viewer (down and to the left), arcing over and falling.
+          sparks.push({
+            s,
+            vx: -10 - Math.random() * 25,
+            vy: -18 - Math.random() * 18,
+            age: 0,
+            life: 0.35 + Math.random() * 0.35,
+          });
+        }
+      }
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const p = sparks[i];
+        p.age += dt;
+        if (p.age >= p.life) {
+          p.s.destroy();
+          sparks.splice(i, 1);
+          continue;
+        }
+        p.vy += 70 * dt;
+        p.s.x += p.vx * dt;
+        p.s.y += p.vy * dt;
+        p.s.alpha = 1 - p.age / p.life;
       }
       for (let i = puffs.length - 1; i >= 0; i--) {
         const p = puffs[i];

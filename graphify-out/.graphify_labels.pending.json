@@ -28,7 +28,8 @@
   "26": "life.ts",
   "27": "daylight.ts",
   "28": "save.ts",
-  "30": "pixi.js",
+  "29": "wind.ts",
+  "30": "fxaa.ts",
   "31": "applyCamera",
   "33": "panel.ts"
 }

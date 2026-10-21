@@ -14,6 +14,9 @@ export interface Settings {
   weather: boolean;
   /** Leaves stir in the wind (one extra full-screen pass). */
   wind: boolean;
+  /** Sound effects and ambience; the music. */
+  sound: boolean;
+  music: boolean;
   fps: boolean;
 }
 
@@ -27,6 +30,8 @@ const DEFAULTS: Settings = {
   dayCycle: true,
   weather: true,
   wind: true,
+  sound: true,
+  music: true,
   fps: false,
 };
 
@@ -150,6 +155,8 @@ export function createSettingsPanel(root: HTMLElement, s: Settings, apply: (s: S
     select('Napszak', DAY_CYCLE, s.dayCycle, (dayCycle) => update({ dayCycle })),
     select('Időjárás', WEATHER, s.weather, (weather) => update({ weather })),
     select('Szél a fákban', WIND, s.wind, (wind) => update({ wind })),
+    select('Hangok', WIND, s.sound, (sound) => update({ sound })),
+    select('Zene', WIND, s.music, (music) => update({ music })),
     select('Élsimítás', ANTIALIAS, s.antialias, (antialias) => update({ antialias })),
     fps,
     note,

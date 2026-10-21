@@ -102,11 +102,11 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Mozgó élet: emberkék sétálnak az utakon, szekerek a raktár/kikötő és a házak között (legrövidebb úton), halászcsónakok a halászkunyhóknál; vitorlások a nyílt tengeren hullámnyommal, orrhullámmal és tükörképpel
 - [x] Csiszolás: 4× felbontású sprite-ok, dúsabb lomb és tűlevél, kopott falak és foltos-mohás tetők, keréknyomos köves utak, részletes emberkék és szekér, kötélzetes hajók árnyalt vitorlával, mohás párkányos sziklafalak
 - [x] Asset-generációváltás: hegyek és sziklák magasságmezőből, lombkoronák gömbökből, fenyők kúpokból, képpontonként megvilágítva (fényirány, takarás, peremfény, felületi textúra); épületeken vakolat-, cserép- és nádtextúra
-- [ ] Grafika finomítása (épület sprite-ok, animációk)
-- [ ] Hangok, zene
+- [x] Grafika finomítása (épület sprite-ok, animációk): favágó vág a tuskónál, amíg dolgozik; szikrák a kovácsműhely és a téglaégető szájából; épületforgatás (R)
+- [x] Hangok, zene (a böngészőben szintetizálva, fájl nélkül): tenger, eső, madarak nappal; kattintás, építés, út, bontás, teljesített feladat, figyelmeztetés; halk pengetős zene d-dórban; beállításokban ki/be
 - [x] Teljesítmény: statikus világ darabonként textúrába sütve (zoomhoz igazított felbontás, csak a változott darab sül újra, nem látott darabok felszabadulnak), élő csak a víz-shader; JS idő/képkocka 9,5 → 1,1 ms
 - [x] Hegyek újrarajzolva: csupasz és havas csúcsok, ritkább elhelyezés, rétegzett sziklatalaj
-- [ ] Egyensúlyozás
+- [x] Egyensúlyozás (első kör): fenntartás felezve, adó duplázva, hajó 600 arany, halfogyasztás 0,07/fő/perc; automatikus végigjátszó teszt (20 perc játékidő: a pénz nem fogy el, a város nő, marad pénz hajóra és új kikötőre)
 
 ### Később (nem MVP)
 - [ ] Orient régió, nomádok/nemesek

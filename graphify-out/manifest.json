@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "src/main.ts": {
-    "mtime": 1792582953.7462447,
-    "seen": 1792583275.6077173,
-    "ast_hash": "b30d14226645e4e9b5be7cf414e67ee9",
+    "mtime": 1792618154.0379379,
+    "seen": 1792618514.4399295,
+    "ast_hash": "1ed00e84505b25ab756af0931787136c",
     "semantic_hash": ""
   },
   "src/render/iso.test.ts": {
@@ -144,9 +144,9 @@
     "semantic_hash": ""
   },
   "PLAN.md": {
-    "mtime": 1792577260.9182615,
-    "seen": 1792577275.5698485,
-    "ast_hash": "f0e66e768a3646299bb0930a7ab799d3",
+    "mtime": 1792618509.4514406,
+    "seen": 1792618514.4400215,
+    "ast_hash": "63e011f556b3feb1ab2447cde0d8c6bd",
     "semantic_hash": ""
   },
   "index.html": {
@@ -204,9 +204,9 @@
     "semantic_hash": ""
   },
   "src/render/buildings.ts": {
-    "mtime": 1792582920.3949873,
-    "seen": 1792583275.6077213,
-    "ast_hash": "92ee8af734a9d8bf53bc6de9c1dce240",
+    "mtime": 1792618154.036578,
+    "seen": 1792618514.4399338,
+    "ast_hash": "2c3c1249a45f93c7f7587087fbf73c39",
     "semantic_hash": ""
   },
   "src/sim/world.test.ts": {
@@ -240,9 +240,9 @@
     "semantic_hash": ""
   },
   "src/render/effects.ts": {
-    "mtime": 1792570448.2349806,
-    "seen": 1792571040.6381826,
-    "ast_hash": "4484ad60a1a946c254b82ae0b4859b19",
+    "mtime": 1792618389.6624365,
+    "seen": 1792618514.439946,
+    "ast_hash": "d0e7c6120260266edd1fb9db52a6f85b",
     "semantic_hash": ""
   },
   "src/render/fxaa.ts": {
@@ -252,9 +252,9 @@
     "semantic_hash": ""
   },
   "src/ui/settings.ts": {
-    "mtime": 1792406993.665886,
-    "seen": 1792407368.6572618,
-    "ast_hash": "47259ba2f56f73d681d90191e2ac4ec2",
+    "mtime": 1792618093.9465404,
+    "seen": 1792618514.439993,
+    "ast_hash": "aeb732bd1cd73625dcb36b924a543a6f",
     "semantic_hash": ""
   },
   "src/render/daylight.test.ts": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "src/render/life.ts": {
-    "mtime": 1792575483.6466317,
-    "seen": 1792575849.801872,
-    "ast_hash": "f8c2edd3c56296a463868bae5b57e107",
+    "mtime": 1792618169.100137,
+    "seen": 1792618514.4399536,
+    "ast_hash": "c0fabfd18a4deda4cde274f4cffa7430",
     "semantic_hash": ""
   },
   "src/render/sculpt.ts": {
@@ -318,9 +318,9 @@
     "semantic_hash": ""
   },
   "src/data/population.ts": {
-    "mtime": 1792582946.8647432,
-    "seen": 1792583275.6077156,
-    "ast_hash": "67396c1cdce1d774ca10b5ad72f8e103",
+    "mtime": 1792618236.6665418,
+    "seen": 1792618514.4399276,
+    "ast_hash": "51ba0a7fec864e96b215286b6b127712",
     "semantic_hash": ""
   },
   "src/sim/population.test.ts": {
@@ -387,6 +387,18 @@
     "mtime": 1792577038.9067242,
     "seen": 1792577275.5698204,
     "ast_hash": "e926099ab3f972d2387ea78bd9878315",
+    "semantic_hash": ""
+  },
+  "src/audio/sound.ts": {
+    "mtime": 1792618083.5641391,
+    "seen": 1792618514.4399214,
+    "ast_hash": "c767651403409b6b0ed9fab3a021b2dd",
+    "semantic_hash": ""
+  },
+  "src/sim/balance.test.ts": {
+    "mtime": 1792618236.6733825,
+    "seen": 1792618514.4399629,
+    "ast_hash": "f32e5e3e882fc100753a60ec902ee709",
     "semantic_hash": ""
   }
 }
