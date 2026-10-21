@@ -95,6 +95,11 @@ export interface World {
   time: number;
   /** Buildings whose look changed (a house rising a level): the renderer redraws and clears them. */
   changed: number[];
+  /** Goods made and carted into the stores so far, by kind. */
+  made: Stock;
+  /** The quest being worked on (index into QUESTS), and news for the player (the UI takes them). */
+  quest: number;
+  news: string[];
   nextId: number;
 }
 
@@ -152,6 +157,9 @@ export function createWorld(map: GameMap): World {
     fertile,
     time: 0,
     changed: [],
+    made: emptyStock(),
+    quest: 0,
+    news: [],
     nextId: 1,
   };
   // The player's first ship, with the goods to found a town, off the largest island; the free

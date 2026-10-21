@@ -34,6 +34,7 @@ import {
 import { CAP, tick, TICK, trouble } from './sim/economy';
 import { buildShip, FILL, KEEP, moveShip, sailToHarbor, setSailing, SHIP_COST, transfer } from './sim/ships';
 import { createPanel } from './ui/panel';
+import { QUESTS, questTick, rewardOf } from './sim/quests';
 import { balance, unmet } from './sim/population';
 import { LEVELS, NEED_NAMES } from './data/population';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
@@ -284,6 +285,32 @@ addEventListener('keydown', (e) => {
   } else if (['1', '2', '3'].includes(e.key)) setSpeed([1, 2, 4][Number(e.key) - 1]);
 });
 
+/** The quest card: the task at hand, how to do it and how far along it is; it folds to one line. */
+const questCard = document.getElementById('quest')!;
+let questFolded = false;
+let questHtml = '';
+questCard.addEventListener('click', (e) => {
+  if (!(e.target as HTMLElement).closest('[data-act="fold"]')) return;
+  questFolded = !questFolded;
+  questHtml = '';
+});
+const showQuest = () => {
+  const q = QUESTS[world.quest];
+  const [done, needed] = q ? q.progress(world) : [1, 1];
+  const html = q
+    ? `<div class="qhead"><span>Feladat ${world.quest + 1}/${QUESTS.length}</span><button data-act="fold" title="${questFolded ? 'Kinyitás' : 'Összecsukás'}">${questFolded ? '▾' : '▴'}</button></div>` +
+      `<h3>${q.title}</h3>` +
+      (questFolded ? '' : `<p>${q.text}</p>`) +
+      `<div class="bar"><i style="width:${Math.round((done / needed) * 100)}%"></i></div>` +
+      `<small>${q.counts}: ${done}/${needed}${questFolded ? '' : ` · Jutalom: ${rewardOf(q)}`}</small>`
+    : '<h3>Minden feladat kész</h3><p>Virágzó szigetvilágot építettél. Játssz tovább kedvedre!</p>';
+  if (html !== questHtml) questCard.innerHTML = questHtml = html;
+};
+/** News (a quest done) pops up at the top for a few seconds, one after another. */
+const toast = document.getElementById('toast')!;
+let toastLeft = 0;
+const news: string[] = [];
+
 app.ticker.add((t) => {
   const realDt = t.deltaMS / 1000;
   // Everything alive moves in game time: paused, it all stands still (weather and water go on).
@@ -293,6 +320,15 @@ app.ticker.add((t) => {
     tick(world, TICK);
     simTime -= TICK;
   }
+  questTick(world);
+  news.push(...world.news.splice(0));
+  toastLeft -= realDt;
+  if (toastLeft <= 0 && news.length) {
+    toast.textContent = news.shift()!;
+    toastLeft = 5;
+  }
+  toast.hidden = toastLeft <= 0;
+  showQuest();
   // Houses that rose a level are redrawn.
   if (world.changed.length) {
     const tiles = world.changed.flatMap((id) => {

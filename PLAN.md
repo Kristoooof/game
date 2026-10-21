@@ -72,6 +72,7 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Szabadkereskedő NPC hajó: sorban járja a kikötőket, ahol a kikötő paneljén beállított áruból vesz (10 fölött) vagy elad (15-ig, másfélszeres áron)
 
 ### 6. UI és élmény
+- [x] Küldetések: 19 lépéses feladatlánc a partraszállástól a kereskedőházig (mit és hogyan kell csinálni, haladásjelző, jutalom pénzben/áruban, felugró értesítés teljesítéskor; a kártya összecsukható)
 - [ ] Magyar felület: felső sáv (pénz, lakosság), épület infópanel, raktár
 - [ ] Mobil elrendezés, érintés-barát gombok
 - [ ] Minimap

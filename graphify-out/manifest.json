@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "src/main.ts": {
-    "mtime": 1792575811.4273126,
-    "seen": 1792575849.8018415,
-    "ast_hash": "dd24999ef62b239f0cd25deed3ec773c",
+    "mtime": 1792576560.2556694,
+    "seen": 1792576639.9482214,
+    "ast_hash": "cb5794d2e2e91731c1b17978b8489dc7",
     "semantic_hash": ""
   },
   "src/render/iso.test.ts": {
@@ -144,15 +144,15 @@
     "semantic_hash": ""
   },
   "PLAN.md": {
-    "mtime": 1792575835.938738,
-    "seen": 1792575849.8019314,
-    "ast_hash": "2801e49dbf203f2dbac806eb5328f431",
+    "mtime": 1792576637.5699022,
+    "seen": 1792576639.9483736,
+    "ast_hash": "a912ffb3c07a75d549c28ac8a505609b",
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1792575564.3906364,
-    "seen": 1792575849.8019328,
-    "ast_hash": "0687e1e5243d909cffd97195a99d8462",
+    "mtime": 1792576562.3506958,
+    "seen": 1792576639.9483757,
+    "ast_hash": "564d5f0d0066e6f5130c6bcf0faeb86a",
     "semantic_hash": ""
   },
   "src/render/camera.test.ts": {
@@ -216,9 +216,9 @@
     "semantic_hash": ""
   },
   "src/sim/world.ts": {
-    "mtime": 1792575564.2146366,
-    "seen": 1792575849.8019023,
-    "ast_hash": "0931fd8aa7ed65b56e6674c173c8a2d4",
+    "mtime": 1792576472.692702,
+    "seen": 1792576639.9483109,
+    "ast_hash": "777098472e1a52c71a93f94ed0baa533",
     "semantic_hash": ""
   },
   "src/ui/buildMenu.ts": {
@@ -312,9 +312,9 @@
     "semantic_hash": ""
   },
   "src/sim/economy.ts": {
-    "mtime": 1792575392.7536302,
-    "seen": 1792575849.8018882,
-    "ast_hash": "afd7a1b22b7cca68b56e52d93a220f63",
+    "mtime": 1792576472.692108,
+    "seen": 1792576639.9482849,
+    "ast_hash": "fb187ef9cd3b534e29fbe52ab9cac3f9",
     "semantic_hash": ""
   },
   "src/data/population.ts": {
@@ -351,6 +351,18 @@
     "mtime": 1792575496.6546326,
     "seen": 1792575849.8019047,
     "ast_hash": "fa672a5a968063e3ea9de6e6a70da82b",
+    "semantic_hash": ""
+  },
+  "src/sim/quests.test.ts": {
+    "mtime": 1792576535.6676104,
+    "seen": 1792576639.9482973,
+    "ast_hash": "82ca58ff8ed6ddb809a34c7fe68db882",
+    "semantic_hash": ""
+  },
+  "src/sim/quests.ts": {
+    "mtime": 1792576562.050696,
+    "seen": 1792576639.9482994,
+    "ast_hash": "a557b66620e3e0b49d813c5d7d79a323",
     "semantic_hash": ""
   }
 }

@@ -150,6 +150,9 @@ function moveCart(w: World, c: Cart, dt: number) {
     // Home: into the island's store.
     const stock = w.stocks.get(islandOf(w, depot.x, depot.y));
     if (stock && c.good) stock[c.good] += c.amount;
+    // Counted as made when it is the producer's own goods (not its input brought back).
+    const p = BUILDINGS[w.buildings.get(c.producer)?.type ?? 'road'].production;
+    if (c.good && p?.output === c.good) w.made[c.good] += c.amount;
     return false;
   }
   return true;
