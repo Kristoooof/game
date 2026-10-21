@@ -20,7 +20,10 @@ test('harbor settles an island and claims land only on that island', () => {
   expect(owned(w, 5, 4)).toBe(1);
   expect(owned(w, 8, 1)).toBe(0);
   expect(owned(w, 7, 1)).toBe(0); // water
-  expect([w.gold, w.stock.wood, w.stock.tools]).toEqual([4000, 42, 27]);
+  // The first harbour takes in the ship's cargo: the island's own store now.
+  const stock = w.stocks.get(w.islands[1 * w.map.width + 1])!;
+  expect([w.gold, stock.wood, stock.tools]).toEqual([4000, 42, 27]);
+  expect(w.stocks.get(0)!.wood).toBe(0);
 });
 
 test('placement checks terrain, overlap, coast and cost; forest is cleared', () => {
@@ -31,7 +34,7 @@ test('placement checks terrain, overlap, coast and cost; forest is cleared', () 
   expect(place(w, 'house', 5, 2)).toBeNull();
   expect(w.map.tiles[2 * w.map.width + 5]).toBe('grass');
   expect(buildingAt(w, 6, 3)?.type).toBe('house');
-  w.stock.bricks = 0;
+  w.stocks.get(w.islands[2 * w.map.width + 2])!.bricks = 0;
   expect(placementError(w, 'chapel', 2, 3)).toBe('Nincs elég: tégla');
   w.gold = 0;
   expect(placementError(w, 'road', 3, 1)).toBe('Nincs elég arany');

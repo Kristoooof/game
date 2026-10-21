@@ -17,7 +17,8 @@ import { attachCameraControls, screenToWorld, type Camera } from './render/camer
 import { diamond, groundToScreen, screenToGround, setLevels, tileToScreen } from './render/iso';
 import { createTerrain, FAR_SCALE } from './render/terrain';
 import { type GameMap, type Terrain, generateMap, levelAt, parseMap, terrainAt } from './sim/map';
-import { buildingAt, createWorld, demolish, place, placementError, roadPath } from './sim/world';
+import { buildingAt, createWorld, demolish, islandOf, place, placementError, roadPath } from './sim/world';
+import { CAP, tick, TICK, trouble } from './sim/economy';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
 import { createAtmosphere, type Weather } from './render/atmosphere';
 import { createConstruction } from './render/construction';
@@ -62,15 +63,26 @@ const ICONS: Record<'gold' | Good, string> = {
     '<path d="M5 19 14 10" stroke="#7a5a35" stroke-width="3" stroke-linecap="round"/><path d="M12 5h7l-2 4h-6z" fill="#b8bec6" stroke="#4a4f57" stroke-width="1.2"/>',
   bricks:
     '<rect x="3" y="6" width="8" height="5" fill="#b5523a" stroke="#6a2a1a"/><rect x="12" y="6" width="9" height="5" fill="#c0603f" stroke="#6a2a1a"/><rect x="3" y="12" width="12" height="5" fill="#c0603f" stroke="#6a2a1a"/><rect x="16" y="12" width="5" height="5" fill="#b5523a" stroke="#6a2a1a"/>',
+  fish: '<path d="M3 12c4-5 10-5 14 0-4 5-10 5-14 0z" fill="#9aaab4" stroke="#4a5a64" stroke-width="1.2"/><path d="M17 12l4-3.5v7z" fill="#7a8a94" stroke="#4a5a64"/><circle cx="7" cy="11" r="1" fill="#1a2a34"/>',
+  wool: '<circle cx="9" cy="11" r="4.5" fill="#f0ead8" stroke="#8a8270"/><circle cx="15" cy="11" r="4.5" fill="#e8e0cc" stroke="#8a8270"/><circle cx="12" cy="15" r="4.5" fill="#f4eee0" stroke="#8a8270"/>',
+  cloth:
+    '<path d="M4 7h13l3 3v8H7l-3-3z" fill="#4a6a9a" stroke="#22344e" stroke-width="1.2"/><path d="M4 7v8l3 3v-8zM7 10h13" fill="#3a5680" stroke="#22344e"/><path d="M10 10v8M14 10v8" stroke="#6a8aba" stroke-width="0.8"/>',
 };
 const icon = (k: keyof typeof ICONS) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
-const showResources = () =>
-  (resources.innerHTML = [
+/** The island whose goods the bar shows: the one in the middle of the screen, or the last looked at. */
+let shownIsland = 0;
+let shownHtml = '';
+const showResources = () => {
+  const stock = world.stocks.get(shownIsland) ?? world.stocks.get(0)!;
+  const where = world.stocks.has(shownIsland) && shownIsland ? `${shownIsland}. sziget` : 'Hajó';
+  const html = [
     `<span title="Arany">${icon('gold')}${world.gold}</span>`,
-    ...(Object.keys(GOOD_NAMES) as Good[]).map(
-      (g) => `<span title="${GOOD_NAMES[g]}">${icon(g)}${world.stock[g]}</span>`,
-    ),
-  ].join(''));
+    `<span class="where" title="Kinek a készlete">${where}</span>`,
+    ...(Object.keys(GOOD_NAMES) as Good[]).map((g) => `<span title="${GOOD_NAMES[g]}">${icon(g)}${stock[g]}</span>`),
+  ].join('');
+  // Rewritten only when something changed: it is checked every frame.
+  if (html !== shownHtml) resources.innerHTML = shownHtml = html;
+};
 showResources();
 
 const app = new Application();
@@ -208,8 +220,56 @@ let dayTime = fixedTime !== null ? Number(fixedTime) : 0.32;
 const hex = (c: number[]) => (Math.round(c[0] * 255) << 16) | (Math.round(c[1] * 255) << 8) | Math.round(c[2] * 255);
 const countFps = createFpsCounter(document.getElementById('fps')!);
 const view = new Rectangle();
+/** Game speed: 0 paused, 1, 2 or 4 times. The world steps in fixed ticks of game time. */
+let speed = 1;
+let simTime = 0;
+const speedBar = document.getElementById('speed')!;
+const SPEEDS: [number, string, string][] = [
+  [
+    0,
+    '<svg viewBox="0 0 12 12" width="12" height="12"><rect x="2" y="1.5" width="3" height="9" fill="currentColor"/><rect x="7" y="1.5" width="3" height="9" fill="currentColor"/></svg>',
+    'Szünet (szóköz)',
+  ],
+  [1, '1×', 'Normál (1)'],
+  [2, '2×', 'Gyors (2)'],
+  [4, '4×', 'Nagyon gyors (3)'],
+];
+const setSpeed = (v: number) => {
+  speed = v;
+  speedBar.replaceChildren(
+    ...SPEEDS.map(([k, label, title]) => {
+      const b = Object.assign(document.createElement('button'), { innerHTML: label, title });
+      b.classList.toggle('active', k === v);
+      b.addEventListener('click', () => setSpeed(k));
+      return b;
+    }),
+  );
+};
+setSpeed(1);
+let lastSpeed = 1;
+addEventListener('keydown', (e) => {
+  if ((e.target as HTMLElement).tagName === 'INPUT') return;
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (speed) [lastSpeed, speed] = [speed, 0];
+    setSpeed(speed || lastSpeed);
+  } else if (['1', '2', '3'].includes(e.key)) setSpeed([1, 2, 4][Number(e.key) - 1]);
+});
+
 app.ticker.add((t) => {
-  const dt = t.deltaMS / 1000;
+  const realDt = t.deltaMS / 1000;
+  // Everything alive moves in game time: paused, it all stands still (weather and water go on).
+  const dt = realDt * speed;
+  simTime = Math.min(simTime + dt, 2);
+  while (simTime >= TICK) {
+    tick(world, TICK);
+    simTime -= TICK;
+  }
+  const centre = tileAt(app.screen.width / 2, app.screen.height / 2);
+  const here = centre && islandOf(world, centre.x, centre.y);
+  if (here && world.stocks.has(here)) shownIsland = here;
+  showResources();
+  if (info) info();
   const tl = screenToWorld(cam, 0, 0);
   view.x = tl.x;
   view.y = tl.y;
@@ -218,7 +278,7 @@ app.ticker.add((t) => {
   if (fixedTime === null && settings.dayCycle) dayTime = (dayTime + dt / DAY_SECONDS) % 1;
   const day = daylight(fixedTime !== null || settings.dayCycle ? dayTime : 0.42);
   // Weather dims and greys the light; clouds dull the sea's glints.
-  atmosphere.update(dt, view, app.screen, day.sunStrength, settings.weather);
+  atmosphere.update(realDt, view, app.screen, day.sunStrength, settings.weather);
   const { cloud, rain, fog } = atmosphere.sky;
   const dim = 1 - rain * 0.28 - cloud * 0.1;
   const ambient = day.ambient.map((v, i, a) => {
@@ -242,7 +302,7 @@ app.ticker.add((t) => {
     [view.x + view.width * 0.62, 50 / cam.scale, day.night * (1 - cloud * 0.8)],
     [fog, rain, cloud],
   );
-  terrain.update(dt, view, cam.scale);
+  terrain.update(realDt, view, cam.scale);
   construction.update(dt);
   life.update(dt, view, cam.scale < FAR_SCALE);
   terrain.front.visible = cam.scale >= FAR_SCALE;
@@ -252,13 +312,13 @@ app.ticker.add((t) => {
   const windy = settings.wind && cam.scale >= FAR_SCALE;
   terrain.objects.filters = windy ? [wind] : [];
   if (windy) {
-    windTime += dt;
+    windTime += realDt;
     const u = wind.resources.wind.uniforms;
     u.uTime = windTime;
     u.uView.set([view.x, view.y, cam.scale, app.renderer.resolution]);
   }
   app.renderer.render({ container: waterScene, target: waterTexture, transform: waterTransform, clear: true });
-  effects.update(dt, view, cam.scale < FAR_SCALE);
+  effects.update(realDt, view, cam.scale < FAR_SCALE);
   const { width, height } = app.canvas;
   countFps(
     settings.fps,
@@ -313,10 +373,13 @@ const footprint = (x: number, y: number, size: number) => {
 };
 
 let tool: Tool = null;
+/** Refreshes the selected building's line in the hud, while one is selected. */
+let info: (() => void) | null = null;
 let roadStart: { x: number; y: number } | null = null;
 
 const menu = createBuildMenu(document.getElementById('build')!, (t) => {
   tool = t;
+  info = null;
   roadStart = null;
   preview.clear();
   ghost.clear();
@@ -390,10 +453,25 @@ attachCameraControls(app.canvas, cam, {
   onTap(sx, sy) {
     const t = tileAt(sx, sy);
     selection.clear();
+    info = null;
     if (!t) return say();
     const b = buildingAt(world, t.x, t.y);
     outline(selection, t.x, t.y, 0.9);
-    say(`(${t.x}, ${t.y}) ${TERRAIN_NAMES[terrainAt(map, t.x, t.y)!]}${b ? ` · ${BUILDINGS[b.type].name}` : ''}`);
+    const where = `(${t.x}, ${t.y}) ${TERRAIN_NAMES[terrainAt(map, t.x, t.y)!]}`;
+    const p = b && BUILDINGS[b.type].production;
+    if (!b || !p) return say(`${where}${b ? ` · ${BUILDINGS[b.type].name}` : ''}`);
+    if (world.stocks.has(islandOf(world, b.x, b.y))) shownIsland = islandOf(world, b.x, b.y);
+    // A producer: how well it works and why not better, kept up to date while selected.
+    info = () => {
+      if (!world.buildings.has(b.id)) return (info = null);
+      const goods = `${GOOD_NAMES[p.output].toLowerCase()} ${b.output}/${CAP}`;
+      const input = p.input ? ` · ${GOOD_NAMES[p.input].toLowerCase()} ${b.input}/${CAP}` : '';
+      const why = trouble(world, b);
+      say(
+        `${BUILDINGS[b.type].name} · hatékonyság ${Math.round(b.busy! * 100)}% · ${goods}${input}${why ? ` · ${why}` : ''}`,
+      );
+    };
+    info();
   },
   paint: {
     active: () => tool !== null,

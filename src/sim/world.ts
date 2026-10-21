@@ -6,6 +6,30 @@ export interface Building {
   type: BuildingId;
   x: number;
   y: number;
+  /** Production buildings: goods made and waiting for a cart, inputs delivered, progress of the
+   * current piece (0..1), and how hard it has been working of late (0..1). */
+  output?: number;
+  input?: number;
+  progress?: number;
+  busy?: number;
+}
+
+export type Stock = Record<Good, number>;
+
+/** A depot's cart: out along `route` (road tile indices) to a producer and back. */
+export interface Cart {
+  id: number;
+  depot: number;
+  producer: number;
+  route: number[];
+  /** Position along the route in tiles; `dir` 1 going out, -1 coming back. */
+  pos: number;
+  dir: number;
+  /** Seconds left loading or unloading at either end. */
+  wait: number;
+  /** What it carries and how much: fetching a producer's goods, or taking it its input. */
+  good: Good | null;
+  amount: number;
 }
 
 export interface World {
@@ -17,9 +41,31 @@ export interface World {
   /** 1 where the player may build. */
   owned: Uint8Array;
   gold: number;
-  // shortcut: one global stock, split per island in milestone 3 (warehouse storage).
-  stock: Record<Good, number>;
+  /** Goods per island (label), kept in its harbour and warehouses. Key 0 is the ship's hold:
+   * what the player starts with, unloaded at the first harbour. */
+  stocks: Map<number, Stock>;
+  carts: Cart[];
+  /** Game time, seconds. */
+  time: number;
   nextId: number;
+}
+
+export const emptyStock = (): Stock => Object.fromEntries(Object.keys(GOOD_NAMES).map((g) => [g, 0])) as Stock;
+
+export const islandOf = (w: World, x: number, y: number) => w.islands[y * w.map.width + x];
+
+/**
+ * The stock that pays for building at (x, y): its island's. An island without one yet (being
+ * settled) is paid for from the ship's hold, or once that is empty from the richest island.
+ */
+// shortcut: the richest island stands in for a ship bringing the goods until ships sail (milestone 5).
+export function payingStock(w: World, x: number, y: number): Stock {
+  const own = w.stocks.get(islandOf(w, x, y));
+  if (own) return own;
+  const hold = w.stocks.get(0)!;
+  if (Object.values(hold).some((n) => n > 0)) return hold;
+  const total = (s: Stock) => Object.values(s).reduce((a, n) => a + n, 0);
+  return [...w.stocks.values()].reduce((a, b) => (total(b) > total(a) ? b : a), hold);
 }
 
 export function createWorld(map: GameMap): World {
@@ -31,7 +77,9 @@ export function createWorld(map: GameMap): World {
     occupied: new Int32Array(n),
     owned: new Uint8Array(n),
     gold: 5000,
-    stock: { wood: 50, tools: 30, bricks: 20 },
+    stocks: new Map([[0, { ...emptyStock(), wood: 50, tools: 30, bricks: 20 }]]),
+    carts: [],
+    time: 0,
     nextId: 1,
   };
 }
@@ -68,8 +116,9 @@ export function placementError(w: World, type: BuildingId, x: number, y: number)
   );
   if (def.coast && !touchesWater) return 'Partra kell építeni';
   if (w.gold < def.cost.gold) return 'Nincs elég arany';
+  const stock = payingStock(w, x, y);
   for (const g of Object.keys(GOOD_NAMES) as Good[])
-    if (w.stock[g] < (def.cost[g] ?? 0)) return `Nincs elég: ${GOOD_NAMES[g].toLowerCase()}`;
+    if (stock[g] < (def.cost[g] ?? 0)) return `Nincs elég: ${GOOD_NAMES[g].toLowerCase()}`;
   return null;
 }
 
@@ -78,15 +127,26 @@ export function place(w: World, type: BuildingId, x: number, y: number): string 
   const err = placementError(w, type, x, y);
   if (err) return err;
   const def = BUILDINGS[type];
+  const stock = payingStock(w, x, y);
   const id = w.nextId++;
-  w.buildings.set(id, { id, type, x, y });
+  w.buildings.set(
+    id,
+    def.production ? { id, type, x, y, output: 0, input: 0, progress: 0, busy: 0 } : { id, type, x, y },
+  );
   for (const [tx, ty] of footprint(type, x, y)) {
     const i = ty * w.map.width + tx;
     w.occupied[i] = id;
     if (w.map.tiles[i] === 'forest') w.map.tiles[i] = 'grass';
   }
   w.gold -= def.cost.gold;
-  for (const g of Object.keys(GOOD_NAMES) as Good[]) w.stock[g] -= def.cost[g] ?? 0;
+  for (const g of Object.keys(GOOD_NAMES) as Good[]) stock[g] -= def.cost[g] ?? 0;
+  // A new island's first depot opens its store; the first of all takes in the ship's cargo.
+  const island = islandOf(w, x, y);
+  if (def.depot && !w.stocks.has(island)) {
+    const hold = w.stocks.get(0)!;
+    w.stocks.set(island, w.stocks.size === 1 ? { ...hold } : emptyStock());
+    if (w.stocks.size === 2) w.stocks.set(0, emptyStock());
+  }
   if (def.radius) updateTerritory(w);
   return null;
 }

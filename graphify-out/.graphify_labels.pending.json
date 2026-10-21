@@ -7,7 +7,7 @@
   "5": "compilerOptions",
   "6": "caveman-commit",
   "7": "caveman-review",
-  "8": "terrain.ts",
+  "8": "applySettings",
   "9": "Ponytail Help",
   "10": "render/buildings.ts",
   "11": "ponytail-audit/SKILL.md",
@@ -18,7 +18,7 @@
   "16": ".claude/CLAUDE.md",
   "17": "camera.ts",
   "18": "showPreview",
-  "19": "data/buildings.ts",
+  "19": "world.ts",
   "20": "settings.ts",
   "21": "map.ts",
   "22": "refresh",
@@ -26,5 +26,5 @@
   "24": "textures.ts",
   "25": "daylight.ts",
   "26": "life.ts",
-  "27": "world.ts"
+  "27": "setSpeed"
 }

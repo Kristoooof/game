@@ -50,11 +50,11 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Kikötő/raktár hatósugár – csak ezen belül lehet építeni
 
 ### 3. Gazdaság és termelési láncok
-- [ ] Szimulációs tick, játékidő, szünet és gyorsítás
-- [ ] Áruk és raktárkészlet szigetenként (most még egy közös készlet)
-- [ ] Termelő épületek (favágó, halász, birkafarm → szövöde, stb.)
-- [ ] Szállítók: piaci/raktári kocsik útkereséssel (A*) az utakon
-- [ ] Termelés hatékonyság kijelzése
+- [x] Szimulációs tick (fix 0,25 s játékidő), szünet és gyorsítás (1×/2×/4×; szóköz, 1/2/3)
+- [x] Áruk és raktárkészlet szigetenként (a kezdő készlet a hajón, az első kikötő kirakja; a felső sáv a képernyő közepén lévő sziget készletét mutatja)
+- [x] Termelő épületek: favágó (erdő), halász (víz), birkafarm (fű) → szövöde (posztó), kovácsműhely (fa → szerszám), téglaégető (hegy/sziklás part); a környező terep adja a sebességet
+- [x] Szállítók: minden kikötőnek/raktárnak egy szekere, legrövidebb úton viszi a termelők árut a sziget raktárába, és hozza nekik az alapanyagot
+- [x] Termelés hatékonyság kijelzése (koppintásra: hatékonyság, készlet, ok: nincs út, megtelt, nincs alapanyag, kevés erdő)
 
 ### 4. Lakosság
 - [ ] Lakóházak, lakossági szintek (Paraszt → Polgár → Kereskedő)

@@ -89,6 +89,46 @@
         width: 18px;
         height: 18px;
       }
+      #resources .where {
+        font-weight: normal;
+        font-style: italic;
+        opacity: 0.8;
+      }
+      /* Game speed: a small wooden bar of buttons, beside the settings gear. */
+      #speed {
+        position: fixed;
+        top: 8px;
+        right: 60px;
+        z-index: 1;
+        display: flex;
+        gap: 2px;
+        padding: 4px;
+        border: 2px solid #1e140a;
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--frame);
+      }
+      #speed button {
+        min-width: 38px;
+        height: 30px;
+        border: 0;
+        border-radius: 5px;
+        background: none;
+        color: var(--ink);
+        font:
+          600 15px 'Palatino Linotype',
+          Palatino,
+          Georgia,
+          serif;
+        cursor: pointer;
+      }
+      #speed button:hover {
+        background: rgba(232, 198, 122, 0.15);
+      }
+      #speed button.active {
+        background: linear-gradient(180deg, #c49a52, #8a6430 60%, #6e4c22);
+        color: #fffaf0;
+      }
       #hud {
         bottom: 110px;
         right: 8px;
@@ -355,6 +395,7 @@
   </head>
   <body>
     <div id="resources"></div>
+    <div id="speed"></div>
     <div id="hud"></div>
     <div id="build"></div>
     <div id="settings"></div>

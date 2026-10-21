@@ -883,6 +883,144 @@ export function drawBuilding(
       barrel(g, x + 1.15, y + 1.8);
       break;
     }
+    case 'sheepfarm': {
+      // Thatched fold at the back, a fenced paddock in front with the flock and a haystack.
+      const b = box(0.12, 0.12, 1.15, 0.85);
+      gabled(g, b, 8, 9, 0x9a7a52, 0xa08a50, true);
+      for (let t = 0.08; t < 1; t += 0.11) onLeft(g, b, t, t + 0.012, 0, 8, 0x6a5232);
+      door(g, b, 0.55, 0.3, 6.5, 0x4a3a2a);
+      const hay = P(x + 1.55, y + 0.45, 0);
+      g.ellipse(hay[0], hay[1] - 4, 7, 6).fill(0xc8a850);
+      g.ellipse(hay[0] - 2, hay[1] - 6, 3.5, 2.6).fill(0xdcc070);
+      g.moveTo(hay[0] - 6, hay[1] - 2)
+        .lineTo(hay[0] + 6, hay[1] - 2)
+        .stroke({ width: 0.5, color: 0x8a7030 });
+      // Sheep: woolly bodies, dark faces, a few heads down grazing.
+      for (const [u, v, k] of [
+        [0.45, 1.25, 0],
+        [0.85, 1.45, 1],
+        [1.3, 1.2, 0],
+        [1.55, 1.6, 1],
+        [0.95, 1.05, 0],
+      ]) {
+        const [sx, sy] = P(x + u, y + v, 0);
+        g.ellipse(sx + 0.5, sy, 4, 1.2).fill({ color: 0x000000, alpha: 0.18 });
+        g.rect(sx - 2, sy - 2.5, 0.8, 2.5)
+          .fill(0x3a3430)
+          .rect(sx + 1.6, sy - 2.5, 0.8, 2.5)
+          .fill(0x3a3430);
+        g.ellipse(sx, sy - 4, 3.6, 2.4).fill(0xeee8d8);
+        g.ellipse(sx - 0.8, sy - 4.8, 2.2, 1.3).fill(0xfaf6ec);
+        g.ellipse(sx + 3.6, sy - (k ? 2.6 : 4.8), 1.3, 1).fill(0x3a3430);
+      }
+      // Post-and-rail fence round the paddock's open sides.
+      const fence = [
+        [0.08, 0.95],
+        [0.08, 1.9],
+        [1.9, 1.9],
+        [1.9, 0.08],
+      ];
+      for (let k = 0; k < fence.length - 1; k++) {
+        const [a, c] = [fence[k], fence[k + 1]];
+        for (const h of [2.2, 4.2]) {
+          const [p0, p1] = [P(x + a[0], y + a[1], h), P(x + c[0], y + c[1], h)];
+          g.moveTo(p0[0], p0[1]).lineTo(p1[0], p1[1]);
+        }
+        for (let t = 0; t <= 1; t += 0.2) {
+          const [px, py] = P(x + a[0] + (c[0] - a[0]) * t, y + a[1] + (c[1] - a[1]) * t, 0);
+          g.moveTo(px, py).lineTo(px, py - 5);
+        }
+      }
+      g.stroke({ width: 0.8, color: 0x6a4a2a });
+      break;
+    }
+    case 'weaver': {
+      // Half-timbered workshop; bolts of dyed cloth drying on a line in front.
+      const b = box(0.15, 0.15, 1.45, 1.25);
+      gabled(g, b, 14, 10, 0xe2d6b8, 0x8a4a32);
+      timber(g, b, 14);
+      door(g, b, 0.42, 0.18, 8, 0x5a3a20);
+      for (const t of [0.12, 0.72]) windowLeft(g, b, t, 0.12, 5, 9.5, 0x4a6a8a);
+      windowRight(g, b, 0.3, 0.3, 6, 10);
+      const [l0, l1] = [P(x + 1.62, y + 0.25, 12), P(x + 1.62, y + 1.6, 12)];
+      for (const [px, py] of [l0, l1]) g.moveTo(px, py).lineTo(px, py + 12);
+      g.moveTo(l0[0], l0[1]).lineTo(l1[0], l1[1]);
+      g.stroke({ width: 1, color: 0x4a3420 });
+      [0x3f5f8a, 0xb84a3a, 0xd8c890, 0x5a7a3a].forEach((c, k) => {
+        const t = 0.15 + k * 0.2;
+        const [a0, a1] = [P(x + 1.62, y + 0.25 + t * 1.35, 12), P(x + 1.62, y + 0.25 + (t + 0.14) * 1.35, 12)];
+        g.poly([a0[0], a0[1], a1[0], a1[1], a1[0], a1[1] + 8, a0[0], a0[1] + 7]).fill(c);
+        g.poly([a0[0], a0[1], a1[0], a1[1], a1[0], a1[1] + 1.2, a0[0], a0[1] + 1.2]).fill(shade(c, 0.7));
+      });
+      sack(g, x + 0.3, y + 1.55);
+      sack(g, x + 0.55, y + 1.62);
+      break;
+    }
+    case 'smithy': {
+      // Stone forge under a slate roof, its open front glowing, an anvil and a quench tub outside.
+      const b = box(0.2, 0.2, 1.35, 1.3);
+      gabled(g, b, 11, 9, 0xa09a8c, 0x4f5866);
+      lit(onLeft(g, b, 0.35, 0.75, 0, 7, 0x2a1a12));
+      onLeft(g, b, 0.4, 0.7, 0, 3, 0xd8742a);
+      onLeft(g, b, 0.45, 0.65, 0.5, 2, 0xffc060);
+      onLeft(g, b, 0.32, 0.78, 7, 8.2, 0x5b3b24);
+      windowRight(g, b, 0.35, 0.3, 5, 8);
+      const stack = box(0.35, 0.35, 0.62, 0.62);
+      walls(g, stack, 11, 28, 0x8a8478);
+      walls(g, box(0.32, 0.32, 0.65, 0.65), 28, 29.5, 0x5e5850);
+      const [ax, ay] = P(x + 1.0, y + 1.6, 0);
+      g.rect(ax - 1.5, ay - 4, 3, 4).fill(0x5a3e22);
+      g.poly([ax - 4, ay - 6, ax + 3, ay - 6, ax + 4.5, ay - 5, ax + 3, ay - 4, ax - 3, ay - 4]).fill(0x3a3e44);
+      g.rect(ax - 4, ay - 6.4, 7, 0.6).fill(0x8a9098);
+      barrel(g, x + 1.6, y + 1.5);
+      crate(g, x + 1.45, y + 0.3, 0.3, 0x7a5a36);
+      break;
+    }
+    case 'brickworks': {
+      // A squat kiln with its own chimney, a drying shed on posts, stacks of finished bricks.
+      const kiln = box(0.15, 0.15, 0.95, 0.95);
+      walls(g, kiln, 0, 12, 0xa8543a);
+      fill(g, [P(kiln.x0, kiln.y1, 12), P(kiln.x1, kiln.y1, 12), P(0.55 + x, 0.55 + y, 19)], 0x8a3e2a);
+      fill(g, [P(kiln.x1, kiln.y1, 12), P(kiln.x1, kiln.y0, 12), P(0.55 + x, 0.55 + y, 19)], 0x6e3020);
+      lit(onLeft(g, kiln, 0.35, 0.65, 0, 4.5, 0x2a1410));
+      onLeft(g, kiln, 0.4, 0.6, 0.3, 2.4, 0xe0802a);
+      const stack = box(0.48, 0.48, 0.66, 0.66);
+      walls(g, stack, 16, 30, 0x8a4430);
+      // Drying shed: four posts and a plank roof over rows of green bricks.
+      const shed = box(1.05, 0.2, 1.85, 1.0);
+      for (const [u, v] of [
+        [shed.x0, shed.y0],
+        [shed.x1, shed.y0],
+        [shed.x0, shed.y1],
+        [shed.x1, shed.y1],
+      ]) {
+        const [p0, p1] = [P(u, v, 0), P(u, v, 9)];
+        g.moveTo(p0[0], p0[1]).lineTo(p1[0], p1[1]);
+      }
+      g.stroke({ width: 1, color: 0x4a3420 });
+      for (let k = 0; k < 3; k++) walls(g, box(1.15, 0.3 + k * 0.22, 1.75, 0.4 + k * 0.22), 0, 2.5, 0x9a8a6a);
+      fill(
+        g,
+        [
+          P(shed.x0 - 0.05, shed.y0, 10),
+          P(shed.x1 + 0.05, shed.y0, 10),
+          P(shed.x1 + 0.05, shed.y1 + 0.08, 8.5),
+          P(shed.x0 - 0.05, shed.y1 + 0.08, 8.5),
+        ],
+        0x7a5a36,
+      );
+      // Fired bricks stacked in the yard.
+      for (const [u, v] of [
+        [0.3, 1.3],
+        [0.75, 1.45],
+        [1.3, 1.4],
+      ]) {
+        const pile = box(u, v, u + 0.3, v + 0.25);
+        walls(g, pile, 0, 6, 0xb5523a);
+        for (let h = 1.5; h < 6; h += 1.5) onLeft(g, pile, 0, 1, h - 0.15, h + 0.15, 0x7a3020);
+      }
+      break;
+    }
     case 'chapel': {
       const nave = box(0.2, 0.4, 1.6, 1.55);
       gabled(g, nave, 14, 10, 0xe2dccd, 0x4f5866);
@@ -939,9 +1077,11 @@ export function drawBuilding(
 
 /** World point where smoke leaves a building's chimney, if it has one. */
 export function chimneyAt(type: BuildingId, x: number, y: number) {
-  if (type !== 'house') return null;
   lift = liftAt(x, y);
-  const [px, py] = P(x + 0.535, y + 0.535, 29);
+  // The forge and the kiln smoke too.
+  const at = { house: [0.535, 29], smithy: [0.485, 30], brickworks: [0.57, 31] }[type as string];
+  if (!at) return null;
+  const [px, py] = P(x + at[0], y + at[0], at[1]);
   return { x: px, y: py };
 }
 

@@ -1,7 +1,7 @@
 import { Container, Graphics, type Rectangle, type Renderer, Sprite, type Texture } from 'pixi.js';
 import { terrainAt } from '../sim/map';
-import { roadRoute, roadsBeside, type World } from '../sim/world';
-import { BUILDINGS } from '../data/buildings';
+import { type World } from '../sim/world';
+import { BUILDINGS, type Good } from '../data/buildings';
 import { pierBox } from './buildings';
 import { groundToScreen } from './iso';
 
@@ -216,7 +216,16 @@ const walkerArt = (r: Renderer) =>
     }),
   );
 type Figure = ReturnType<typeof walkerArt>[number];
-type Load = 'crates' | 'sacks' | 'logs' | 'barrels';
+type Load = 'crates' | 'sacks' | 'logs' | 'barrels' | 'empty';
+/** How each good travels on a cart. */
+const LOADS: Record<Good, Load> = {
+  wood: 'logs',
+  tools: 'crates',
+  bricks: 'crates',
+  fish: 'barrels',
+  wool: 'sacks',
+  cloth: 'sacks',
+};
 /**
  * A horse in profile facing right, at trot frame `f` of ROLL: legs jointed at the knee and hock,
  * moving in diagonal pairs; barrel body, arched neck, a head with muzzle and ear, mane and tail.
@@ -307,7 +316,7 @@ const cartArt = (r: Renderer, load: Load, f: number) =>
           .fill(0xdcb980)
           .stroke({ width: 0.3, color: 0x7a4f25 });
       }
-    else
+    else if (load === 'barrels')
       for (const x of [-10.5, -6]) {
         g.roundRect(x - 2.2, -16, 4.4, 6, 1.4).fill(0x7a5230);
         g.moveTo(x - 2.2, -14)
@@ -460,16 +469,6 @@ interface Walker {
   pace: number;
   lane: number;
 }
-interface Cart {
-  s: Sprite;
-  frames: Baked[];
-  route: number[];
-  /** Position along the route in tiles; the cart turns round at either end after a pause. */
-  pos: number;
-  dir: number;
-  wait: number;
-  home: number[];
-}
 interface Vessel {
   g: Graphics;
   mirror: Graphics;
@@ -488,10 +487,9 @@ interface Vessel {
 }
 
 const WALK_SPEED = 0.7;
-const CART_SPEED = 1.1;
 
 /**
- * Life on the map: people walking the roads, carts between warehouses and houses, fishing boats
+ * Life on the map: people walking the roads, the depots' carts going to and from the producers, fishing boats
  * off the fishers' huts and sailing ships at sea. They go in `front`, depth-sorted with the
  * buildings and trees; wakes and reflections in `water`, between the sea and the land.
  */
@@ -507,9 +505,12 @@ export function createLife(
   const mirrors = new Container({ eventMode: 'none', alpha: 0.28 });
   const water = new Container({ children: [wakes, mirrors], eventMode: 'none' });
   const walkerFrames = walkerArt(renderer);
-  const cartArts = (['crates', 'sacks', 'logs', 'barrels'] as const).map((l) =>
-    Array.from({ length: ROLL }, (_, f) => cartArt(renderer, l, f)),
-  );
+  const cartArts = Object.fromEntries(
+    (['crates', 'sacks', 'logs', 'barrels', 'empty'] as const).map((l) => [
+      l,
+      Array.from({ length: ROLL }, (_, f) => cartArt(renderer, l, f)),
+    ]),
+  ) as Record<Load, Baked[]>;
 
   const center = (i: number) => groundToScreen((i % W) + 0.5, Math.floor(i / W) + 0.5);
   /** Tile x + y of a point a fraction t from tile i's centre to tile j's (matches the scene's zIndex). */
@@ -565,7 +566,7 @@ export function createLife(
   };
 
   let walkers: Walker[] = [];
-  let carts: Cart[] = [];
+  const carts = new Map<number, Sprite>();
   const ships: Vessel[] = [];
   let boats: Vessel[] = [];
   /** Wake foam left at the stern; `trail` joins the points of one side of one vessel into a line. */
@@ -659,23 +660,6 @@ export function createLife(
           pace: 0.8 + Math.random() * 0.45,
           lane: 3 + Math.random() * 4.5,
         });
-      }
-      // Carts: one per warehouse or harbour, to houses it can reach by road.
-      for (const c of carts) c.s.destroy();
-      carts = [];
-      for (const b of world.buildings.values()) {
-        if (b.type !== 'warehouse' && b.type !== 'harbor') continue;
-        const home = roadsBeside(world, b);
-        const targets = houses.map((h) => roadsBeside(world, h)).filter((r) => r.length);
-        const route =
-          home.length && targets.length
-            ? roadRoute(world, home, targets[Math.floor(Math.random() * targets.length)])
-            : null;
-        if (!route || route.length < 2) continue;
-        const frames = cartArts[b.id % cartArts.length];
-        const s = spriteOf(frames[0]);
-        front.addChild(s);
-        carts.push({ s, frames, route, pos: 0, dir: 1, wait: 1, home });
       }
       piers = [...world.buildings.values()].flatMap((b) =>
         b.type === 'harbor' || b.type === 'fisher' ? (pierBox(map, b.x, b.y, BUILDINGS[b.type].size) ?? []) : [],
@@ -780,32 +764,36 @@ export function createLife(
         w.s.scale.set(face * w.broad, w.tall);
       }
 
-      for (const c of carts) {
-        if (c.wait > 0) {
-          c.wait -= dt;
-        } else {
-          c.pos += c.dir * dt * CART_SPEED;
-          if (c.pos >= c.route.length - 1 || c.pos <= 0) {
-            c.pos = Math.max(0, Math.min(c.route.length - 1, c.pos));
-            c.dir = -c.dir;
-            c.wait = 2;
-          }
+      // Carts: the economy's own, going out to the producers and back with what they carry.
+      for (const [id, sp] of carts)
+        if (!world.carts.some((c) => c.id === id)) {
+          sp.destroy();
+          carts.delete(id);
         }
-        const i = Math.min(c.route.length - 2, Math.floor(c.pos));
+      for (const c of world.carts) {
+        let sp = carts.get(c.id);
+        if (!sp) {
+          sp = spriteOf(cartArts.empty[0]);
+          front.addChild(sp);
+          carts.set(c.id, sp);
+        }
+        const i = Math.max(0, Math.min(c.route.length - 2, Math.floor(c.pos)));
         const a = center(c.route[i]);
-        const b = center(c.route[i + 1]);
-        const t = c.pos - i;
+        const b = center(c.route[Math.min(i + 1, c.route.length - 1)]);
+        const t = Math.min(1, c.pos - i);
         const x = a.x + (b.x - a.x) * t;
         const y = a.y + (b.y - a.y) * t;
-        c.s.visible = inView(x, y);
-        c.s.zIndex = depth(c.route[i], c.route[i + 1], t);
-        c.s.position.set(x, y);
+        sp.visible = inView(x, y);
+        sp.zIndex = depth(c.route[i], c.route[Math.min(i + 1, c.route.length - 1)], t);
+        sp.position.set(x, y);
         // Drawn to the villagers' scale: the horse a horse beside them, not a pony.
-        c.s.scale.set((b.x - a.x) * c.dir < 0 ? -1.3 : 1.3, 1.3);
+        if (b.x !== a.x) sp.scale.set((b.x - a.x) * c.dir < 0 ? -1.3 : 1.3, 1.3);
+        else sp.scale.set(1.3 * Math.sign(sp.scale.x || 1), 1.3);
         // Wheel and hooves keep pace with the ground covered; still while it waits.
-        const fr = c.frames[Math.floor(c.pos * ROLL * 3) % ROLL];
-        c.s.texture = fr.texture as Texture;
-        c.s.anchor.set(fr.ax, fr.ay);
+        const frames = cartArts[c.good ? LOADS[c.good] : 'empty'];
+        const fr = frames[Math.floor(c.pos * ROLL * 3) % ROLL];
+        sp.texture = fr.texture as Texture;
+        sp.anchor.set(fr.ax, fr.ay);
       }
 
       const all = [...ships, ...boats];
