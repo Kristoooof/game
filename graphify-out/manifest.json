@@ -168,9 +168,9 @@
     "semantic_hash": ""
   },
   "src/render/terrain.ts": {
-    "mtime": 1792571028.438367,
-    "seen": 1792571040.6381958,
-    "ast_hash": "78ac04af59f6c1176fcfc52daa35e4ae",
+    "mtime": 1792573385.9705071,
+    "seen": 1792573594.7759323,
+    "ast_hash": "d4e0c8ca5ed9340cc088862e8bd12c15",
     "semantic_hash": ""
   },
   "src/sim/map.test.ts": {
@@ -204,9 +204,9 @@
     "semantic_hash": ""
   },
   "src/render/buildings.ts": {
-    "mtime": 1792406836.8058596,
-    "seen": 1792407368.657215,
-    "ast_hash": "65a9ff2dca8be62ff7ea35ee07c24ca7",
+    "mtime": 1792573064.4197946,
+    "seen": 1792573594.7759047,
+    "ast_hash": "9c55312b5ca90c6cfab273e2feeb1131",
     "semantic_hash": ""
   },
   "src/sim/world.test.ts": {
@@ -234,9 +234,9 @@
     "semantic_hash": ""
   },
   "src/render/ground.ts": {
-    "mtime": 1792570970.7522092,
-    "seen": 1792571040.6381862,
-    "ast_hash": "ac743eac9ebbc34840b8b5874ef882b9",
+    "mtime": 1792573361.3032215,
+    "seen": 1792573594.775922,
+    "ast_hash": "8fbaa023fbef0d8cc0b2e5afe2d07470",
     "semantic_hash": ""
   },
   "src/render/effects.ts": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "src/render/life.ts": {
-    "mtime": 1792570417.0192363,
-    "seen": 1792571040.6381907,
-    "ast_hash": "efd8e8a7339d59940966ea6f23686dab",
+    "mtime": 1792572997.2457883,
+    "seen": 1792573594.7759273,
+    "ast_hash": "3bd19fe860b54c1b3fe0a708082f775f",
     "semantic_hash": ""
   },
   "src/render/sculpt.ts": {

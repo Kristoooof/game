@@ -10,7 +10,7 @@ function bake(renderer: Renderer, draw: (g: Graphics) => void) {
   const g = new Graphics();
   draw(g);
   const b = g.getLocalBounds();
-  const texture = renderer.generateTexture({ target: g, resolution: 3, antialias: true });
+  const texture = renderer.generateTexture({ target: g, resolution: 6, antialias: true });
   g.destroy();
   return { texture, ax: -b.minX / b.width, ay: -b.minY / b.height };
 }
@@ -43,11 +43,9 @@ const walkerArt = (r: Renderer) =>
       const job = n % 3;
       const axe = !woman && job === 0;
       const sack = !woman && job === 1;
-      return Array.from({ length: STRIDE }, (_, k) => {
-        const ph = (k / STRIDE) * Math.PI * 2;
-        const swing = Math.sin(ph);
-        const up = -0.6 * Math.abs(Math.cos(ph));
-        return bake(r, (g) => {
+      /** One frame: `swing` of the stride, `up` of the body; `act` a phase of work (axe) or of talk. */
+      const frame = (swing: number, up: number, act?: number) =>
+        bake(r, (g) => {
           const dark = 0x2a2018;
           g.ellipse(0.3, 0, 3.6, 1.2).fill({ color: 0x000000, alpha: 0.24 });
           const hipY = -6 + up;
@@ -87,7 +85,7 @@ const walkerArt = (r: Renderer) =>
             g.roundRect(swing * 2 - 0.8, -1.2, 2, 1.2, 0.5).fill(0x241a12);
           } else leg(-swing, true);
           if (sack) arm(-1.4, -12.6 + up, true);
-          else arm(...swingHand(swing), true);
+          else if (act === undefined || !axe) arm(...swingHand(swing), true);
           if (woman) {
             g.roundRect(-swing * 2 - 0.8, -1.2, 2, 1.2, 0.5).fill(0x3a2a1a);
             // Long skirt swaying with the stride, an apron over it.
@@ -153,7 +151,34 @@ const walkerArt = (r: Renderer) =>
             } else if (n % 3 === 0) g.ellipse(hx - 0.2, hy - 1.6, 2.2, 1.1).fill(0x4a3020);
           }
           // Near arm last, with whatever it carries.
-          if (axe) {
+          if (act !== undefined && axe) {
+            // Chopping: both hands on the haft, swung from over the shoulder down to the cut.
+            const a = [-2.1, -1.4, -0.3, 0.55][Math.floor(act * 4)];
+            const [dx, dy] = [Math.cos(a), Math.sin(a)];
+            const [px, py] = [-dy, dx];
+            const [hx, hy] = [dx * 3.4, -11.2 + up + dy * 3.4];
+            arm(hx - dx * 0.8, hy - dy * 0.8, false);
+            arm(hx, hy, false);
+            const [ex, ey] = [hx + dx * 6, hy + dy * 6];
+            g.moveTo(hx - dx * 1.2, hy - dy * 1.2)
+              .lineTo(ex, ey)
+              .stroke({ width: 0.7, color: 0x8a6038, cap: 'round' });
+            g.poly([
+              ex - dx * 1.4,
+              ey - dy * 1.4,
+              ex + dx * 0.4,
+              ey + dy * 0.4,
+              ex + dx * 0.7 + px * 2.3,
+              ey + dy * 0.7 + py * 2.3,
+              ex - dx * 1.7 + px * 2.3,
+              ey - dy * 1.7 + py * 2.3,
+            ])
+              .fill(0x8c8c88)
+              .stroke({ width: 0.3, color: 0x4a4f57 });
+          } else if (act !== undefined) {
+            // Talking: the near hand comes up and goes down again as they speak.
+            arm(2.2, -8.2 + up - Math.sin(act * Math.PI * 2) * 1.6, false);
+          } else if (axe) {
             arm(1.6, -10.4 + up, false);
             g.moveTo(-1.2, -6.6 + up)
               .lineTo(3.6, -14.6 + up)
@@ -178,9 +203,19 @@ const walkerArt = (r: Renderer) =>
             g.poly([bx - 1.3, by + 0.6, bx + 1.3, by + 0.6, bx + 1, by + 3, bx - 1, by + 3]).fill(0x8a6038);
           } else arm(...swingHand(-swing), false);
         });
-      });
+      return {
+        axe,
+        walk: Array.from({ length: STRIDE }, (_, k) => {
+          const ph = (k / STRIDE) * Math.PI * 2;
+          return frame(Math.sin(ph), -0.6 * Math.abs(Math.cos(ph)));
+        }),
+        // Standing: still, breathing.
+        stand: [frame(0, 0), frame(0, -0.25)],
+        work: [0, 0.25, 0.5, 0.75].map((k) => frame(0, 0, k)),
+      };
     }),
   );
+type Figure = ReturnType<typeof walkerArt>[number];
 type Load = 'crates' | 'sacks' | 'logs' | 'barrels';
 /**
  * A horse in profile facing right, at trot frame `f` of ROLL: legs jointed at the knee and hock,
@@ -409,7 +444,14 @@ function drawShip(g: Graphics, a: number, small: boolean, mirrored = false) {
 
 interface Walker {
   s: Sprite;
-  frames: Baked[];
+  fig: Figure;
+  /** Seconds left standing still (to rest, talk or work), and at what; which way they face. */
+  idle: number;
+  work: boolean;
+  face: number;
+  /** Build: taller or shorter, broader or slighter than the drawing. */
+  tall: number;
+  broad: number;
   from: number;
   to: number;
   t: number;
@@ -599,12 +641,17 @@ export function createLife(
       while (walkers.length > want) walkers.pop()!.s.destroy();
       while (walkers.length < want) {
         const from = roads[Math.floor(Math.random() * roads.length)];
-        const frames = walkerFrames[Math.floor(Math.random() * walkerFrames.length)];
-        const s = spriteOf(frames[0]);
+        const fig = walkerFrames[Math.floor(Math.random() * walkerFrames.length)];
+        const s = spriteOf(fig.walk[0]);
         front.addChild(s);
         walkers.push({
           s,
-          frames,
+          fig,
+          idle: 0,
+          work: false,
+          face: 1,
+          tall: 1.2 + Math.random() * 0.2,
+          broad: 1.15 + Math.random() * 0.25,
           from,
           to: roadNeighbours(from)[0] ?? from,
           t: Math.random(),
@@ -658,16 +705,47 @@ export function createLife(
         x > view.x - m && x < view.x + view.width + m && y > view.y - m && y < view.y + view.height + m;
 
       for (const w of walkers) {
-        // Slow up behind someone just ahead going the same way, rather than walk through them.
-        const blocked = walkers.some(
-          (o) => o !== w && o.from === w.from && o.to === w.to && o.t > w.t && o.t - w.t < 0.3,
-        );
-        w.t += dt * WALK_SPEED * w.pace * (blocked ? 0.2 : 1);
-        if (w.t >= 1) {
-          // At the next tile: carry on, turning at random; back only at a dead end.
-          const options = roadNeighbours(w.to).filter((j) => j !== w.from);
-          const next = options.length ? options[Math.floor(Math.random() * options.length)] : w.from;
-          [w.from, w.to, w.t] = [w.to, next, w.t - 1];
+        if (w.idle > 0) w.idle -= dt;
+        else {
+          // Someone just ahead going the same way in the same lane: step aside and pass them,
+          // slowing a little, rather than walk through them or queue up behind.
+          const ahead = walkers.find(
+            (o) =>
+              o !== w &&
+              o.from === w.from &&
+              o.to === w.to &&
+              o.t > w.t &&
+              o.t - w.t < 0.3 &&
+              Math.abs(o.lane - w.lane) < 2,
+          );
+          if (ahead) w.lane = Math.max(2.5, Math.min(8, w.lane + (ahead.lane > 5.2 ? -1 : 1) * dt * 8));
+          w.t += dt * WALK_SPEED * w.pace * (ahead ? 0.6 : 1);
+          if (w.t >= 1) {
+            // At the next tile: carry on, turning at random; back only at a dead end.
+            const options = roadNeighbours(w.to).filter((j) => j !== w.from);
+            const next = options.length ? options[Math.floor(Math.random() * options.length)] : w.from;
+            [w.from, w.to, w.t] = [w.to, next, w.t - 1];
+            // Now and then they stop: a woodcutter beside the forest to fell a tree, others to
+            // rest or have a word with whoever else is standing about.
+            const here = center(w.from);
+            const wood = w.fig.axe
+              ? [w.from + 1, w.from - 1, w.from + W, w.from - W].find(
+                  (j) => !world.occupied[j] && terrainAt(map, j % W, Math.floor(j / W)) === 'forest',
+                )
+              : undefined;
+            if (wood !== undefined && Math.random() < 0.6) {
+              [w.idle, w.work, w.t] = [4 + Math.random() * 5, true, 0];
+              w.face = Math.sign(center(wood).x - here.x) || 1;
+            } else if (Math.random() < 0.12) {
+              [w.idle, w.work, w.t] = [2 + Math.random() * 4, false, 0];
+              const near = walkers.find(
+                (o) => o !== w && o.idle > 0 && Math.abs(o.s.x - here.x) < 30 && Math.abs(o.s.y - here.y) < 16,
+              );
+              w.face = near ? Math.sign(near.s.x - here.x) || 1 : Math.random() < 0.5 ? -1 : 1;
+              // Whoever they stop beside turns to them, and they talk.
+              if (near && !near.work) near.face = -w.face;
+            }
+          }
         }
         const a = center(w.from);
         const b = center(w.to);
@@ -681,12 +759,25 @@ export function createLife(
         if (!w.s.visible) continue;
         // Depth among buildings and trees: tile x + y of where it stands.
         w.s.zIndex = depth(w.from, w.to, w.t);
-        w.step = (w.step + dt * 1.6 * w.pace * (blocked ? 0.2 : 1)) % 1;
-        const fr = w.frames[Math.floor(w.step * STRIDE)];
+        let fr: Baked;
+        let face = dx < 0 ? -1 : 1;
+        if (w.idle > 0) {
+          // Working or talking (when someone is close by), otherwise just standing.
+          const talk =
+            !w.work &&
+            walkers.some((o) => o !== w && o.idle > 0 && Math.abs(o.s.x - x) < 30 && Math.abs(o.s.y - y) < 16);
+          w.step = (w.step + dt * (w.work ? 1.4 : talk ? 0.9 : 0.4)) % 1;
+          fr =
+            w.work || (talk && !w.fig.axe) ? w.fig.work[Math.floor(w.step * 4)] : w.fig.stand[Math.floor(w.step * 2)];
+          face = w.face;
+        } else {
+          w.step = (w.step + dt * 1.6 * w.pace) % 1;
+          fr = w.fig.walk[Math.floor(w.step * STRIDE)];
+        }
         w.s.texture = fr.texture as Texture;
         w.s.anchor.set(fr.ax, fr.ay);
         w.s.position.set(x, y);
-        w.s.scale.set(dx < 0 ? -1.3 : 1.3, 1.3);
+        w.s.scale.set(face * w.broad, w.tall);
       }
 
       for (const c of carts) {
@@ -709,7 +800,8 @@ export function createLife(
         c.s.visible = inView(x, y);
         c.s.zIndex = depth(c.route[i], c.route[i + 1], t);
         c.s.position.set(x, y);
-        c.s.scale.x = (b.x - a.x) * c.dir < 0 ? -1 : 1;
+        // Drawn to the villagers' scale: the horse a horse beside them, not a pony.
+        c.s.scale.set((b.x - a.x) * c.dir < 0 ? -1.3 : 1.3, 1.3);
         // Wheel and hooves keep pace with the ground covered; still while it waits.
         const fr = c.frames[Math.floor(c.pos * ROLL * 3) % ROLL];
         c.s.texture = fr.texture as Texture;

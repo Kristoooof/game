@@ -168,6 +168,27 @@ export const setSun = (s: typeof sun) => (sun = s);
 let wet = 0;
 export const setWet = (w: number) => (wet = w);
 /** Rain on a roof face: darkened, wetter towards the eaves. */
+/**
+ * A few odd patches of tiles on roof face `face` (eave, eave, ridge, ridge): weathered darker or
+ * newer and brighter, so no roof is a printed pattern. Stable per face.
+ */
+const patchRoof = (g: Graphics, face: number[][], roofColor: number) => {
+  const r = mulberry32(Math.round(face[0][0] * 7 + face[0][1] * 13));
+  const at = (u: number, v: number) => {
+    const [e0, e1, r1, r0] = face;
+    const a = [e0[0] + (e1[0] - e0[0]) * u, e0[1] + (e1[1] - e0[1]) * u];
+    const b = [r0[0] + (r1[0] - r0[0]) * u, r0[1] + (r1[1] - r0[1]) * u];
+    return [a[0] + (b[0] - a[0]) * v, a[1] + (b[1] - a[1]) * v];
+  };
+  for (let k = 0; k < 4; k++) {
+    const [u, v, du, dv] = [0.1 + r() * 0.7, 0.05 + r() * 0.7, 0.05 + r() * 0.1, 0.08 + r() * 0.15];
+    g.poly([...at(u, v), ...at(u + du, v), ...at(u + du, v + dv), ...at(u, v + dv)]).fill({
+      color: shade(roofColor, r() < 0.6 ? 0.78 : 1.2),
+      alpha: 0.45,
+    });
+  }
+};
+
 const wetRoof = (g: Graphics, face: number[][]) => {
   if (wet > 0) g.poly(face.flat()).fill({ color: 0x101820, alpha: 0.22 * wet });
 };
@@ -325,6 +346,10 @@ function gabled(g: Graphics, b: Box, wall: number, roof: number, wallColor: numb
   const cover = thatch ? surface().thatch : surface().tiles;
   overlayQuad(g, south, cover, 0.42);
   overlayQuad(g, north, cover, 0.42);
+  if (!thatch) {
+    patchRoof(g, south, shade(roofColor, 1.08));
+    patchRoof(g, north, shade(roofColor, 0.64));
+  }
   wetRoof(g, south);
   wetRoof(g, north);
   const r0 = P(x0 - o, yc, top);
@@ -446,6 +471,7 @@ function hipped(g: Graphics, b: Box, wall: number, roof: number, wallColor: numb
   // Tiles on all four slopes, rows running along each eave.
   const tiles = surface().tiles;
   overlay(g, [sw, se, B, A], A, [se[0] - sw[0], se[1] - sw[1]], [sw[0] - A[0], sw[1] - A[1]], tiles, 0.42);
+  patchRoof(g, [sw, se, B, A], shade(roofColor, 1.08));
   overlay(g, [nw, ne, B, A], A, [ne[0] - nw[0], ne[1] - nw[1]], [nw[0] - A[0], nw[1] - A[1]], tiles, 0.42);
   overlay(
     g,
@@ -992,7 +1018,10 @@ export function drawRoads(g: Graphics, w: World, x0 = 0, y0 = 0, x1 = w.map.widt
       const side = (r() < 0.5 ? -1 : 1) * (8 + r() * 3);
       const x = ax + (bx - ax) * t + nx * side;
       const y = ay + (by - ay) * t + ny * side * 0.6;
-      g.ellipse(x, y, 1 + r() * 0.8, 0.7 + r() * 0.5).fill({ color: r() < 0.5 ? 0x8a8478 : 0xa8a090, alpha: 0.9 });
+      // Earthy greys a little lighter than the road: no cold specks that glow blue by night.
+      const [rx, ry] = [1 + r() * 0.8, 0.7 + r() * 0.5];
+      g.ellipse(x + 0.3, y + 0.4, rx, ry).fill({ color: 0x4a3a26, alpha: 0.35 });
+      g.ellipse(x, y, rx, ry).fill({ color: r() < 0.5 ? 0x8c7c62 : 0xa08e70, alpha: 0.85 });
     }
   }
   for (const [ax, ay, bx, by] of ruts) g.moveTo(ax, ay).lineTo(bx, by);

@@ -374,17 +374,23 @@ void main() {
   // Close up: blades a few pixels tall, leaning this way and that, in tussocks and thinner
   // patches: two layers of cells, warped and staggered, so they never line up into a grid.
   float tuft = smoothstep(0.3, 0.7, noise(g * 1.3 + 7.0));
+  // Combed by the wind in broad patches: neighbouring blades lean together, one patch this way,
+  // the next that; longer grass in the hollows, short where it is grazed or dry.
+  float lean = (noise(g * 0.35 + 21.0) - 0.5) * 0.7;
+  float tall = 0.95 + 0.6 * noise(g * 0.5 + 31.0);
   float blades = 0.0;
   for (int k = 0; k < 2; k++) {
     float fk = float(k);
-    vec2 q = vg / vec2(2.3 + fk * 0.9, 4.2 + fk * 1.3) + (vec2(noise(g * 0.9 + fk * 5.0), noise(g * 0.9 + 3.0 + fk * 5.0)) - 0.5) * 2.0;
+    vec2 q = vg / vec2(2.3 + fk * 0.9, (4.2 + fk * 1.3) * tall) + (vec2(noise(g * 0.9 + fk * 5.0), noise(g * 0.9 + 3.0 + fk * 5.0)) - 0.5) * 2.0;
     q.x += 0.5 * mod(floor(q.y), 2.0);
     vec2 qi = floor(q), qf = fract(q);
     if (hash(qi + 61.0 + fk) > 0.35 + 0.5 * tuft) continue;
-    float bx = qf.x - 0.3 - 0.4 * hash(qi + 41.0) - (hash(qi + 47.0) - 0.5) * 0.9 * (1.0 - qf.y);
-    blades += (1.0 - smoothstep(0.06, 0.16, abs(bx))) * smoothstep(0.0, 0.4, qf.y) * (hash(qi + 43.0) - 0.45);
+    // Bent, not straight: the lean grows towards the tip.
+    float up = 1.0 - qf.y;
+    float bx = qf.x - 0.3 - 0.4 * hash(qi + 41.0) - (lean + (hash(qi + 47.0) - 0.5) * 0.4) * up * (0.4 + 0.6 * up);
+    blades += (1.0 - smoothstep(0.07, 0.18, abs(bx))) * smoothstep(0.0, 0.4, qf.y) * (hash(qi + 43.0) - 0.45);
   }
-  grass *= 1.0 + blades * 0.32 * uDetail;
+  grass *= 1.0 + blades * 0.42 * uDetail;
   // Grit: sparse round specks of lighter and darker ground, for the bare places below.
   vec2 gq = vg * 0.45 + (vec2(noise(g * 1.1), noise(g * 1.1 + 9.0)) - 0.5) * 3.0, gqi = floor(gq);
   float speck = (1.0 - smoothstep(0.12, 0.3, length(fract(gq) - 0.5 - (vec2(hash(gqi + 3.0), hash(gqi + 8.0)) - 0.5) * 0.4)));

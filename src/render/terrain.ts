@@ -231,7 +231,12 @@ export function createTerrain(world: World, renderer: Renderer) {
       else if (t === 'forest' && !far) {
         // Young trees and undergrowth at the edge; old, tall, shadowed trees deep inside.
         const d = woodDepth[y * W + x];
-        const n = 3 + Math.floor(r() * 2) + (d > 1 ? 1 : 0);
+        // Woods grow in stands, not a salad: pinewoods and leafy groves, each mostly of one kind,
+        // and now and then a clearing deep inside with a single tree standing in it.
+        const pines = 0.12 + 0.8 * Math.min(1, Math.max(0, (noise2(x * 0.12, y * 0.12, 23) - 0.3) / 0.4));
+        const kind = art.broadleaves[Math.min(6, Math.floor(noise2(x * 0.18, y * 0.18, 29) * 7))];
+        const glade = d >= 2 && noise2(x * 0.3, y * 0.3, 37) > 0.7;
+        const n = glade ? 1 : 3 + Math.floor(r() * 2) + (d > 1 ? 1 : 0);
         const grow = 0.85 + d * 0.08;
         const dark = [0xffffff, 0xe6ece4, 0xccd6ca, 0xb8c4b6][d];
         for (let i = 0; i < n; i++) {
@@ -239,9 +244,10 @@ export function createTerrain(world: World, renderer: Renderer) {
           const v = 0.1 + r() * 0.8;
           const k = r();
           const bush = d === 0 ? 0.75 : 0.93;
-          if (k < 0.55)
+          const tree = r() < 0.6 && noise2(x * 0.09, y * 0.09, 5) <= 0.6 ? kind : leaf(r(), x, y);
+          if (k < pines * 0.93)
             put(art.conifers[Math.floor(r() * art.conifers.length)], u, v, (0.75 + r() * 0.45) * grow, true, dark);
-          else if (k < bush) put(leaf(r(), x, y), u, v, (0.7 + r() * 0.4) * grow, true, dark);
+          else if (k < bush) put(tree, u, v, (0.7 + r() * 0.4) * grow, true, dark);
           else put(art.bushes[Math.floor(r() * art.bushes.length)], u, v, 0.8 + r() * 0.4);
         }
       } else if (t === 'mountain') {
@@ -485,10 +491,11 @@ export function createTerrain(world: World, renderer: Renderer) {
       o.addChild(pg);
     }
     setGlow(null);
+    // Ranges and buildings (meshes and vector drawings) multisampled: smooth skylines and eaves.
     const obj = renderTrimmed(
       o,
       tier,
-      o.children.some((m) => m instanceof Mesh),
+      o.children.some((m) => m instanceof Mesh || m instanceof Graphics),
     );
     // Mirror images softened as they are baked: still water never gives a hard edge back.
     refl.filters = [soften];
