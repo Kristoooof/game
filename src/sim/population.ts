@@ -1,6 +1,6 @@
 import { BUILDINGS, type Good } from '../data/buildings';
-import { CHAPEL_RADIUS, CONSUMPTION, LEVELS, type Need } from '../data/population';
-import { type Building, islandOf, type World } from './world';
+import { CHAPEL_RADIUS, CONSUMPTION, LEVELS, NEED_NAMES, type Need } from '../data/population';
+import { type Building, islandOf, warn, type World } from './world';
 
 /** Seconds for a house to gain or lose one resident on its way to what it can hold. */
 const SETTLE = 10;
@@ -24,6 +24,7 @@ export const unmet = (w: World, b: Building) => LEVELS[b.level!].needs.filter((n
  * island has the building materials); they pay taxes, and every building costs its upkeep.
  */
 export function populationTick(w: World, dt: number) {
+  if (w.gold < 0) warn(w, 'gold', 'Elfogyott a pénz! Építs házakat az adóért, vagy bonts le, ami sokba kerül.', 120);
   for (const b of w.buildings.values()) {
     w.gold -= ((BUILDINGS[b.type].upkeep ?? 0) * dt) / 60;
     if (b.type !== 'house') continue;
@@ -47,6 +48,17 @@ export function populationTick(w: World, dt: number) {
       sum += met;
     }
     b.happy = sum / lv.needs.length;
+    // Tell the player what is short, once in a while, per island and good.
+    const island = islandOf(w, b.x, b.y);
+    for (const need of lv.needs)
+      if ((b.met![need] ?? 1) < 0.5)
+        warn(
+          w,
+          `${island}:${need}`,
+          need === 'faith'
+            ? `Kápolna hiányzik a házak közeléből (${island}. sziget)`
+            : `Elfogyott: ${NEED_NAMES[need]} (${island}. sziget) – elégedetlenek a lakók`,
+        );
     // Content houses fill up; half-content ones hold half; neglected ones empty to a quarter.
     const target = Math.round(lv.max * (b.happy >= 0.9 ? 1 : b.happy >= 0.5 ? 0.5 : 0.25));
     b.progress = (b.progress ?? 0) + dt / SETTLE;

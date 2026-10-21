@@ -73,12 +73,12 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 
 ### 6. UI és élmény
 - [x] Küldetések: 19 lépéses feladatlánc a partraszállástól a kereskedőházig (mit és hogyan kell csinálni, haladásjelző, jutalom pénzben/áruban, felugró értesítés teljesítéskor; a kártya összecsukható)
-- [ ] Magyar felület: felső sáv (pénz, lakosság), épület infópanel, raktár
-- [ ] Mobil elrendezés, érintés-barát gombok
-- [ ] Minimap
-- [ ] Értesítések (hiány, elégedetlenség)
-- [ ] Mentés / betöltés (több mentési hely)
-- [ ] Főmenü, új játék seed-del
+- [x] Magyar felület: felső sáv (pénz és mérleg, lakosság, a sziget készlete), épület infópanel minden épületre (ház: lakók, elégedettség, igények ✓/✗, bővítés; termelő: hatékonyság, készlet, akadály; raktár/kikötő: a sziget készlete), lebontás gomb a panelen
+- [x] Mobil elrendezés: keskeny képernyőn a sáv tördel, a sebesség és a feladat alul, a panel alsó lapként; érintés-barát (44 px) gombok
+- [x] Minimap jobb lent: a térkép rombuszként, épületek, hajók (a szabadkereskedő pirosan), a látott terület kerete; kattintásra odaugrik
+- [x] Értesítések: piros felugró figyelmeztetés, ha elfogy egy áru, amit a lakók igényelnek, ha nincs kápolna a házak közelében, vagy ha elfogy a pénz (ismétlés legfeljebb 1,5–2 percenként)
+- [x] Mentés / betöltés: 3 mentési hely + automatikus mentés 2 percenként és kilépéskor (a böngészőben, localStorage; a térképből csak a változás mentődik)
+- [x] Főmenü (☰ a sebességsávban, és induláskor, ha nincs játék a címben): folytatás, új játék seed-del, példa térkép, mentés, betöltés
 
 ### 7. Csiszolás
 - [x] Grafika v2: animált tenger, sekély part menti víz, tajték, megemelt szigetek sziklafallal, textúrázott terep, fák/bokrok/hegyek sprite-okból, részletes épületek, földutak, felhőárnyékok, középkori UI

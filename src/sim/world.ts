@@ -71,6 +71,19 @@ export interface Ship {
   trader?: boolean;
 }
 
+/** A message for the player: good news, or a warning (something is short, people are unhappy). */
+export interface News {
+  text: string;
+  warn?: boolean;
+}
+
+/** Tells the player `text`, unless the same warning (`key`) was given in the last `every` seconds. */
+export function warn(w: World, key: string, text: string, every = 90) {
+  if (w.time - (w.warned.get(key) ?? -Infinity) < every) return;
+  w.warned.set(key, w.time);
+  w.news.push({ text, warn: true });
+}
+
 /** What the free trader may do with a good at an island: buy it from us, or sell it to us. */
 export type Deal = 'sell' | 'buy';
 
@@ -99,7 +112,9 @@ export interface World {
   made: Stock;
   /** The quest being worked on (index into QUESTS), and news for the player (the UI takes them). */
   quest: number;
-  news: string[];
+  news: News[];
+  /** Game time each warning was last given (by its key), so it is not repeated every tick. */
+  warned: Map<string, number>;
   nextId: number;
 }
 
@@ -160,6 +175,7 @@ export function createWorld(map: GameMap): World {
     made: emptyStock(),
     quest: 0,
     news: [],
+    warned: new Map(),
     nextId: 1,
   };
   // The player's first ship, with the goods to found a town, off the largest island; the free
@@ -317,7 +333,7 @@ export const buildingAt = (w: World, x: number, y: number) =>
   terrainAt(w.map, x, y) ? w.buildings.get(w.occupied[y * w.map.width + x]) : undefined;
 
 /** Land within a harbor's or warehouse's radius, on that building's island. */
-function updateTerritory(w: World) {
+export function updateTerritory(w: World) {
   const { width, height } = w.map;
   w.owned.fill(0);
   for (const b of w.buildings.values()) {

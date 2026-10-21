@@ -219,7 +219,7 @@ export function questTick(w: World) {
   w.gold += q.reward.gold ?? 0;
   const stock = w.stocks.values().next().value;
   if (stock) for (const g of Object.keys(GOOD_NAMES) as Good[]) stock[g] += q.reward[g] ?? 0;
-  w.news.push(`Teljesítve: ${q.title}` + (rewardOf(q) ? ` · Jutalom: ${rewardOf(q)}` : ''));
+  w.news.push({ text: `Teljesítve: ${q.title}` + (rewardOf(q) ? ` · Jutalom: ${rewardOf(q)}` : '') });
   w.quest++;
-  if (!QUESTS[w.quest]) w.news.push('Minden feladat kész: virágzó szigetvilágot építettél!');
+  if (!QUESTS[w.quest]) w.news.push({ text: 'Minden feladat kész: virágzó szigetvilágot építettél!' });
 }

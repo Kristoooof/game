@@ -29,14 +29,18 @@ import {
   place,
   placementError,
   roadPath,
+  type News,
   type Ship,
 } from './sim/world';
 import { CAP, tick, TICK, trouble } from './sim/economy';
 import { buildShip, FILL, KEEP, moveShip, sailToHarbor, setSailing, SHIP_COST, transfer } from './sim/ships';
 import { createPanel } from './ui/panel';
+import { fetchSave, fromSave, type Slot, type Source, store, toSave } from './sim/save';
+import { createMenu } from './ui/menu';
+import { createMinimap } from './ui/minimap';
 import { QUESTS, questTick, rewardOf } from './sim/quests';
 import { balance, unmet } from './sim/population';
-import { LEVELS, NEED_NAMES } from './data/population';
+import { CHAPEL_RADIUS, LEVELS, NEED_NAMES } from './data/population';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
 import { createAtmosphere, type Weather } from './render/atmosphere';
 import { createConstruction } from './render/construction';
@@ -57,18 +61,25 @@ const TERRAIN_NAMES: Record<Terrain, string> = {
   river: 'Folyó',
 };
 
-// ?map=pelda loads a hand-made map, ?seed=123 a generated one; otherwise a random seed.
+// ?betolt=1 continues a saved game, ?map=pelda starts a hand-made map, ?seed=123 a generated
+// one. With none of them the main menu opens, over a random archipelago.
 const params = new URLSearchParams(location.search);
-const mapName = params.get('map') ?? '';
-const seed = Number(params.get('seed')) || Math.floor(Math.random() * 1e6);
-const map: GameMap = MAPS[mapName] ? parseMap(MAPS[mapName]) : generateMap(seed);
+const loaded = params.has('betolt') ? fetchSave(params.get('betolt') as Slot) : null;
+const named = params.get('map') ?? '';
+const source: Source =
+  loaded?.source ??
+  (MAPS[named] ? { map: named } : { seed: Number(params.get('seed')) || Math.floor(Math.random() * 1e6) });
+const playing = !!loaded || params.has('map') || params.has('seed');
+const map: GameMap = 'map' in source ? parseMap(MAPS[source.map]) : generateMap(source.seed);
+/** The tiles as the map was made: a save stores only what changed since. */
+const pristine = [...map.tiles];
 // Everything placed on the ground is raised to its tile's terrace.
 setLevels((x, y) => levelAt(map, x, y));
-const world = createWorld(map);
+const world = loaded ? fromSave(map, loaded) : createWorld(map);
 
 const hud = document.getElementById('hud')!;
 const resources = document.getElementById('resources')!;
-const mapLabel = MAPS[mapName] ? `Térkép: ${mapName}` : `Seed: ${seed}`;
+const mapLabel = 'map' in source ? `Térkép: ${source.map}` : `Seed: ${source.seed}`;
 const say = (msg = '') => {
   hud.textContent = msg;
   hud.hidden = !msg;
@@ -265,7 +276,13 @@ const SPEEDS: [number, string, string][] = [
 ];
 const setSpeed = (v: number) => {
   speed = v;
+  const menuButton = Object.assign(document.createElement('button'), {
+    textContent: '☰',
+    title: 'Menü (mentés, betöltés, új játék)',
+  });
+  menuButton.addEventListener('click', () => openMenu());
   speedBar.replaceChildren(
+    menuButton,
     ...SPEEDS.map(([k, label, title]) => {
       const b = Object.assign(document.createElement('button'), { innerHTML: label, title });
       b.classList.toggle('active', k === v);
@@ -274,10 +291,33 @@ const setSpeed = (v: number) => {
     }),
   );
 };
+/** The menu pauses the game while it is open. */
+let speedBeforeMenu = 1;
+const menu = createMenu(
+  document.getElementById('menu')!,
+  playing,
+  (slot) => store(slot, toSave(world, source, pristine)),
+  () => closeMenu(),
+);
+const openMenu = () => {
+  if (menu.isOpen) return;
+  speedBeforeMenu = speed || 1;
+  setSpeed(0);
+  menu.open();
+};
+const closeMenu = () => {
+  menu.close();
+  setSpeed(speedBeforeMenu);
+};
 setSpeed(1);
 let lastSpeed = 1;
+// Saved now and then, and when the page is left.
+const AUTOSAVE = 120;
+let autosaveLeft = AUTOSAVE;
+const autosave = () => playing && store('auto', toSave(world, source, pristine));
+addEventListener('pagehide', autosave);
 addEventListener('keydown', (e) => {
-  if ((e.target as HTMLElement).tagName === 'INPUT') return;
+  if ((e.target as HTMLElement).tagName === 'INPUT' || menu.isOpen) return;
   if (e.key === ' ') {
     e.preventDefault();
     if (speed) [lastSpeed, speed] = [speed, 0];
@@ -287,7 +327,8 @@ addEventListener('keydown', (e) => {
 
 /** The quest card: the task at hand, how to do it and how far along it is; it folds to one line. */
 const questCard = document.getElementById('quest')!;
-let questFolded = false;
+// Folded to a line on small screens, where it would cover too much.
+let questFolded = innerWidth < 700;
 let questHtml = '';
 questCard.addEventListener('click', (e) => {
   if (!(e.target as HTMLElement).closest('[data-act="fold"]')) return;
@@ -309,7 +350,7 @@ const showQuest = () => {
 /** News (a quest done) pops up at the top for a few seconds, one after another. */
 const toast = document.getElementById('toast')!;
 let toastLeft = 0;
-const news: string[] = [];
+const news: News[] = [];
 
 app.ticker.add((t) => {
   const realDt = t.deltaMS / 1000;
@@ -321,10 +362,17 @@ app.ticker.add((t) => {
     simTime -= TICK;
   }
   questTick(world);
+  autosaveLeft -= realDt;
+  if (autosaveLeft <= 0) {
+    autosave();
+    autosaveLeft = AUTOSAVE;
+  }
   news.push(...world.news.splice(0));
   toastLeft -= realDt;
   if (toastLeft <= 0 && news.length) {
-    toast.textContent = news.shift()!;
+    const n = news.shift()!;
+    toast.textContent = n.text;
+    toast.classList.toggle('warn', !!n.warn);
     toastLeft = 5;
   }
   toast.hidden = toastLeft <= 0;
@@ -400,6 +448,7 @@ app.ticker.add((t) => {
   }
   app.renderer.render({ container: waterScene, target: waterTexture, transform: waterTransform, clear: true });
   effects.update(realDt, view, cam.scale < FAR_SCALE);
+  minimap.update(realDt, view);
   const { width, height } = app.canvas;
   countFps(
     settings.fps,
@@ -415,6 +464,7 @@ const refresh = (tiles: [number, number][] = []) => {
   effects.setChimneys([...world.buildings.values()].flatMap((b) => chimneyAt(b.type, b.x, b.y, b.level) ?? []));
   drawTerritory(territory, world);
   showResources();
+  minimap.redraw();
 };
 
 // Start at the player's ship, lying off the biggest island with the goods to found a town.
@@ -428,6 +478,15 @@ const applyCamera = () => {
   scene.scale.set(cam.scale);
 };
 applyCamera();
+const minimap = createMinimap(document.getElementById('minimap')!, world, (wx, wy) => {
+  cam.x = app.screen.width / 2 - wx * cam.scale;
+  cam.y = app.screen.height / 2 - wy * cam.scale;
+  applyCamera();
+});
+// A loaded game's buildings, people and smoke; the minimap's land.
+refresh();
+// No game chosen yet: the main menu, over the sea.
+if (!playing) openMenu();
 
 const tileAt = (sx: number, sy: number) => {
   const w = screenToWorld(cam, sx, sy);
@@ -473,28 +532,17 @@ const harborPanel = (b: Building) => {
   const island = islandOf(world, b.x, b.y);
   info = () => {
     if (!world.buildings.has(b.id)) return deselect();
-    const stock = world.stocks.get(island)!;
-    const deals = world.trade.get(island) ?? {};
-    const rows = GOODS.map(
-      (g) =>
-        `<tr><td>${icon(g)} ${GOOD_NAMES[g]}</td><td class="n">${stock[g]}</td><td>` +
-        (['', 'sell', 'buy'] as const)
-          .map(
-            (d) =>
-              `<button data-act="deal" data-arg="${g}:${d}" class="${(deals[g] ?? '') === d ? 'on' : ''}">${d === 'sell' ? 'Elad' : d === 'buy' ? 'Vesz' : '–'}</button>`,
-          )
-          .join('') +
-        '</td></tr>',
-    ).join('');
     const here = world.ships.filter((s) => s.docked === b.id && !s.trader);
     panel.show(
       `Kikötő · ${islandName(b)}`,
       `<p>A szabadkereskedő elviszi, ami ${KEEP} fölött van („Elad”), és ${FILL}-ig hoz („Vesz”).</p>` +
-        `<table>${rows}</table>` +
+        stockTable(island, true) +
         `<button class="wide" data-act="build">Hajó építése · ${SHIP_COST.gold} arany, ${SHIP_COST.wood} fa, ${SHIP_COST.tools} szerszám</button>` +
         (here.length
           ? `<p>Itt horgonyoz: ${here.map((s) => `<button data-act="ship" data-arg="${s.id}">${s.name}</button>`).join(' ')}</p>`
-          : ''),
+          : '') +
+        `<p class="dim">Fenntartás: ${BUILDINGS.harbor.upkeep} arany/perc</p>` +
+        '<button class="wide danger" data-act="demolish">Lebontás</button>',
       {
         deal(arg) {
           const [g, d] = arg.split(':') as [Good, '' | 'sell' | 'buy'];
@@ -505,8 +553,84 @@ const harborPanel = (b: Building) => {
         },
         build: () => say(buildShip(world, b.id) ?? 'Új hajó futott vízre'),
         ship: (id) => selectShip(world.ships.find((s) => s.id === Number(id))!),
+        demolish() {
+          demolishAt({ x: b.x, y: b.y });
+          deselect();
+        },
       },
     );
+  };
+  info();
+};
+
+/** An island's store as a table (with the free trader's buttons for a harbour). */
+const stockTable = (island: number, trade: boolean) => {
+  const stock = world.stocks.get(island)!;
+  const deals = world.trade.get(island) ?? {};
+  return (
+    '<table>' +
+    GOODS.map(
+      (g) =>
+        `<tr><td>${icon(g)} ${GOOD_NAMES[g]}</td><td class="n">${stock[g]}</td>` +
+        (trade
+          ? '<td>' +
+            (['', 'sell', 'buy'] as const)
+              .map(
+                (d) =>
+                  `<button data-act="deal" data-arg="${g}:${d}" class="${(deals[g] ?? '') === d ? 'on' : ''}">${d === 'sell' ? 'Elad' : d === 'buy' ? 'Vesz' : '–'}</button>`,
+              )
+              .join('') +
+            '</td>'
+          : '') +
+        '</tr>',
+    ).join('') +
+    '</table>'
+  );
+};
+const bar = (k: number) => `<div class="bar"><i style="width:${Math.round(k * 100)}%"></i></div>`;
+
+/** The selected building's panel: what it is doing and lacking, its upkeep, and pulling it down. */
+const buildingPanel = (b: Building) => {
+  if (world.stocks.has(islandOf(world, b.x, b.y))) shownIsland = islandOf(world, b.x, b.y);
+  if (b.type === 'harbor') return harborPanel(b);
+  const def = BUILDINGS[b.type];
+  info = () => {
+    if (!world.buildings.has(b.id)) return deselect();
+    let title = def.name;
+    let body = '';
+    const p = def.production;
+    if (b.type === 'house') {
+      const lv = LEVELS[b.level!];
+      title = lv.house;
+      const lack = unmet(world, b);
+      body =
+        `<p>${b.residents}/${lv.max} ${lv.name.toLowerCase()} · adó ${Math.round(b.residents! * lv.tax * (0.5 + 0.5 * b.happy!))} arany/perc</p>` +
+        `<p>Elégedettség: ${Math.round(b.happy! * 100)}%</p>${bar(b.happy!)}` +
+        `<p>Igények: ${lv.needs.map((n) => `<span class="${lack.includes(n) ? 'bad' : 'ok'}">${lack.includes(n) ? '✗' : '✓'} ${NEED_NAMES[n]}</span>`).join(' ')}</p>` +
+        (lv.upgrade
+          ? `<p class="dim">Tele és elégedett házból ${LEVELS[b.level! + 1].house.toLowerCase()} lesz: ${costOf(lv.upgrade)} kell hozzá a raktárban.</p>`
+          : '<p class="dim">A legmagasabb szint.</p>');
+    } else if (p) {
+      const why = trouble(world, b);
+      body =
+        `<p>Hatékonyság: ${Math.round(b.busy! * 100)}%</p>${bar(b.busy!)}` +
+        `<p>Kész: ${b.output}/${CAP} ${GOOD_NAMES[p.output].toLowerCase()}` +
+        (p.input ? ` · alapanyag: ${b.input}/${CAP} ${GOOD_NAMES[p.input].toLowerCase()}` : '') +
+        '</p>' +
+        (why ? `<p class="bad">${why}</p>` : '') +
+        `<p class="dim">${p.input ? `1 ${GOOD_NAMES[p.input].toLowerCase()} → ` : ''}1 ${GOOD_NAMES[p.output].toLowerCase()} ${p.seconds} másodpercenként teljes sebességnél.</p>`;
+    } else if (def.depot)
+      body = `<p>${islandName(b)} raktárkészlete:</p>${stockTable(islandOf(world, b.x, b.y), false)}`;
+    else if (b.type === 'chapel') body = `<p>Hitet ad a ${CHAPEL_RADIUS} mezőn belüli házaknak.</p>`;
+    body +=
+      (def.upkeep ? `<p class="dim">Fenntartás: ${def.upkeep} arany/perc</p>` : '') +
+      '<button class="wide danger" data-act="demolish">Lebontás</button>';
+    panel.show(title, body, {
+      demolish() {
+        demolishAt({ x: b.x, y: b.y });
+        deselect();
+      },
+    });
   };
   info();
 };
@@ -584,7 +708,7 @@ const selectShip = (s: Ship) => {
 };
 let roadStart: { x: number; y: number } | null = null;
 
-const menu = createBuildMenu(document.getElementById('build')!, (t) => {
+const buildMenu = createBuildMenu(document.getElementById('build')!, (t) => {
   tool = t;
   [info, ship, addingStop] = [null, null, false];
   panel.hide();
@@ -598,7 +722,8 @@ const menu = createBuildMenu(document.getElementById('build')!, (t) => {
 });
 addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  menu.setTool(null);
+  if (menu.isOpen) return playing && closeMenu();
+  buildMenu.setTool(null);
   deselect();
 });
 
@@ -687,41 +812,9 @@ attachCameraControls(app.canvas, cam, {
     deselect();
     if (!t) return;
     const b = buildingAt(world, t.x, t.y);
-    if (b?.type === 'harbor') {
-      outline(selection, t.x, t.y, 0.9);
-      return harborPanel(b);
-    }
     outline(selection, t.x, t.y, 0.9);
-    const where = `(${t.x}, ${t.y}) ${TERRAIN_NAMES[terrainAt(map, t.x, t.y)!]}`;
-    const p = b && BUILDINGS[b.type].production;
-    if (b && world.stocks.has(islandOf(world, b.x, b.y))) shownIsland = islandOf(world, b.x, b.y);
-    if (b?.type === 'house') {
-      // A house: its people, how content they are and what they lack.
-      info = () => {
-        if (!world.buildings.has(b.id)) return (info = null);
-        const lv = LEVELS[b.level!];
-        const lack = unmet(world, b).map((n) => NEED_NAMES[n]);
-        const next = lv.upgrade && b.residents! >= lv.max && !lack.length ? ' · bővítéshez: ' + costOf(lv.upgrade) : '';
-        say(
-          `${lv.house} · ${b.residents}/${lv.max} ${lv.name.toLowerCase()} · elégedettség ${Math.round(b.happy! * 100)}%` +
-            (lack.length ? ` · hiányzik: ${lack.join(', ')}` : '') +
-            next,
-        );
-      };
-      return info();
-    }
-    if (!b || !p) return say(`${where}${b ? ` · ${BUILDINGS[b.type].name}` : ''}`);
-    // A producer: how well it works and why not better, kept up to date while selected.
-    info = () => {
-      if (!world.buildings.has(b.id)) return (info = null);
-      const goods = `${GOOD_NAMES[p.output].toLowerCase()} ${b.output}/${CAP}`;
-      const input = p.input ? ` · ${GOOD_NAMES[p.input].toLowerCase()} ${b.input}/${CAP}` : '';
-      const why = trouble(world, b);
-      say(
-        `${BUILDINGS[b.type].name} · hatékonyság ${Math.round(b.busy! * 100)}% · ${goods}${input}${why ? ` · ${why}` : ''}`,
-      );
-    };
-    info();
+    if (b && b.type !== 'road') return buildingPanel(b);
+    say(`(${t.x}, ${t.y}) ${TERRAIN_NAMES[terrainAt(map, t.x, t.y)!]}${b ? ' · Út' : ''}`);
   },
   paint: {
     active: () => tool !== null,

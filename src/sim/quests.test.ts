@@ -23,7 +23,7 @@ test('quests follow one another as the town grows, paying their rewards', () => 
   questTick(w);
   expect(w.quest).toBe(1);
   expect(w.gold).toBe(gold + 200);
-  expect(w.news.pop()).toBe('Teljesítve: Partraszállás · Jutalom: 200 arany');
+  expect(w.news.pop()?.text).toBe('Teljesítve: Partraszállás · Jutalom: 200 arany');
   for (const [x, y] of roadPath(2, 3, 12, 3)) place(w, 'road', x, y);
   questTick(w);
   expect(w.quest).toBe(2);
