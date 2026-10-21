@@ -20,10 +20,10 @@ test('harbor settles an island and claims land only on that island', () => {
   expect(owned(w, 5, 4)).toBe(1);
   expect(owned(w, 8, 1)).toBe(0);
   expect(owned(w, 7, 1)).toBe(0); // water
-  // The first harbour takes in the ship's cargo: the island's own store now.
+  // The first harbour is paid from the ship lying off the island, which then unloads into it.
   const stock = w.stocks.get(w.islands[1 * w.map.width + 1])!;
   expect([w.gold, stock.wood, stock.tools]).toEqual([4000, 42, 27]);
-  expect(w.stocks.get(0)!.wood).toBe(0);
+  expect(w.ships[0].cargo.wood).toBe(0);
 });
 
 test('placement checks terrain, overlap, coast and cost; forest is cleared', () => {
@@ -49,6 +49,25 @@ test('demolish frees tiles and drops territory with its harbor', () => {
   expect(demolish(w, 2, 2)?.type).toBe('harbor');
   expect(owned(w, 4, 4)).toBe(0);
   expect(demolish(w, 0, 0)).toBeUndefined();
+});
+
+test('the second island needs a ship with the materials close by, and sheep only on some islands', () => {
+  const w = createWorld(parseMap(MAP));
+  place(w, 'harbor', 1, 1);
+  const [ship] = w.ships;
+  // The ship is empty now and lies off the home island, far from the eastern isle.
+  [ship.x, ship.y] = [9.5, 3.5];
+  expect(placementError(w, 'harbor', 8, 1)).toBe('Nincs elég: fa');
+  [ship.x, ship.y] = [0.5, 5.5];
+  ship.cargo.wood = 20;
+  ship.cargo.tools = 5;
+  expect(placementError(w, 'harbor', 8, 1)).toBe('Hajó kell a közelben az építőanyaggal');
+  [ship.x, ship.y] = [9.5, 3.5];
+  expect(place(w, 'harbor', 8, 1)).toBeNull();
+  expect(ship.cargo.wood).toBe(12);
+  expect(w.stocks.get(w.islands[1 * w.map.width + 8])!.wood).toBe(0);
+  // The home island (the largest) keeps no sheep; the other does.
+  expect(placementError(w, 'sheepfarm', 2, 3)).toBe('Ezen a szigeten nem terem: gyapjú');
 });
 
 test('roadPath is an L along x then y', () => {

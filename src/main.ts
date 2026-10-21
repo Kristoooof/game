@@ -14,11 +14,26 @@ import pelda from './data/maps/pelda.txt?raw';
 import { chimneyAt, drawBuilding, drawTerritory } from './render/buildings';
 import { createEffects } from './render/effects';
 import { attachCameraControls, screenToWorld, type Camera } from './render/camera';
-import { diamond, groundToScreen, screenToGround, setLevels, tileToScreen } from './render/iso';
+import { diamond, groundToScreen, screenToGround, setLevels } from './render/iso';
 import { createTerrain, FAR_SCALE } from './render/terrain';
 import { type GameMap, type Terrain, generateMap, levelAt, parseMap, terrainAt } from './sim/map';
-import { buildingAt, createWorld, demolish, islandOf, place, placementError, roadPath } from './sim/world';
+import {
+  type Building,
+  buildingAt,
+  cargoOf,
+  createWorld,
+  demolish,
+  emptyStock,
+  HOLD,
+  islandOf,
+  place,
+  placementError,
+  roadPath,
+  type Ship,
+} from './sim/world';
 import { CAP, tick, TICK, trouble } from './sim/economy';
+import { buildShip, FILL, KEEP, moveShip, sailToHarbor, setSailing, SHIP_COST, transfer } from './sim/ships';
+import { createPanel } from './ui/panel';
 import { balance, unmet } from './sim/population';
 import { LEVELS, NEED_NAMES } from './data/population';
 import { costText, createBuildMenu, type Tool } from './ui/buildMenu';
@@ -79,8 +94,12 @@ const icon = (k: keyof typeof ICONS) => `<svg viewBox="0 0 24 24" aria-hidden="t
 let shownIsland = 0;
 let shownHtml = '';
 const showResources = () => {
-  const stock = world.stocks.get(shownIsland) ?? world.stocks.get(0)!;
-  const where = world.stocks.has(shownIsland) && shownIsland ? `${shownIsland}. sziget` : 'Hajó';
+  // Before the first harbour, the goods are still aboard the first ship.
+  if (!world.stocks.has(shownIsland) && world.stocks.size) shownIsland = world.stocks.keys().next().value!;
+  const aboard = world.ships.find((s) => !s.trader);
+  const island = world.stocks.get(shownIsland);
+  const stock = island ?? aboard?.cargo ?? emptyStock();
+  const where = island ? `${shownIsland}. sziget` : (aboard?.name ?? '');
   const { income, upkeep, people } = balance(world);
   const net = Math.round(income - upkeep);
   const html = [
@@ -288,6 +307,14 @@ app.ticker.add((t) => {
   if (here && world.stocks.has(here)) shownIsland = here;
   showResources();
   if (info) info();
+  // The selected ship: a ring on the water round it, following it.
+  if (ship) {
+    const p = groundToScreen(ship.x, ship.y);
+    selection
+      .clear()
+      .ellipse(p.x, p.y + 2, 26, 11)
+      .stroke({ width: 2, color: 0xffe9a8, alpha: 0.9 });
+  }
   const tl = screenToWorld(cam, 0, 0);
   view.x = tl.x;
   view.y = tl.y;
@@ -354,15 +381,9 @@ const refresh = (tiles: [number, number][] = []) => {
   showResources();
 };
 
-// Start centred on the biggest island.
-const sums = new Map<number, [number, number, number]>();
-world.islands.forEach((l, i) => {
-  if (!l) return;
-  const s = sums.get(l) ?? [0, 0, 0];
-  sums.set(l, [s[0] + (i % map.width), s[1] + Math.floor(i / map.width), s[2] + 1]);
-});
-const [sx, sy, n] = [...sums.values()].sort((a, b) => b[2] - a[2])[0] ?? [map.width / 2, map.height / 2, 1];
-const mid = tileToScreen(sx / n, sy / n);
+// Start at the player's ship, lying off the biggest island with the goods to found a town.
+const first = world.ships.find((s) => !s.trader);
+const mid = groundToScreen(first?.x ?? map.width / 2, first?.y ?? map.height / 2);
 const cam: Camera = { scale: 0.6, x: 0, y: 0 };
 cam.x = app.screen.width / 2 - mid.x * cam.scale;
 cam.y = app.screen.height / 2 - mid.y * cam.scale;
@@ -393,11 +414,144 @@ const footprint = (x: number, y: number, size: number) => {
 let tool: Tool = null;
 /** Refreshes the selected building's line in the hud, while one is selected. */
 let info: (() => void) | null = null;
+/** The ship selected: a tap on the water sends it there, a tap on a harbour has it tie up. */
+let ship: Ship | null = null;
+/** Waiting for a tap on a harbour to add as the selected ship's next stop. */
+let addingStop = false;
+const deselect = () => {
+  [ship, addingStop, info] = [null, false, null];
+  panel.hide();
+  selection.clear();
+  say();
+};
+const panel = createPanel(document.getElementById('panel')!, deselect);
+const GOODS = Object.keys(GOOD_NAMES) as Good[];
+const islandName = (b: Building) => `${islandOf(world, b.x, b.y)}. sziget`;
+const harborName = (id: number) => {
+  const b = world.buildings.get(id);
+  return b ? `${BUILDINGS[b.type].name}, ${islandName(b)}` : 'elbontott kikötő';
+};
+
+/** A harbour: its island's store, what the free trader may buy or sell there, shipbuilding. */
+const harborPanel = (b: Building) => {
+  const island = islandOf(world, b.x, b.y);
+  info = () => {
+    if (!world.buildings.has(b.id)) return deselect();
+    const stock = world.stocks.get(island)!;
+    const deals = world.trade.get(island) ?? {};
+    const rows = GOODS.map(
+      (g) =>
+        `<tr><td>${icon(g)} ${GOOD_NAMES[g]}</td><td class="n">${stock[g]}</td><td>` +
+        (['', 'sell', 'buy'] as const)
+          .map(
+            (d) =>
+              `<button data-act="deal" data-arg="${g}:${d}" class="${(deals[g] ?? '') === d ? 'on' : ''}">${d === 'sell' ? 'Elad' : d === 'buy' ? 'Vesz' : '–'}</button>`,
+          )
+          .join('') +
+        '</td></tr>',
+    ).join('');
+    const here = world.ships.filter((s) => s.docked === b.id && !s.trader);
+    panel.show(
+      `Kikötő · ${islandName(b)}`,
+      `<p>A szabadkereskedő elviszi, ami ${KEEP} fölött van („Elad”), és ${FILL}-ig hoz („Vesz”).</p>` +
+        `<table>${rows}</table>` +
+        `<button class="wide" data-act="build">Hajó építése · ${SHIP_COST.gold} arany, ${SHIP_COST.wood} fa, ${SHIP_COST.tools} szerszám</button>` +
+        (here.length
+          ? `<p>Itt horgonyoz: ${here.map((s) => `<button data-act="ship" data-arg="${s.id}">${s.name}</button>`).join(' ')}</p>`
+          : ''),
+      {
+        deal(arg) {
+          const [g, d] = arg.split(':') as [Good, '' | 'sell' | 'buy'];
+          const m = world.trade.get(island) ?? {};
+          if (d) m[g] = d;
+          else delete m[g];
+          world.trade.set(island, m);
+        },
+        build: () => say(buildShip(world, b.id) ?? 'Új hajó futott vízre'),
+        ship: (id) => selectShip(world.ships.find((s) => s.id === Number(id))!),
+      },
+    );
+  };
+  info();
+};
+
+/** A ship: where it is, its cargo (loaded and unloaded by hand in harbour), its trade route. */
+const selectShip = (s: Ship) => {
+  [ship, addingStop] = [s, false];
+  say(s.trader ? '' : 'Koppints a vízre: oda hajózik · kikötőre: ott köt ki');
+  info = () => {
+    const where = s.docked ? `Kikötőben: ${harborName(s.docked)}` : s.path.length ? 'Úton' : 'Horgonyoz';
+    if (s.trader) {
+      panel.show(
+        s.name,
+        `<p>${where}</p><p>Kikötőről kikötőre jár; ott vesz és elad, ahol a kikötőben beállítod.</p>`,
+        {},
+      );
+      return;
+    }
+    const docked = world.buildings.get(s.docked);
+    const stock = docked && world.stocks.get(islandOf(world, docked.x, docked.y));
+    const rows = GOODS.map(
+      (g) =>
+        `<tr><td>${icon(g)} ${GOOD_NAMES[g]}</td><td class="n">${s.cargo[g]}</td>` +
+        (stock
+          ? `<td><button data-act="move" data-arg="${g}:-5" title="Kirakodás">ki 5</button><button data-act="move" data-arg="${g}:5" title="Berakodás">be 5</button></td><td class="n dim">${stock[g]}</td>`
+          : '') +
+        '</tr>',
+    ).join('');
+    const stops = s.route
+      .map(
+        (stop, k) =>
+          `<div class="stop"><b>${k + 1}.</b> ${harborName(stop.harbor)} <button data-act="drop" data-arg="${k}" title="Megálló törlése">✕</button><br>` +
+          GOODS.map((g) => {
+            const st = stop.load.includes(g) ? 'be' : stop.unload.includes(g) ? 'ki' : '';
+            return `<button data-act="stop" data-arg="${k}:${g}" class="${st ? 'on' : ''}">${GOOD_NAMES[g]}${st ? ' ' + st : ''}</button>`;
+          }).join('') +
+          '</div>',
+      )
+      .join('');
+    panel.show(
+      s.name,
+      `<p>${where} · rakomány ${cargoOf(s)}/${HOLD}</p><table>${rows}</table>` +
+        `<h3>Kereskedelmi útvonal</h3>${stops || '<p class="dim">Nincs még megálló.</p>'}` +
+        `<p class="dim">Koppints egy árura a megállóban: be (berakodja) → ki (kirakodja) → semmi.</p>` +
+        `<button data-act="add" class="${addingStop ? 'on' : ''}">${addingStop ? 'Koppints egy kikötőre…' : '+ Megálló'}</button> ` +
+        `<button data-act="sail" class="${s.sailing ? 'on' : ''}">${s.sailing ? 'Útvonal leállítása' : 'Útvonal indítása'}</button>`,
+      {
+        move(arg) {
+          const [g, n] = arg.split(':');
+          transfer(world, s, g as Good, Number(n));
+        },
+        drop(k) {
+          s.route.splice(Number(k), 1);
+          if (s.route.length < 2) s.sailing = false;
+        },
+        stop(arg) {
+          const [k, g] = arg.split(':') as [string, Good];
+          const stop = s.route[Number(k)];
+          // Cycle: nothing → load → unload → nothing.
+          if (stop.load.includes(g)) {
+            stop.load = stop.load.filter((x) => x !== g);
+            stop.unload.push(g);
+          } else if (stop.unload.includes(g)) stop.unload = stop.unload.filter((x) => x !== g);
+          else stop.load.push(g);
+        },
+        add: () => (addingStop = !addingStop),
+        sail() {
+          setSailing(world, s, !s.sailing);
+          if (!s.sailing && s.route.length < 2) say('Legalább két megálló kell');
+        },
+      },
+    );
+  };
+  info();
+};
 let roadStart: { x: number; y: number } | null = null;
 
 const menu = createBuildMenu(document.getElementById('build')!, (t) => {
   tool = t;
-  info = null;
+  [info, ship, addingStop] = [null, null, false];
+  panel.hide();
   roadStart = null;
   preview.clear();
   ghost.clear();
@@ -406,7 +560,11 @@ const menu = createBuildMenu(document.getElementById('build')!, (t) => {
   territory.visible = !!t && t !== 'demolish';
   say(t === 'demolish' ? 'Bontás: koppints vagy húzz az épületekre' : t ? `${BUILDINGS[t].name}: ${costText(t)}` : '');
 });
-addEventListener('keydown', (e) => e.key === 'Escape' && menu.setTool(null));
+addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  menu.setTool(null);
+  deselect();
+});
 
 /** Top corner for a building so the pointer sits near its middle. */
 const anchorFor = (size: number, t: { x: number; y: number }) => ({
@@ -469,11 +627,34 @@ attachCameraControls(app.canvas, cam, {
     if (t) outline(hover, t.x, t.y, 0.35);
   },
   onTap(sx, sy) {
+    // A ship under the finger (its hull or sails) is selected first.
+    const wp = screenToWorld(cam, sx, sy);
+    const hit = world.ships.find((s) => {
+      const p = groundToScreen(s.x, s.y);
+      return Math.abs(wp.x - p.x) < 22 && wp.y > p.y - 50 && wp.y < p.y + 10;
+    });
+    if (hit) return selectShip(hit);
     const t = tileAt(sx, sy);
-    selection.clear();
-    info = null;
-    if (!t) return say();
+    // With a ship selected: a harbour to add as a stop or to sail to, or water to sail to.
+    if (ship && !ship.trader && t) {
+      const at = buildingAt(world, t.x, t.y);
+      if (at?.type === 'harbor' && addingStop) {
+        ship.route.push({ harbor: at.id, unload: [], load: [] });
+        addingStop = false;
+        return;
+      }
+      if (at?.type === 'harbor')
+        return say(sailToHarbor(world, ship, at.id) ? `${ship.name} → ${harborName(at.id)}` : 'Oda nem jut el hajó');
+      if (terrainAt(map, t.x, t.y) === 'water')
+        return say(moveShip(world, ship, t.x, t.y) ? `${ship.name} útnak indul` : 'Oda nem jut el hajó');
+    }
+    deselect();
+    if (!t) return;
     const b = buildingAt(world, t.x, t.y);
+    if (b?.type === 'harbor') {
+      outline(selection, t.x, t.y, 0.9);
+      return harborPanel(b);
+    }
     outline(selection, t.x, t.y, 0.9);
     const where = `(${t.x}, ${t.y}) ${TERRAIN_NAMES[terrainAt(map, t.x, t.y)!]}`;
     const p = b && BUILDINGS[b.type].production;

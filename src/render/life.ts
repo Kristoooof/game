@@ -1,6 +1,6 @@
 import { Container, Graphics, type Rectangle, type Renderer, Sprite, type Texture } from 'pixi.js';
 import { terrainAt } from '../sim/map';
-import { type World } from '../sim/world';
+import { type Ship, type World } from '../sim/world';
 import { BUILDINGS, type Good } from '../data/buildings';
 import { pierBox } from './buildings';
 import { groundToScreen } from './iso';
@@ -484,6 +484,8 @@ interface Vessel {
   /** Fishing boats keep near their hut: its tile and how far they may go. */
   home?: { x: number; y: number; r: number };
   nextWake: number;
+  /** One of the game's ships: it goes where the simulation says, not where it pleases. */
+  sim?: Ship;
 }
 
 const WALK_SPEED = 0.7;
@@ -568,6 +570,7 @@ export function createLife(
   let walkers: Walker[] = [];
   const carts = new Map<number, Sprite>();
   const ships: Vessel[] = [];
+  const fleet = new Map<number, Vessel>();
   let boats: Vessel[] = [];
   /** Wake foam left at the stern; `trail` joins the points of one side of one vessel into a line. */
   const wake: {
@@ -603,7 +606,7 @@ export function createLife(
     };
   };
   // Ships: a handful on the open sea, wherever there is room.
-  for (let tries = 0; ships.length < 7 && tries < 2000; tries++) {
+  for (let tries = 0; ships.length < 4 && tries < 2000; tries++) {
     const x = Math.random() * W;
     const y = Math.random() * map.height;
     if (sea(x, y, 4)) ships.push(newVessel(x, y, false));
@@ -800,7 +803,15 @@ export function createLife(
         sp.anchor.set(fr.ax, fr.ay);
       }
 
-      const all = [...ships, ...boats];
+      // The game's ships (the player's and the free trader), kept in step with the simulation.
+      for (const s of world.ships)
+        if (!fleet.has(s.id)) {
+          const v = newVessel(s.x, s.y, false);
+          v.sim = s;
+          v.a = s.a;
+          fleet.set(s.id, v);
+        }
+      const all = [...ships, ...boats, ...fleet.values()];
       // Never overlap, even while one lies still: vessels too close are eased apart.
       for (let i = 0; i < all.length; i++)
         for (let j = i + 1; j < all.length; j++) {
@@ -815,10 +826,18 @@ export function createLife(
           if (sea(b.x - ox * k, b.y - oy * k, 1)) [b.x, b.y] = [b.x - ox * k, b.y - oy * k];
         }
       for (const v of all) {
+        if (v.sim) {
+          // Placed by the simulation; only the heading eases round, so it never snaps.
+          [v.x, v.y, v.tx, v.ty] = [v.sim.x, v.sim.y, v.sim.x, v.sim.y];
+          let da = v.sim.a - v.a;
+          da = Math.atan2(Math.sin(da), Math.cos(da));
+          v.a += Math.max(-dt * 2.5, Math.min(dt * 2.5, da));
+        }
         const dx = v.tx - v.x;
         const dy = v.ty - v.y;
-        const dist = Math.hypot(dx, dy);
-        if (v.wait > 0) v.wait -= dt;
+        const dist = v.sim ? (v.sim.path.length && v.sim.wait <= 0 ? 1 : 0) : Math.hypot(dx, dy);
+        if (v.sim) v.wait = dist ? 0 : 1;
+        else if (v.wait > 0) v.wait -= dt;
         else if (dist < 0.5) {
           // Arrived: fishing boats stop a while to fish, ships sail on.
           v.wait = v.small ? 3 + Math.random() * 4 : 0;

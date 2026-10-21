@@ -25,6 +25,8 @@ export interface Production {
   seconds: number;
   input?: Good;
   needs?: { terrain: Terrain[]; radius: number; count: number };
+  /** Only on islands where the output grows (see World.fertile). */
+  fertile?: boolean;
 }
 
 export interface BuildingDef {
@@ -53,6 +55,9 @@ export const GOOD_NAMES: Record<Good, string> = {
   wool: 'Gyapjú',
   cloth: 'Posztó',
 };
+
+/** What the free trader pays for a good; selling to us it asks half as much again. */
+export const PRICES: Record<Good, number> = { wood: 8, tools: 30, bricks: 18, fish: 12, wool: 20, cloth: 45 };
 
 export const CATEGORY_NAMES: Record<Category, string> = {
   infra: 'Infrastruktúra',
@@ -107,7 +112,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     category: 'production',
     size: 2,
     cost: { gold: 150, wood: 4, tools: 1 },
-    production: { output: 'wool', seconds: 30, needs: { terrain: ['grass'], radius: 3, count: 12 } },
+    production: { output: 'wool', seconds: 30, needs: { terrain: ['grass'], radius: 3, count: 12 }, fertile: true },
   },
   weaver: {
     name: 'Szövöde',

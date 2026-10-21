@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "src/main.ts": {
-    "mtime": 1792574956.263006,
-    "seen": 1792575194.2354176,
-    "ast_hash": "5c10ac800acbc0cab09130b21daa4381",
+    "mtime": 1792575811.4273126,
+    "seen": 1792575849.8018415,
+    "ast_hash": "dd24999ef62b239f0cd25deed3ec773c",
     "semantic_hash": ""
   },
   "src/render/iso.test.ts": {
@@ -144,15 +144,15 @@
     "semantic_hash": ""
   },
   "PLAN.md": {
-    "mtime": 1792575192.0929825,
-    "seen": 1792575194.2354903,
-    "ast_hash": "255a129bd6673b91a7d05c16c13d9a72",
+    "mtime": 1792575835.938738,
+    "seen": 1792575849.8019314,
+    "ast_hash": "2801e49dbf203f2dbac806eb5328f431",
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1792574956.2643027,
-    "seen": 1792575194.2354918,
-    "ast_hash": "64c459b8b15b50c9cd3e832a007f35d2",
+    "mtime": 1792575564.3906364,
+    "seen": 1792575849.8019328,
+    "ast_hash": "0687e1e5243d909cffd97195a99d8462",
     "semantic_hash": ""
   },
   "src/render/camera.test.ts": {
@@ -198,9 +198,9 @@
     "semantic_hash": ""
   },
   "src/data/buildings.ts": {
-    "mtime": 1792574830.5567853,
-    "seen": 1792575194.2354121,
-    "ast_hash": "587de5a20d18dc8e234007ca460b2d31",
+    "mtime": 1792575350.781921,
+    "seen": 1792575849.8018348,
+    "ast_hash": "6a653d768fd093898e3d1416f6fd3491",
     "semantic_hash": ""
   },
   "src/render/buildings.ts": {
@@ -210,15 +210,15 @@
     "semantic_hash": ""
   },
   "src/sim/world.test.ts": {
-    "mtime": 1792574057.194658,
-    "seen": 1792574728.576638,
-    "ast_hash": "0d16a2afa8558a50f26c09f4a391d6e4",
+    "mtime": 1792575423.714771,
+    "seen": 1792575849.801901,
+    "ast_hash": "810b6b5b2fa0eee5cebff001720ee1a1",
     "semantic_hash": ""
   },
   "src/sim/world.ts": {
-    "mtime": 1792574878.8869727,
-    "seen": 1792575194.2354612,
-    "ast_hash": "1499821a03317332d9b778b1cf336ef4",
+    "mtime": 1792575564.2146366,
+    "seen": 1792575849.8019023,
+    "ast_hash": "0931fd8aa7ed65b56e6674c173c8a2d4",
     "semantic_hash": ""
   },
   "src/ui/buildMenu.ts": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "src/render/life.ts": {
-    "mtime": 1792574957.5866005,
-    "seen": 1792575194.23544,
-    "ast_hash": "1b53928cc4d33a6c6721e8798f843314",
+    "mtime": 1792575483.6466317,
+    "seen": 1792575849.801872,
+    "ast_hash": "f8c2edd3c56296a463868bae5b57e107",
     "semantic_hash": ""
   },
   "src/render/sculpt.ts": {
@@ -312,9 +312,9 @@
     "semantic_hash": ""
   },
   "src/sim/economy.ts": {
-    "mtime": 1792574878.8875554,
-    "seen": 1792575194.2354505,
-    "ast_hash": "b44d6f7963978e37aea5a2eb028aa12d",
+    "mtime": 1792575392.7536302,
+    "seen": 1792575849.8018882,
+    "ast_hash": "afd7a1b22b7cca68b56e52d93a220f63",
     "semantic_hash": ""
   },
   "src/data/population.ts": {
@@ -333,6 +333,24 @@
     "mtime": 1792574892.399728,
     "seen": 1792575194.2354562,
     "ast_hash": "383bba26ea8da1f38840d2ae80eff06e",
+    "semantic_hash": ""
+  },
+  "src/sim/ships.test.ts": {
+    "mtime": 1792575448.935688,
+    "seen": 1792575849.8018978,
+    "ast_hash": "2aaa63632baa4b363e806b2cd9c1a5fd",
+    "semantic_hash": ""
+  },
+  "src/sim/ships.ts": {
+    "mtime": 1792575583.0846634,
+    "seen": 1792575849.8018994,
+    "ast_hash": "b2d1cced1034b4439a143457fdbe25a3",
+    "semantic_hash": ""
+  },
+  "src/ui/panel.ts": {
+    "mtime": 1792575496.6546326,
+    "seen": 1792575849.8019047,
+    "ast_hash": "fa672a5a968063e3ea9de6e6a70da82b",
     "semantic_hash": ""
   }
 }

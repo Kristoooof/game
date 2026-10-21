@@ -138,6 +138,112 @@
         background: linear-gradient(180deg, #c49a52, #8a6430 60%, #6e4c22);
         color: #fffaf0;
       }
+      /* Side panel for the selected harbour or ship. */
+      #panel {
+        position: fixed;
+        top: 56px;
+        left: 8px;
+        z-index: 2;
+        width: min(340px, calc(100vw - 32px));
+        max-height: calc(100vh - 190px);
+        overflow-y: auto;
+        padding: 12px 14px;
+        border: 2px solid #1e140a;
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--frame);
+        color: var(--ink);
+        font:
+          14px/1.35 'Palatino Linotype',
+          Palatino,
+          'Book Antiqua',
+          Georgia,
+          serif;
+        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+      }
+      #panel[hidden] {
+        display: none;
+      }
+      #panel .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid rgba(216, 180, 104, 0.35);
+      }
+      #panel h2,
+      #panel h3 {
+        margin: 0;
+        font-size: 17px;
+        font-weight: normal;
+        color: var(--gold);
+      }
+      #panel h3 {
+        margin-top: 10px;
+        font-size: 15px;
+      }
+      #panel p {
+        margin: 6px 0;
+      }
+      #panel table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      #panel td {
+        padding: 1px 4px 1px 0;
+        white-space: nowrap;
+      }
+      #panel td svg {
+        width: 16px;
+        height: 16px;
+        vertical-align: -3px;
+      }
+      #panel .n {
+        text-align: right;
+        font-weight: 600;
+      }
+      #panel .dim {
+        opacity: 0.65;
+      }
+      #panel button {
+        margin: 1px;
+        padding: 2px 7px;
+        border: 1px solid #1e140a;
+        border-radius: 5px;
+        background: linear-gradient(180deg, #4a3220, #33220f);
+        box-shadow: inset 0 0 0 1px rgba(216, 180, 104, 0.3);
+        color: var(--ink);
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      #panel button:hover {
+        box-shadow: inset 0 0 0 1px rgba(216, 180, 104, 0.7);
+      }
+      #panel button.on {
+        background: linear-gradient(180deg, #c49a52, #8a6430 60%, #6e4c22);
+        color: #fffaf0;
+      }
+      #panel button.wide {
+        width: 100%;
+        margin-top: 8px;
+        padding: 5px;
+      }
+      #panel button.close {
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        border-radius: 50%;
+        font-size: 18px;
+        line-height: 1;
+      }
+      #panel .stop {
+        margin: 6px 0;
+        padding: 5px;
+        border-radius: 5px;
+        background: rgba(0, 0, 0, 0.18);
+      }
       #hud {
         bottom: 110px;
         right: 8px;
@@ -406,6 +512,7 @@
     <div id="resources"></div>
     <div id="speed"></div>
     <div id="hud"></div>
+    <div id="panel"></div>
     <div id="build"></div>
     <div id="settings"></div>
     <div id="fps" hidden></div>

@@ -40,6 +40,40 @@ export interface Cart {
   amount: number;
 }
 
+/** A stop on a ship's trade route: what it unloads there, then what it loads. */
+export interface Stop {
+  harbor: number;
+  unload: Good[];
+  load: Good[];
+}
+
+/** A ship at sea, in tile coordinates. */
+export interface Ship {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  /** Heading, radians in tile space. */
+  a: number;
+  /** Water tiles (indices) still to sail through, the next first. */
+  path: number[];
+  /** Harbour it is making for (0: a point at sea), and the one it lies at (0: none). */
+  goal: number;
+  docked: number;
+  cargo: Stock;
+  /** Trade route: its stops, the one it is on, whether it is running. */
+  route: Stop[];
+  leg: number;
+  sailing: boolean;
+  /** Seconds left loading, unloading or trading. */
+  wait: number;
+  /** The free trader: not the player's, it buys and sells at the harbours. */
+  trader?: boolean;
+}
+
+/** What the free trader may do with a good at an island: buy it from us, or sell it to us. */
+export type Deal = 'sell' | 'buy';
+
 export interface World {
   map: GameMap;
   islands: Int32Array;
@@ -49,10 +83,14 @@ export interface World {
   /** 1 where the player may build. */
   owned: Uint8Array;
   gold: number;
-  /** Goods per island (label), kept in its harbour and warehouses. Key 0 is the ship's hold:
-   * what the player starts with, unloaded at the first harbour. */
+  /** Goods per island (label), kept in its harbour and warehouses. */
   stocks: Map<number, Stock>;
   carts: Cart[];
+  ships: Ship[];
+  /** Per island, the goods its harbour trades with the free trader. */
+  trade: Map<number, Partial<Record<Good, Deal>>>;
+  /** Per island, the crops that grow there (not every island suits sheep). */
+  fertile: Map<number, Set<Good>>;
   /** Game time, seconds. */
   time: number;
   /** Buildings whose look changed (a house rising a level): the renderer redraws and clears them. */
@@ -64,35 +102,124 @@ export const emptyStock = (): Stock => Object.fromEntries(Object.keys(GOOD_NAMES
 
 export const islandOf = (w: World, x: number, y: number) => w.islands[y * w.map.width + x];
 
+/** A settling harbour must be paid for from a ship lying within this many tiles. */
+export const SETTLE_RANGE = 8;
+/** Goods a ship can carry, all kinds together. */
+export const HOLD = 40;
+
+export const cargoOf = (s: Ship) => Object.values(s.cargo).reduce((a, n) => a + n, 0);
+
 /**
- * The stock that pays for building at (x, y): its island's. An island without one yet (being
- * settled) is paid for from the ship's hold, or once that is empty from the richest island.
+ * The stock that pays for `type` at (x, y): its island's. On an island not yet settled, the
+ * cargo of a ship close by (one carrying enough, if any), or null if none lies near.
  */
-// shortcut: the richest island stands in for a ship bringing the goods until ships sail (milestone 5).
-export function payingStock(w: World, x: number, y: number): Stock {
+export function payingStock(w: World, type: BuildingId, x: number, y: number): Stock | null {
   const own = w.stocks.get(islandOf(w, x, y));
   if (own) return own;
-  const hold = w.stocks.get(0)!;
-  if (Object.values(hold).some((n) => n > 0)) return hold;
-  const total = (s: Stock) => Object.values(s).reduce((a, n) => a + n, 0);
-  return [...w.stocks.values()].reduce((a, b) => (total(b) > total(a) ? b : a), hold);
+  const near = w.ships
+    .filter((s) => !s.trader && Math.hypot(s.x - x, s.y - y) <= SETTLE_RANGE)
+    .sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
+  const cost = BUILDINGS[type].cost;
+  const enough = (s: Ship) => (Object.keys(GOOD_NAMES) as Good[]).every((g) => s.cargo[g] >= (cost[g] ?? 0));
+  return (near.find(enough) ?? near[0])?.cargo ?? null;
+}
+
+/** Islands by size, largest first: the largest is where the game starts. */
+function islandsBySize(labels: Int32Array) {
+  const size = new Map<number, number>();
+  for (const l of labels) if (l) size.set(l, (size.get(l) ?? 0) + 1);
+  return [...size.keys()].sort((a, b) => size.get(b)! - size.get(a)! || a - b);
 }
 
 export function createWorld(map: GameMap): World {
   const n = map.tiles.length;
-  return {
+  const islands = labelIslands(map);
+  const bySize = islandsBySize(islands);
+  // Sheep thrive on every other island, never the home island (unless it is the only one):
+  // cloth means trade.
+  const fertile = new Map(bySize.map((l, k) => [l, new Set<Good>(k % 2 || bySize.length === 1 ? ['wool'] : [])]));
+  const w: World = {
     map,
-    islands: labelIslands(map),
+    islands,
     buildings: new Map(),
     occupied: new Int32Array(n),
     owned: new Uint8Array(n),
     gold: 5000,
-    stocks: new Map([[0, { ...emptyStock(), wood: 50, tools: 30, bricks: 20 }]]),
+    stocks: new Map(),
     carts: [],
+    ships: [],
+    trade: new Map(),
+    fertile,
     time: 0,
     changed: [],
     nextId: 1,
   };
+  // The player's first ship, with the goods to found a town, off the largest island; the free
+  // trader out at the edge of the map.
+  const home = bySize[0];
+  let sx = 0;
+  let sy = 0;
+  let count = 0;
+  islands.forEach((l, i) => {
+    if (l !== home) return;
+    sx += i % map.width;
+    sy += Math.floor(i / map.width);
+    count++;
+  });
+  const start = nearestWater(map, count ? sx / count : map.width / 2, count ? sy / count : map.height / 2);
+  const ship = (name: string, i: number, trader = false): Ship => ({
+    id: w.nextId++,
+    name,
+    x: (i % map.width) + 0.5,
+    y: Math.floor(i / map.width) + 0.5,
+    a: 0,
+    path: [],
+    goal: 0,
+    docked: 0,
+    cargo: emptyStock(),
+    route: [],
+    leg: 0,
+    sailing: false,
+    wait: 0,
+    trader,
+  });
+  if (start >= 0)
+    w.ships.push({ ...ship('Hajnalcsillag', start), cargo: { ...emptyStock(), wood: 50, tools: 30, bricks: 20 } });
+  const edge = map.tiles.indexOf('water');
+  if (edge >= 0) w.ships.push(ship('Szabadkereskedő', edge, true));
+  return w;
+}
+
+/** The water tile nearest (x, y), preferring one clear of the shore by two tiles. */
+function nearestWater(map: GameMap, x: number, y: number) {
+  const W = map.width;
+  const toLand = new Int32Array(map.tiles.length).fill(-1);
+  const queue: number[] = [];
+  map.tiles.forEach((t, i) => {
+    if (t !== 'water') {
+      toLand[i] = 0;
+      queue.push(i);
+    }
+  });
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    for (const j of [i % W ? i - 1 : -1, (i + 1) % W ? i + 1 : -1, i - W, i + W])
+      if (j >= 0 && j < toLand.length && toLand[j] < 0) {
+        toLand[j] = toLand[i] + 1;
+        queue.push(j);
+      }
+  }
+  let best = -1;
+  let bestD = Infinity;
+  for (const min of [2, 1]) {
+    toLand.forEach((d, i) => {
+      if (d < min) return;
+      const dd = Math.hypot((i % W) + 0.5 - x, Math.floor(i / W) + 0.5 - y);
+      if (dd < bestD) [best, bestD] = [i, dd];
+    });
+    if (best >= 0) return best;
+  }
+  return best;
 }
 
 const footprint = (type: BuildingId, x: number, y: number) => {
@@ -126,8 +253,12 @@ export function placementError(w: World, type: BuildingId, x: number, y: number)
     ].some(([nx, ny]) => terrainAt(w.map, nx, ny) === 'water'),
   );
   if (def.coast && !touchesWater) return 'Partra kell építeni';
+  const crop = def.production?.fertile && def.production.output;
+  if (crop && !w.fertile.get(islandOf(w, x, y))?.has(crop))
+    return `Ezen a szigeten nem terem: ${GOOD_NAMES[crop].toLowerCase()}`;
   if (w.gold < def.cost.gold) return 'Nincs elég arany';
-  const stock = payingStock(w, x, y);
+  const stock = payingStock(w, type, x, y);
+  if (!stock) return 'Hajó kell a közelben az építőanyaggal';
   for (const g of Object.keys(GOOD_NAMES) as Good[])
     if (stock[g] < (def.cost[g] ?? 0)) return `Nincs elég: ${GOOD_NAMES[g].toLowerCase()}`;
   return null;
@@ -138,7 +269,7 @@ export function place(w: World, type: BuildingId, x: number, y: number): string 
   const err = placementError(w, type, x, y);
   if (err) return err;
   const def = BUILDINGS[type];
-  const stock = payingStock(w, x, y);
+  const stock = payingStock(w, type, x, y)!;
   const id = w.nextId++;
   const b: Building = { id, type, x, y };
   if (def.production) Object.assign(b, { output: 0, input: 0, progress: 0, busy: 0 });
@@ -152,12 +283,13 @@ export function place(w: World, type: BuildingId, x: number, y: number): string 
   }
   w.gold -= def.cost.gold;
   for (const g of Object.keys(GOOD_NAMES) as Good[]) stock[g] -= def.cost[g] ?? 0;
-  // A new island's first depot opens its store; the first of all takes in the ship's cargo.
+  // A new island's first depot opens its store. The very first harbour of all: the ship that
+  // brought the settlers unloads everything into it.
   const island = islandOf(w, x, y);
   if (def.depot && !w.stocks.has(island)) {
-    const hold = w.stocks.get(0)!;
-    w.stocks.set(island, w.stocks.size === 1 ? { ...hold } : emptyStock());
-    if (w.stocks.size === 2) w.stocks.set(0, emptyStock());
+    const first = !w.stocks.size;
+    w.stocks.set(island, first ? { ...stock } : emptyStock());
+    if (first) Object.assign(stock, emptyStock());
   }
   if (def.radius) updateTerritory(w);
   return null;

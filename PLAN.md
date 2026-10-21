@@ -63,13 +63,13 @@ Anno 1404 ihlette, böngészőben futó gazdasági stratégiai játék. Saját n
 - [x] Adóbevétel (lakónként és szintenként, elégedettséggel arányos), épület-fenntartási költség; a felső sávban pénzmérleg percenként és lakosság; házra koppintva lakók, elégedettség, hiányzó igények
 
 ### 5. Hajók és szigetek közti kereskedelem
-- [ ] Hajóépítés a kikötőben
-- [ ] Hajó mozgatása (útkeresés vízen), kijelölés, parancsok
-- [ ] Rakodás/kirakodás kikötők között
-- [ ] Kereskedelmi útvonalak (automata körjárat, áru-szabályok)
-- [ ] Új sziget megszerzése (kikötő építése)
-- [ ] Szigetenként eltérő termékenység (pl. csak bizonyos szigeten nő a komló)
-- [ ] Szabadkereskedő NPC hajó (vétel/eladás)
+- [x] Hajóépítés a kikötőben (kikötőre koppintva: 800 arany, 10 fa, 4 szerszám; 40 egység raktér)
+- [x] Hajó mozgatása (A* útkeresés vízen, földnyelvet nem vág át), kijelölés koppintással, parancs: koppintás a vízre vagy egy kikötőre
+- [x] Rakodás/kirakodás kikötőben a hajó paneljén (5-ösével)
+- [x] Kereskedelmi útvonalak: megállók kikötőnként, áruként „be”/„ki”, automata körjárat (a raktér egyenlően oszlik a berakott áruk közt)
+- [x] Új sziget megszerzése: a kikötőt egy 8 mezőn belül álló hajó rakományából kell fizetni; a játék a kezdő hajónál indul, az első kikötő a teljes rakományt kirakja
+- [x] Szigetenként eltérő termékenység: birka (gyapjú) minden második szigeten, a kezdő szigeten nem → a posztóhoz kereskedni kell
+- [x] Szabadkereskedő NPC hajó: sorban járja a kikötőket, ahol a kikötő paneljén beállított áruból vesz (10 fölött) vagy elad (15-ig, másfélszeres áron)
 
 ### 6. UI és élmény
 - [ ] Magyar felület: felső sáv (pénz, lakosság), épület infópanel, raktár
