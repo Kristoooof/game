@@ -17,16 +17,16 @@ export interface Level {
 }
 
 export const LEVELS: Level[] = [
-  { name: 'Paraszt', house: 'Paraszt ház', max: 8, tax: 1, needs: ['fish', 'faith'], upgrade: { wood: 3 } },
+  { name: 'Paraszt', house: 'Paraszt ház', max: 8, tax: 2, needs: ['fish', 'faith'], upgrade: { wood: 3 } },
   {
     name: 'Polgár',
     house: 'Polgárház',
     max: 16,
-    tax: 2,
+    tax: 4,
     needs: ['fish', 'cloth', 'faith'],
     upgrade: { bricks: 3, tools: 2 },
   },
-  { name: 'Kereskedő', house: 'Kereskedőház', max: 25, tax: 3, needs: ['fish', 'cloth', 'tools', 'faith'] },
+  { name: 'Kereskedő', house: 'Kereskedőház', max: 25, tax: 6, needs: ['fish', 'cloth', 'tools', 'faith'] },
 ];
 
 /** Goods each resident uses up per minute. */

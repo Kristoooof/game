@@ -15,7 +15,12 @@ let flip = false;
 /** Terrace height of the building being drawn: all of it stands on one level. */
 let lift = 0;
 /** Screen point of tile coords (x, y) at height h above raised land (below it in mirror mode). */
+/** Turned buildings are drawn mirrored across their footprint's diagonal (x and y swapped about
+ * its centre): the front faces right instead of left. */
+let turned = false;
+let mid = [0, 0];
 const P = (x: number, y: number, h: number) => {
+  if (turned) [x, y] = [mid[0] + (y - mid[1]), mid[1] + (x - mid[0])];
   const s = tileToScreen(x, y);
   return [s.x, (flip ? s.y + h : s.y - h) - lift];
 };
@@ -238,8 +243,9 @@ function walls(g: Graphics, b: Box, h0: number, h1: number, color: number, top =
   const { x0, y0, x1, y1 } = b;
   const left = [P(x0, y1, h0), P(x1, y1, h0), P(x1, y1, h1), P(x0, y1, h1)];
   const right = [P(x1, y1, h0), P(x1, y0, h0), P(x1, y0, h1), P(x1, y1, h1)];
-  fill(g, left, shade(color, 0.92));
-  fill(g, right, shade(color, 0.72));
+  // The face towards the sun (upper left) lit, the other in shade, whichever way it is turned.
+  fill(g, left, shade(color, turned ? 0.72 : 0.92));
+  fill(g, right, shade(color, turned ? 0.92 : 0.72));
   overlayQuad(g, left, surface().plaster, 0.3);
   overlayQuad(g, right, surface().plaster, 0.3);
   if (top) fill(g, [P(x0, y0, h1), P(x1, y0, h1), P(x1, y1, h1), P(x0, y1, h1)], color);
@@ -434,13 +440,14 @@ function shadow(g: Graphics, x: number, y: number, size: number, height = 26) {
   const swept = (k: number) =>
     hull([...foot, ...foot.map(([px, py]) => [px + sun.dx * height * k * reach, py + sun.dy * height * k * reach])]);
   for (const k of [1, 0.8, 0.6, 0.4]) g.poly(swept(k).flat()).fill({ color: 0x0a1a10, alpha: 0.055 * sun.alpha });
-  // Contact shade: the ground darkens right against the walls, whatever the sun.
-  for (const e of [0.22, 0.14, 0.07]) {
+  // Contact shade: the ground darkens right against the walls, whatever the sun. It stays on the
+  // plot (the walls stand a little in from its edge): a road alongside keeps its own colour.
+  for (const e of [0.16, 0.1, 0.05]) {
     const q = [
-      P(x - e, y - e, 0),
-      P(x + size + e, y - e, 0),
-      P(x + size + e, y + size + e, 0),
-      P(x - e, y + size + e, 0),
+      P(x + 0.18 - e, y + 0.18 - e, 0),
+      P(x + size - 0.18 + e, y + 0.18 - e, 0),
+      P(x + size - 0.18 + e, y + size - 0.18 + e, 0),
+      P(x + 0.18 - e, y + size - 0.18 + e, 0),
     ];
     g.poly(q.flat()).fill({ color: 0x0a1a10, alpha: 0.07 });
   }
@@ -741,12 +748,16 @@ export function drawBuilding(
   shadowed = true,
   /** A house's level (see data/population.ts). */
   level = 0,
+  /** 1: turned, the front facing the other way. */
+  rot = 0,
 ) {
   const size = BUILDINGS[type].size;
   rnd = mulberry32(variant * 7919 + x * 131 + y * 31 + type.length);
   flip = mirrored;
   lift = liftAt(x, y);
   if (!flip && shadowed) shadow(g, x, y, size);
+  turned = rot === 1;
+  mid = [x + size / 2, y + size / 2];
   const box = (a: number, b: number, c: number, d: number): Box => ({ x0: x + a, y0: y + b, x1: x + c, y1: y + d });
   switch (type) {
     case 'house':
@@ -1085,15 +1096,19 @@ export function drawBuilding(
       break;
   }
   flip = false;
+  turned = false;
 }
 
 /** World point where smoke leaves a building's chimney, if it has one. */
-export function chimneyAt(type: BuildingId, x: number, y: number, level = 0) {
+export function chimneyAt(type: BuildingId, x: number, y: number, level = 0, rot = 0) {
   lift = liftAt(x, y);
   // The forge and the kiln smoke too; a house's chimney rises with its storeys.
   const at = { house: [0.535, level ? 38 : 29], smithy: [0.485, 30], brickworks: [0.57, 31] }[type as string];
   if (!at) return null;
+  turned = rot === 1;
+  mid = [x + BUILDINGS[type].size / 2, y + BUILDINGS[type].size / 2];
   const [px, py] = P(x + at[0], y + at[0], at[1]);
+  turned = false;
   return { x: px, y: py };
 }
 

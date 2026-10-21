@@ -9,7 +9,7 @@ const STAY = 4;
 /** The trader buys our surplus down to KEEP, and sells to us up to FILL. */
 export const KEEP = 10;
 export const FILL = 15;
-export const SHIP_COST = { gold: 800, wood: 10, tools: 4 };
+export const SHIP_COST = { gold: 600, wood: 10, tools: 4 };
 
 const isSea = (w: World, i: number) => w.map.tiles[i] === 'water';
 

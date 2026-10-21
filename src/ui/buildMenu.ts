@@ -34,7 +34,8 @@ const button = (label: string, onClick: () => void, title = '') => {
 };
 
 /** Bottom bar: category tabs, a row of buildings for the open category, demolish and cancel. */
-export function createBuildMenu(root: HTMLElement, onTool: (tool: Tool) => void) {
+/** `onRotate`: turn the building being placed (shown while one is chosen). */
+export function createBuildMenu(root: HTMLElement, onTool: (tool: Tool) => void, onRotate: () => void) {
   let open: Category | null = null;
   let tool: Tool = null;
   const items = document.createElement('div');
@@ -67,6 +68,7 @@ export function createBuildMenu(root: HTMLElement, onTool: (tool: Tool) => void)
         button(tabLabel('demolish', 'Bontás'), () => setTool(tool === 'demolish' ? null : 'demolish')),
         { className: tool === 'demolish' ? 'active danger' : 'danger' },
       ),
+      ...(tool && tool !== 'road' && tool !== 'demolish' ? [button('⟳', onRotate, 'Forgatás (R)')] : []),
       ...(tool ? [button('✕', () => setTool(null), 'Mégse (Esc)')] : []),
     );
   };

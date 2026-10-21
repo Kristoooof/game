@@ -128,7 +128,7 @@ export const QUESTS: Quest[] = [
   {
     title: 'Új hajó',
     text:
-      'Koppints a kikötőre, és a panelen építs egy új hajót (800 arany, 10 fa, 4 szerszám). ' +
+      'Koppints a kikötőre, és a panelen építs egy új hajót (600 arany, 10 fa, 4 szerszám). ' +
       'Hajóra koppintva kijelölöd; utána a vízre koppintva oda hajózik.',
     counts: 'Saját hajó',
     progress: (w) => [Math.min(2, players(w).length), 2],

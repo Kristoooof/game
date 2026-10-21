@@ -190,10 +190,23 @@ export function createTerrain(world: World, renderer: Renderer) {
    * Nature on `tiles`. Without `reflections` only the plain sprites, no shadows or mirror images:
    * the live copies that hide people behind trees (see `refreshFront`).
    */
+  /** True if a building (not a road) stands on one of the eight tiles round (x, y). */
+  const besideBuilding = (x: number, y: number) => {
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        if (x + dx < 0 || y + dy < 0 || x + dx >= W || y + dy >= H) continue;
+        const b = world.buildings.get(world.occupied[(y + dy) * W + x + dx]);
+        if (b && b.type !== 'road') return true;
+      }
+    return false;
+  };
   function addNature(tiles: Iterable<[number, number]>, into: Container, reflections: Container | null, far: boolean) {
     for (const [x, y] of tiles) {
       if (world.occupied[y * W + x]) continue;
       const t = at(x, y);
+      // Round a building the ground is a trodden yard: no bush or lone tree leaning into its walls.
+      // (A wood stays a wood.)
+      if (t !== 'forest' && besideBuilding(x, y)) continue;
       const r = mulberry32(x * 92821 + y * 68917 + 7);
       /** `lean`: trees bend a little with the prevailing wind. */
       const put = (a: Art, u: number, v: number, scale: number, lean = false, tint = 0xffffff) => {
@@ -464,7 +477,7 @@ export function createTerrain(world: World, renderer: Renderer) {
       const size = BUILDINGS[b.type].size;
       const draw = (mirrored = false) => {
         const bg = new Graphics({ zIndex: b.x + b.y + size });
-        drawBuilding(bg, b.type, b.x, b.y, b.id, mirrored, true, b.level);
+        drawBuilding(bg, b.type, b.x, b.y, b.id, mirrored, true, b.level, b.rot);
         return bg;
       };
       setGlow(lights);
@@ -544,7 +557,7 @@ export function createTerrain(world: World, renderer: Renderer) {
       for (const b of world.buildings.values()) {
         if (b.type === 'road' || hidden.has(b.id)) continue;
         const g = new Graphics({ zIndex: b.x + b.y + BUILDINGS[b.type].size });
-        drawBuilding(g, b.type, b.x, b.y, b.id, false, false, b.level);
+        drawBuilding(g, b.type, b.x, b.y, b.id, false, false, b.level, b.rot);
         tmp.addChild(g);
       }
       occluders = [...tmp.children] as Container[];

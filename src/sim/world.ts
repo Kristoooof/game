@@ -7,6 +7,8 @@ export interface Building {
   type: BuildingId;
   x: number;
   y: number;
+  /** 1 when turned to face the other way (only its look). */
+  rot?: number;
   /** Production buildings: goods made and waiting for a cart, inputs delivered, progress of the
    * current piece (0..1), and how hard it has been working of late (0..1). */
   output?: number;
@@ -289,13 +291,13 @@ export function placementError(w: World, type: BuildingId, x: number, y: number)
 }
 
 /** Builds if possible. Returns the error otherwise. Building on forest clears it. */
-export function place(w: World, type: BuildingId, x: number, y: number): string | null {
+export function place(w: World, type: BuildingId, x: number, y: number, rot = 0): string | null {
   const err = placementError(w, type, x, y);
   if (err) return err;
   const def = BUILDINGS[type];
   const stock = payingStock(w, type, x, y)!;
   const id = w.nextId++;
-  const b: Building = { id, type, x, y };
+  const b: Building = rot ? { id, type, x, y, rot } : { id, type, x, y };
   if (def.production) Object.assign(b, { output: 0, input: 0, progress: 0, busy: 0 });
   // A new house: a couple moves in, hopeful.
   if (type === 'house') Object.assign(b, { level: 0, residents: 2, happy: 1, owed: {}, met: {} });

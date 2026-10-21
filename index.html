@@ -12,6 +12,9 @@
         overflow: hidden;
         background: #0b3a5a;
         touch-action: none;
+        /* Dragging across the map must not select the panels' text. */
+        -webkit-user-select: none;
+        user-select: none;
       }
       :root {
         /* Painted wood: brass rivets in the corners, grain running across, darker towards the foot. */

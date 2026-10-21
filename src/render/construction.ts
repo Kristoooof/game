@@ -37,14 +37,14 @@ export function createConstruction(dust: (x: number, y: number) => void, done: (
 
   return {
     layer,
-    start(b: { id: number; type: BuildingId; x: number; y: number }) {
+    start(b: { id: number; type: BuildingId; x: number; y: number; rot?: number }) {
       const size = BUILDINGS[b.type].size;
       const h = HEIGHT[b.type] ?? 30;
       const L = groundToScreen(b.x, b.y + size);
       const F = groundToScreen(b.x + size, b.y + size);
       const R = groundToScreen(b.x + size, b.y);
       const body = new Graphics();
-      drawBuilding(body, b.type, b.x, b.y, b.id);
+      drawBuilding(body, b.type, b.x, b.y, b.id, false, true, 0, b.rot);
       const mask = new Graphics();
       body.mask = mask;
       // Front scaffold: poles at the corners and between, ledgers every 8 px, a brace per face.

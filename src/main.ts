@@ -461,7 +461,7 @@ const refresh = (tiles: [number, number][] = []) => {
   terrain.changed(tiles);
   terrain.refreshFront();
   life.refresh();
-  effects.setChimneys([...world.buildings.values()].flatMap((b) => chimneyAt(b.type, b.x, b.y, b.level) ?? []));
+  effects.setChimneys([...world.buildings.values()].flatMap((b) => chimneyAt(b.type, b.x, b.y, b.level, b.rot) ?? []));
   drawTerritory(territory, world);
   showResources();
   minimap.redraw();
@@ -707,20 +707,36 @@ const selectShip = (s: Ship) => {
   info();
 };
 let roadStart: { x: number; y: number } | null = null;
+/** Which way the building being placed faces: 0 as drawn, 1 turned. */
+let rotation = 0;
+let lastHover: { x: number; y: number } | undefined;
+const rotate = () => {
+  rotation ^= 1;
+  showPreview(lastHover);
+};
 
-const buildMenu = createBuildMenu(document.getElementById('build')!, (t) => {
-  tool = t;
-  [info, ship, addingStop] = [null, null, false];
-  panel.hide();
-  roadStart = null;
-  preview.clear();
-  ghost.clear();
-  hover.clear();
-  selection.clear();
-  territory.visible = !!t && t !== 'demolish';
-  say(t === 'demolish' ? 'Bontás: koppints vagy húzz az épületekre' : t ? `${BUILDINGS[t].name}: ${costText(t)}` : '');
-});
+const buildMenu = createBuildMenu(
+  document.getElementById('build')!,
+  (t) => {
+    tool = t;
+    [info, ship, addingStop] = [null, null, false];
+    panel.hide();
+    roadStart = null;
+    preview.clear();
+    ghost.clear();
+    hover.clear();
+    selection.clear();
+    territory.visible = !!t && t !== 'demolish';
+    say(
+      t === 'demolish' ? 'Bontás: koppints vagy húzz az épületekre' : t ? `${BUILDINGS[t].name}: ${costText(t)}` : '',
+    );
+  },
+  rotate,
+);
+
 addEventListener('keydown', (e) => {
+  if ((e.key === 'r' || e.key === 'R') && tool && tool !== 'road' && tool !== 'demolish' && !menu.isOpen)
+    return rotate();
   if (e.key !== 'Escape') return;
   if (menu.isOpen) return playing && closeMenu();
   buildMenu.setTool(null);
@@ -734,6 +750,7 @@ const anchorFor = (size: number, t: { x: number; y: number }) => ({
 });
 
 const showPreview = (t: { x: number; y: number } | undefined) => {
+  lastHover = t;
   preview.clear();
   ghost.clear();
   if (!t || !tool) return;
@@ -760,7 +777,7 @@ const showPreview = (t: { x: number; y: number } | undefined) => {
   const err = placementError(world, tool, a.x, a.y);
   const color = err ? 0xff3b30 : 0x4cd964;
   for (const [x, y] of footprint(a.x, a.y, def.size)) outline(preview, x, y, 0.5, color);
-  drawBuilding(ghost, tool, a.x, a.y);
+  drawBuilding(ghost, tool, a.x, a.y, 0, false, true, 0, rotation);
   say(err ?? `${def.name}: ${costText(tool)}`);
 };
 
@@ -839,7 +856,7 @@ attachCameraControls(app.canvas, cam, {
       } else if (t && tool && tool !== 'demolish' && tool !== 'road') {
         const s = BUILDINGS[tool].size;
         const a = anchorFor(s, t);
-        const err = place(world, tool, a.x, a.y);
+        const err = place(world, tool, a.x, a.y, rotation);
         const b = err ? undefined : buildingAt(world, a.x, a.y);
         if (b) {
           terrain.hide(b.id, true);

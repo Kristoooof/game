@@ -52,7 +52,7 @@ test('taxes come in and upkeep goes out', () => {
   const { income, upkeep, people } = balance(w);
   expect(people).toBe(2);
   expect(income).toBeGreaterThan(0);
-  expect(upkeep).toBe(20);
+  expect(upkeep).toBe(8);
   const gold = w.gold;
   run(w, 60);
   // A harbour's upkeep outweighs one small house's taxes.

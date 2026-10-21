@@ -1,17 +1,17 @@
 # Graph Report - game  (2026-10-21)
 
 ## Corpus Check
-- 62 files · ~69,544 words
+- 62 files · ~70,004 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 3)
 
 ## Summary
-- 585 nodes · 1452 edges · 34 communities (27 shown, 7 thin omitted)
+- 587 nodes · 1455 edges · 32 communities (28 shown, 4 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 9 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `99c0e9a4`
+- Built from commit: `06054f97`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -45,10 +45,8 @@
 - life.ts
 - daylight.ts
 - save.ts
-- fxaa.ts
-- minimap.ts
+- pixi.js
 - applyCamera
-- wind.ts
 - panel.ts
 
 ## God Nodes (most connected - your core abstractions)
@@ -72,13 +70,13 @@
   src/sim/world.ts → src/data/buildings.ts
 - `Production` --references--> `Terrain`  [EXTRACTED]
   src/data/buildings.ts → src/sim/map.ts
-- `showResources()` --calls--> `emptyStock()`  [EXTRACTED]
-  src/main.ts → src/sim/world.ts
+- `showResources()` --calls--> `balance()`  [EXTRACTED]
+  src/main.ts → src/sim/population.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (34 total, 7 thin omitted)
+## Communities (32 total, 4 thin omitted)
 
 ### Community 0 - "package.json"
 Cohesion: 0.07
@@ -121,8 +119,8 @@ Cohesion: 0.25
 Nodes (7): Configure Default Mode, Deactivate, Levels, More, Ponytail Help, Skills, Update
 
 ### Community 10 - "render/buildings.ts"
-Cohesion: 0.15
-Nodes (46): refresh(), AWNING_COLORS, barrel(), Box, chimneyAt(), crane(), crate(), door() (+38 more)
+Cohesion: 0.14
+Nodes (47): refresh(), AWNING_COLORS, barrel(), Box, chimneyAt(), crane(), crate(), door() (+39 more)
 
 ### Community 11 - "ponytail-audit/SKILL.md"
 Cohesion: 0.40
@@ -145,24 +143,24 @@ Cohesion: 0.21
 Nodes (12): active(), attachCameraControls(), Camera, cancel(), end(), Handlers, MAX_SCALE, MIN_SCALE (+4 more)
 
 ### Community 18 - "showPreview"
-Cohesion: 0.23
-Nodes (13): anchorFor(), buildMenu, cancel(), construction, demolishAt(), footprint(), move(), onHover() (+5 more)
+Cohesion: 0.21
+Nodes (14): anchorFor(), buildMenu, cancel(), construction, demolishAt(), footprint(), move(), onHover() (+6 more)
 
 ### Community 19 - "world.ts"
-Cohesion: 0.11
-Nodes (45): vitest, end(), CAP, CART_SPEED, coverage(), depotFor(), moveCart(), nextJob() (+37 more)
+Cohesion: 0.15
+Nodes (34): vitest, end(), CAP, CART_SPEED, coverage(), depotFor(), moveCart(), nextJob() (+26 more)
 
 ### Community 20 - "settings.ts"
 Cohesion: 0.17
 Nodes (14): Antialias, createFpsCounter(), createSettingsPanel(), DAY_CYCLE, DEFAULTS, displayWidth(), loadSettings(), LOOKS (+6 more)
 
 ### Community 21 - "map.ts"
-Cohesion: 0.10
-Nodes (44): pixi.js, drawLampPost(), drawRoads(), lampPosts(), pierBox(), setGlow(), setSun(), setWet() (+36 more)
+Cohesion: 0.09
+Nodes (51): drawLampPost(), drawRoads(), lampPosts(), pierBox(), setGlow(), setSun(), setWet(), createEffects() (+43 more)
 
 ### Community 22 - "setSpeed"
-Cohesion: 0.67
-Nodes (3): closeMenu(), openMenu(), setSpeed()
+Cohesion: 0.33
+Nodes (6): autosave(), closeMenu(), menu, openMenu(), setSpeed(), toSave()
 
 ### Community 23 - "atmosphere.ts"
 Cohesion: 0.28
@@ -173,8 +171,8 @@ Cohesion: 0.11
 Nodes (37): blit(), clamp01(), Ctx, hexRGB(), litCrown(), mix(), RGB, smooth() (+29 more)
 
 ### Community 25 - "ships.ts"
-Cohesion: 0.14
-Nodes (33): PRICES, bar(), buildingPanel(), costOf(), deselect(), harborName(), harborPanel(), icon() (+25 more)
+Cohesion: 0.13
+Nodes (35): PRICES, bar(), buildingPanel(), costOf(), deselect(), harborName(), harborPanel(), icon() (+27 more)
 
 ### Community 26 - "life.ts"
 Cohesion: 0.14
@@ -186,23 +184,27 @@ Nodes (8): AMBIENT, daylight(), DayTime, lerp(), RGB, smooth(), SUN_STEPS, sunSh
 
 ### Community 28 - "save.ts"
 Cohesion: 0.07
-Nodes (53): BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, GOOD_NAMES, Production (+45 more)
+Nodes (51): BuildingDef, BuildingId, BUILDINGS, Category, CATEGORY_NAMES, Good, GOOD_NAMES, Production (+43 more)
+
+### Community 30 - "pixi.js"
+Cohesion: 0.25
+Nodes (5): pixi.js, createFxaa(), createWind(), COLORS, createMinimap()
 
 ## Knowledge Gaps
 - **3 isolated node(s):** `eslint`, `prettier`, `typescript`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 220 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 221 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `pixi.js` connect `map.ts` to `package.json`, `wind.ts`, `main.ts`, `render/buildings.ts`, `atmosphere.ts`, `textures.ts`, `life.ts`, `fxaa.ts`, `minimap.ts`?**
+- **Why does `pixi.js` connect `pixi.js` to `package.json`, `main.ts`, `render/buildings.ts`, `map.ts`, `atmosphere.ts`, `textures.ts`, `life.ts`, `save.ts`?**
   _High betweenness centrality (0.084) - this node is a cross-community bridge._
 - **What connects `eslint`, `prettier`, `typescript` to the rest of the system?**
   _3 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._
-- **Why does `mulberry32()` connect `textures.ts` to `render/buildings.ts`, `world.ts`, `map.ts`?**
+- **Why does `mulberry32()` connect `textures.ts` to `render/buildings.ts`, `map.ts`?**
   _High betweenness centrality (0.021) - this node is a cross-community bridge._
 - **Should `Caveman Help` be split into smaller, more focused modules?**
   _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._

@@ -69,7 +69,7 @@ export const CATEGORY_NAMES: Record<Category, string> = {
 export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   harbor: {
     name: 'Kikötő',
-    upkeep: 20,
+    upkeep: 8,
     category: 'infra',
     size: 2,
     cost: { gold: 1000, wood: 8, tools: 3 },
@@ -80,7 +80,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   warehouse: {
     name: 'Raktár',
-    upkeep: 10,
+    upkeep: 5,
     category: 'infra',
     size: 2,
     cost: { gold: 400, wood: 4, tools: 2 },
@@ -91,7 +91,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   house: { name: 'Paraszt ház', category: 'housing', size: 2, cost: { gold: 0, wood: 3 } },
   lumberjack: {
     name: 'Favágó',
-    upkeep: 4,
+    upkeep: 2,
     category: 'production',
     size: 2,
     cost: { gold: 50, wood: 2 },
@@ -99,7 +99,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   fisher: {
     name: 'Halászkunyhó',
-    upkeep: 5,
+    upkeep: 2,
     category: 'production',
     size: 2,
     cost: { gold: 100, wood: 3, tools: 2 },
@@ -108,7 +108,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   sheepfarm: {
     name: 'Birkafarm',
-    upkeep: 6,
+    upkeep: 3,
     category: 'production',
     size: 2,
     cost: { gold: 150, wood: 4, tools: 1 },
@@ -116,7 +116,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   weaver: {
     name: 'Szövöde',
-    upkeep: 10,
+    upkeep: 5,
     category: 'production',
     size: 2,
     cost: { gold: 250, wood: 3, tools: 2, bricks: 2 },
@@ -124,7 +124,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   smithy: {
     name: 'Kovácsműhely',
-    upkeep: 12,
+    upkeep: 6,
     category: 'production',
     size: 2,
     cost: { gold: 300, wood: 4, bricks: 3 },
@@ -132,7 +132,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   brickworks: {
     name: 'Téglaégető',
-    upkeep: 8,
+    upkeep: 4,
     category: 'production',
     size: 2,
     cost: { gold: 200, wood: 5, tools: 1 },
@@ -141,7 +141,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   chapel: {
     name: 'Kápolna',
-    upkeep: 8,
+    upkeep: 4,
     category: 'public',
     size: 2,
     cost: { gold: 300, wood: 2, bricks: 4 },
